@@ -1,0 +1,5 @@
+node_modules/
+api/venv/
+.data/
+*.db
+api/static/
