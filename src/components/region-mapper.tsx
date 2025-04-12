@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useRef } from 'react';
 import { getLocationRegions, addLocationRegion, Region } from '@/lib/api';
 
@@ -256,9 +258,8 @@ export default function RegionMapper({ locationId, imagePath }: RegionMapperProp
     
     try {
       const lastRegion = regions[regions.length - 1];
-      const baseName = lastRegion.name.match(/^(.*?)(\d+)$/) 
-        ? lastRegion.name.match(/^(.*?)(\d+)$/)[1] 
-        : lastRegion.name;
+      const match = lastRegion.name.match(/^(.*?)(\d+)$/);
+      const baseName = match ? match[1] : lastRegion.name;
       
       const newRegions = [];
       

@@ -22,6 +22,7 @@ export interface Region {
   y: number;
   width: number;
   height: number;
+  color?: string;
 }
 
 export interface InventoryItem {
@@ -137,6 +138,7 @@ export async function addLocationRegion(locationId: number, region: {
   y: number;
   width: number;
   height: number;
+  color?: string;
 }): Promise<Region> {
   const response = await fetch(`${API_BASE_URL}/locations/${locationId}/regions`, {
     method: 'POST',

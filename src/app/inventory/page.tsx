@@ -1,5 +1,7 @@
+"use client";
+
 import React from 'react';
-import { InventoryItems } from '@/components/inventory-items';
+import InventoryItems from '@/components/inventory-items';
 
 export default function InventoryPage() {
   return (

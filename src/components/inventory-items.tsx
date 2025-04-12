@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from 'react';
 import { getInventoryItems, deleteInventoryItem, InventoryItem } from '@/lib/api';
 import Link from 'next/link';

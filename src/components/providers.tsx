@@ -1,3 +1,5 @@
+"use client";
+
 import { LanguageProvider } from '@/lib/language';
 import { ThemeProvider } from '@/components/theme-provider';
 

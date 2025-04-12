@@ -1,7 +1,9 @@
+"use client";
+
 import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { LocationManager } from '@/components/location-management';
+import LocationManagement from '@/components/location-management';
 
 export default function LocationsPage() {
   return (
@@ -11,7 +13,7 @@ export default function LocationsPage() {
       </div>
       
       <div className="bg-card rounded-lg shadow-sm p-6">
-        <LocationManager />
+        <LocationManagement />
       </div>
     </div>
   );

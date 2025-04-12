@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from 'react';
 import { getLocations, Location } from '@/lib/api';
 import Image from 'next/image';

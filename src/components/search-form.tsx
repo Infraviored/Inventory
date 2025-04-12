@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 import { searchItems, InventoryItem } from '@/lib/api';
 import Link from 'next/link';

@@ -1,4 +1,3 @@
-import { useLanguage } from '@/lib/language';
 import { Providers } from '@/components/providers';
 import { Layout } from '@/components/layout';
 import { Inter } from 'next/font/google';

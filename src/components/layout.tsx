@@ -1,3 +1,5 @@
+"use client";
+
 import { useLanguage } from '@/lib/language';
 import { ThemeToggle } from './theme-toggle';
 import { LanguageToggle } from './language-toggle';

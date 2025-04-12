@@ -1,5 +1,7 @@
+"use client";
+
 import React from 'react';
-import { SearchForm } from '@/components/search-form';
+import SearchForm from '@/components/search-form';
 
 export default function SearchPage() {
   return (

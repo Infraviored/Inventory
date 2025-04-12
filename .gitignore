@@ -1,5 +1,58 @@
+# Node.js / Next.js
 node_modules/
+.next/
+out/
+next-env.d.ts
+*.log
+.vercel
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python / Flask
 api/venv/
+__pycache__/
+api/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Data and uploads
 .data/
 *.db
 api/static/
+api/uploads/
+api/data/
+public/uploads/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build and package files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock

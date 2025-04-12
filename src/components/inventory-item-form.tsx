@@ -1,10 +1,13 @@
+"use client";
+
 import { useState, useEffect } from 'react';
-import { getLocations, getLocationRegions, Location, Region } from '@/lib/api';
-import ImageInput from './image-input';
+import { getLocations, getLocationRegions, addInventoryItem, Location, Region } from '@/lib/api';
+import { ImageInput } from './image-input';
 import LocationCarousel from './location-carousel';
+import { useRouter } from 'next/navigation';
 
 interface InventoryItemFormProps {
-  onSubmit: (formData: FormData) => Promise<void>;
+  onSubmit?: (formData: FormData) => Promise<void>;
   initialData?: {
     name: string;
     description?: string;
@@ -15,6 +18,7 @@ interface InventoryItemFormProps {
 }
 
 export default function InventoryItemForm({ onSubmit, initialData }: InventoryItemFormProps) {
+  const router = useRouter();
   const [name, setName] = useState(initialData?.name || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [quantity, setQuantity] = useState(initialData?.quantity || 1);
@@ -109,7 +113,13 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
         formData.append('image', image);
       }
       
-      await onSubmit(formData);
+      if (onSubmit) {
+        await onSubmit(formData);
+      } else {
+        // If no onSubmit provided, call the API directly
+        await addInventoryItem(formData);
+        router.push('/inventory');
+      }
       
       // Reset form after successful submission
       setName('');
@@ -269,7 +279,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
         <label className="block text-sm font-medium mb-1">
           Image (Optional)
         </label>
-        <ImageInput onImageSelected={setImage} />
+        <ImageInput onImageChange={(file) => setImage(file)} />
       </div>
       
       <div className="pt-4">

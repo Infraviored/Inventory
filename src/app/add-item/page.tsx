@@ -1,5 +1,7 @@
+"use client";
+
 import React from 'react';
-import { InventoryItemForm } from '@/components/inventory-item-form';
+import InventoryItemForm from '@/components/inventory-item-form';
 
 export default function AddItemPage() {
   return (

@@ -1,8 +1,10 @@
+"use client";
+
 import { useState, useEffect } from 'react';
 import { getLocations, addLocation, deleteLocation, Location } from '@/lib/api';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import LocationForm from './location-form';
+import { LocationForm } from './location-form';
 
 export default function LocationManagement({ parentId }: { parentId?: number }) {
   const [locations, setLocations] = useState<Location[]>([]);
@@ -89,7 +91,26 @@ export default function LocationManagement({ parentId }: { parentId?: number }) 
       {showAddForm && (
         <div className="mb-6 p-4 border rounded shadow">
           <h3 className="text-xl font-semibold mb-4">Add New Location</h3>
-          <LocationForm onSubmit={handleFormSubmit} />
+          <LocationForm parentId={parentId} onSuccess={() => {
+            setShowAddForm(false);
+            const fetchLocations = async () => {
+              try {
+                setLoading(true);
+                setError(null);
+                
+                // If parentId is provided, fetch child locations, otherwise fetch root locations
+                const data = await getLocations(parentId, parentId === undefined);
+                setLocations(data);
+              } catch (err) {
+                console.error('Error fetching locations:', err);
+                setError('Failed to fetch locations');
+              } finally {
+                setLoading(false);
+              }
+            };
+            
+            fetchLocations();
+          }} />
         </div>
       )}
 
