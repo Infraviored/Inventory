@@ -1,66 +1,57 @@
-// In-memory database with persistence via localStorage in the browser
-// This approach works in Cloudflare environment since it doesn't require file system access
+// JSON file-based database implementation
+import fs from 'fs';
+import path from 'path';
 
-// Store data in memory
-let locations = [];
-let regions = [];
-let inventoryItems = [];
+// Define data directory
+const DATA_DIR = path.join(process.cwd(), '.data');
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
-// Initialize with default data if needed
-if (typeof window !== 'undefined') {
+// Define file paths for different data types
+const LOCATIONS_FILE = path.join(DATA_DIR, 'locations.json');
+const REGIONS_FILE = path.join(DATA_DIR, 'regions.json');
+const INVENTORY_FILE = path.join(DATA_DIR, 'inventory.json');
+
+// Helper function to read JSON file
+function readJsonFile(filePath) {
   try {
-    // Load data from localStorage if available
-    const storedLocations = localStorage.getItem('locations');
-    const storedRegions = localStorage.getItem('regions');
-    const storedInventory = localStorage.getItem('inventory');
-    
-    if (storedLocations) locations = JSON.parse(storedLocations);
-    if (storedRegions) regions = JSON.parse(storedRegions);
-    if (storedInventory) inventoryItems = JSON.parse(storedInventory);
-    
-    console.log('Loaded data from localStorage:', { 
-      locations: locations.length, 
-      regions: regions.length,
-      items: inventoryItems.length
-    });
+    if (!fs.existsSync(filePath)) {
+      return [];
+    }
+    const data = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(data);
   } catch (error) {
-    console.error('Error loading data from localStorage:', error);
+    console.error(`Error reading file ${filePath}:`, error);
+    return [];
   }
 }
 
-// Helper function to save data to localStorage
-const saveToStorage = () => {
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem('locations', JSON.stringify(locations));
-      localStorage.setItem('regions', JSON.stringify(regions));
-      localStorage.setItem('inventory', JSON.stringify(inventoryItems));
-      
-      console.log('Saved data to localStorage:', { 
-        locations: locations.length, 
-        regions: regions.length, 
-        items: inventoryItems.length 
-      });
-    } catch (error) {
-      console.error('Error saving data to localStorage:', error);
-    }
-  } else {
-    console.log('Window not defined, skipping localStorage save');
+// Helper function to write JSON file
+function writeJsonFile(filePath, data) {
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error(`Error writing file ${filePath}:`, error);
+    throw error;
   }
-};
+}
 
 // Function to get all locations
 export function getLocations() {
-  return [...locations];
+  return readJsonFile(LOCATIONS_FILE);
 }
 
 // Function to get child locations
 export function getChildLocations(parentId) {
+  const locations = getLocations();
   return locations.filter(loc => loc.parentId === parentId);
 }
 
 // Function to get location by ID
 export function getLocationById(id) {
+  const locations = getLocations();
   return locations.find(loc => loc.id === id) || null;
 }
 
@@ -86,6 +77,8 @@ export function getLocationBreadcrumbs(id) {
 
 // Function to add a location
 export function addLocation(name, parentId, description, imagePath) {
+  const locations = getLocations();
+  
   // Generate a new ID
   const newId = locations.length > 0 
     ? Math.max(...locations.map(loc => loc.id)) + 1 
@@ -104,14 +97,15 @@ export function addLocation(name, parentId, description, imagePath) {
   // Add to locations array
   locations.push(newLocation);
   
-  // Save to localStorage
-  saveToStorage();
+  // Save to file
+  writeJsonFile(LOCATIONS_FILE, locations);
   
   return newId;
 }
 
 // Function to update a location
 export function updateLocation(id, name, parentId, description, imagePath) {
+  const locations = getLocations();
   const index = locations.findIndex(loc => loc.id === id);
   
   if (index === -1) {
@@ -128,29 +122,32 @@ export function updateLocation(id, name, parentId, description, imagePath) {
     updatedAt: new Date().toISOString()
   };
   
-  // Save to localStorage
-  saveToStorage();
+  // Save to file
+  writeJsonFile(LOCATIONS_FILE, locations);
   
   return true;
 }
 
 // Function to delete a location
 export function deleteLocation(id) {
-  locations = locations.filter(loc => loc.id !== id);
+  const locations = getLocations();
+  const filteredLocations = locations.filter(loc => loc.id !== id);
   
-  // Save to localStorage
-  saveToStorage();
+  // Save to file
+  writeJsonFile(LOCATIONS_FILE, filteredLocations);
   
   return true;
 }
 
 // Function to get all regions
 export function getRegions() {
-  return [...regions];
+  return readJsonFile(REGIONS_FILE);
 }
 
 // Function to add a region to a location
 export function addLocationRegion(locationId, name, x, y, width, height) {
+  const regions = getRegions();
+  
   // Generate a new ID
   const newId = regions.length > 0 
     ? Math.max(...regions.map(reg => reg.id)) + 1 
@@ -171,24 +168,27 @@ export function addLocationRegion(locationId, name, x, y, width, height) {
   // Add to regions array
   regions.push(newRegion);
   
-  // Save to localStorage
-  saveToStorage();
+  // Save to file
+  writeJsonFile(REGIONS_FILE, regions);
   
   return newId;
 }
 
 // Function to get regions for a location
 export function getLocationRegions(locationId) {
+  const regions = getRegions();
   return regions.filter(reg => reg.locationId === locationId);
 }
 
 // Function to get a specific region
 export function getRegionById(id) {
+  const regions = getRegions();
   return regions.find(reg => reg.id === id) || null;
 }
 
 // Function to update a region
 export function updateRegion(id, name, x, y, width, height) {
+  const regions = getRegions();
   const index = regions.findIndex(reg => reg.id === id);
   
   if (index === -1) {
@@ -206,26 +206,32 @@ export function updateRegion(id, name, x, y, width, height) {
     updatedAt: new Date().toISOString()
   };
   
-  // Save to localStorage
-  saveToStorage();
+  // Save to file
+  writeJsonFile(REGIONS_FILE, regions);
   
   return true;
 }
 
 // Function to delete a region
 export function deleteRegion(id) {
-  regions = regions.filter(reg => reg.id !== id);
+  const regions = getRegions();
+  const filteredRegions = regions.filter(reg => reg.id !== id);
   
-  // Save to localStorage
-  saveToStorage();
+  // Save to file
+  writeJsonFile(REGIONS_FILE, filteredRegions);
   
   return true;
 }
 
 // Function to get all inventory items
 export function getInventoryItems() {
+  const items = readJsonFile(INVENTORY_FILE);
+  
   // Enrich with location and region names
-  return inventoryItems.map(item => {
+  const locations = getLocations();
+  const regions = getRegions();
+  
+  return items.map(item => {
     const location = locations.find(loc => loc.id === item.locationId);
     const region = regions.find(reg => reg.id === item.regionId);
     
@@ -239,9 +245,11 @@ export function getInventoryItems() {
 
 // Function to add an inventory item
 export function addInventoryItem(name, description, quantity, imagePath, locationId, regionId) {
+  const items = readJsonFile(INVENTORY_FILE);
+  
   // Generate a new ID
-  const newId = inventoryItems.length > 0 
-    ? Math.max(...inventoryItems.map(item => item.id)) + 1 
+  const newId = items.length > 0 
+    ? Math.max(...items.map(item => item.id)) + 1 
     : 1;
   
   const newItem = {
@@ -257,40 +265,32 @@ export function addInventoryItem(name, description, quantity, imagePath, locatio
   };
   
   // Add to items array
-  inventoryItems.push(newItem);
+  items.push(newItem);
   
-  // Save to localStorage
-  saveToStorage();
+  // Save to file
+  writeJsonFile(INVENTORY_FILE, items);
   
   return newId;
 }
 
 // Function to get inventory item by ID
 export function getInventoryItemById(id) {
-  const item = inventoryItems.find(item => item.id === id);
-  if (!item) return null;
-  
-  const location = locations.find(loc => loc.id === item.locationId);
-  const region = regions.find(reg => reg.id === item.regionId);
-  
-  return {
-    ...item,
-    locationName: location ? location.name : null,
-    regionName: region ? region.name : null
-  };
+  const items = getInventoryItems();
+  return items.find(item => item.id === id) || null;
 }
 
 // Function to update an inventory item
 export function updateInventoryItem(id, name, description, quantity, imagePath, locationId, regionId) {
-  const index = inventoryItems.findIndex(item => item.id === id);
+  const items = readJsonFile(INVENTORY_FILE);
+  const index = items.findIndex(item => item.id === id);
   
   if (index === -1) {
     throw new Error('Item not found');
   }
   
   // Update the item
-  inventoryItems[index] = {
-    ...inventoryItems[index],
+  items[index] = {
+    ...items[index],
     name,
     description,
     quantity,
@@ -300,18 +300,19 @@ export function updateInventoryItem(id, name, description, quantity, imagePath, 
     updatedAt: new Date().toISOString()
   };
   
-  // Save to localStorage
-  saveToStorage();
+  // Save to file
+  writeJsonFile(INVENTORY_FILE, items);
   
   return true;
 }
 
 // Function to delete an inventory item
 export function deleteInventoryItem(id) {
-  inventoryItems = inventoryItems.filter(item => item.id !== id);
+  const items = readJsonFile(INVENTORY_FILE);
+  const filteredItems = items.filter(item => item.id !== id);
   
-  // Save to localStorage
-  saveToStorage();
+  // Save to file
+  writeJsonFile(INVENTORY_FILE, filteredItems);
   
   return true;
 }

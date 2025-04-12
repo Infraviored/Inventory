@@ -22,12 +22,22 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
   const [currentY, setCurrentY] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [regionName, setRegionName] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
+  // Log on mount to verify component is initialized correctly
+  useEffect(() => {
+    console.log('RegionMapper initialized with image:', imageSrc);
+    console.log('Initial regions:', initialRegions);
+  }, [imageSrc, initialRegions]);
+
   // Handle mouse down (start drawing)
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!containerRef.current || !imageRef.current) return;
+    if (!containerRef.current || !imageRef.current) {
+      console.error('Container or image ref not available');
+      return;
+    }
     
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -38,6 +48,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     setCurrentX(x);
     setCurrentY(y);
     setDrawing(true);
+    console.log(`Started drawing at (${x}, ${y})`);
   };
 
   // Handle mouse move (update rectangle)
@@ -61,9 +72,13 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     const width = Math.abs(currentX - startX);
     const height = Math.abs(currentY - startY);
     
+    console.log(`Finished drawing, size: ${width}x${height}`);
+    
     // Only show form if the rectangle has a minimum size
     if (width > 10 && height > 10) {
       setShowForm(true);
+    } else {
+      console.log('Rectangle too small, ignoring');
     }
   };
 
@@ -91,7 +106,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     e.preventDefault();
     
     if (!regionName.trim()) {
-      alert('Please enter a region name');
+      setError('Please enter a region name');
       return;
     }
     
@@ -112,21 +127,34 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     setRegions(updatedRegions);
     setRegionName('');
     setShowForm(false);
+    setError(null);
+    
+    console.log('Added new region:', newRegion);
+    console.log('Updated regions:', updatedRegions);
   };
 
   const handleRemoveRegion = (index: number) => {
     const updatedRegions = [...regions];
+    const removedRegion = updatedRegions[index];
     updatedRegions.splice(index, 1);
     setRegions(updatedRegions);
+    console.log('Removed region:', removedRegion);
   };
 
   const handleComplete = () => {
+    console.log('Completing region mapping with:', regions);
     onComplete(regions);
   };
 
   return (
     <div className="space-y-4 border rounded-md p-4 bg-muted/50">
       <h3 className="font-medium">Regionen definieren</h3>
+      
+      {error && (
+        <div className="p-2 bg-red-100 text-red-700 rounded-md text-sm">
+          {error}
+        </div>
+      )}
       
       <div 
         ref={containerRef} 
@@ -141,6 +169,10 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
           src={imageSrc}
           alt="Image to define regions on"
           className="max-w-full h-auto"
+          onError={() => {
+            console.error('Failed to load image:', imageSrc);
+            setError('Failed to load image. Please try again with a different image.');
+          }}
         />
         
         {/* Drawing rectangle */}

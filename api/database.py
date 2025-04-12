@@ -3,6 +3,7 @@ import os
 import json
 from datetime import datetime
 from pathlib import Path
+import sys
 
 # Ensure data directory exists
 DATA_DIR = Path('data')
@@ -17,24 +18,46 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_db_connection():
     """Create a database connection and return it"""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
+    except sqlite3.Error as e:
+        print(f"SQLite error opening database {DB_PATH}: {e}", file=sys.stderr)
+        raise
 
 def init_db():
     """Initialize the database with schema"""
-    conn = get_db_connection()
-    
-    # Read schema from migration file
-    with open('migrations/0001_initial.sql', 'r') as f:
-        schema = f.read()
-    
-    # Execute schema
-    conn.executescript(schema)
-    conn.commit()
-    conn.close()
-    
-    print("Database initialized successfully")
+    try:
+        conn = get_db_connection()
+        
+        # Check if the tables already exist
+        cursor = conn.cursor()
+        tables = cursor.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        
+        if tables and len(tables) > 0:
+            print(f"Database already initialized with tables: {', '.join([t[0] for t in tables])}")
+            return
+        
+        # Read schema from migration file
+        migration_path = Path('migrations/0001_initial.sql')
+        if not migration_path.exists():
+            raise FileNotFoundError(f"Migration file not found: {migration_path}")
+            
+        print(f"Reading schema from {migration_path}")
+        with open(migration_path, 'r') as f:
+            schema = f.read()
+        
+        # Execute schema
+        print("Executing schema...")
+        conn.executescript(schema)
+        conn.commit()
+        conn.close()
+        
+        print(f"Database initialized successfully at {DB_PATH}")
+    except Exception as e:
+        print(f"Error initializing database: {e}", file=sys.stderr)
+        raise
 
 # Location functions
 def get_locations(parent_id=None, root_only=False):

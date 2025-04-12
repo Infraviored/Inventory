@@ -2,43 +2,54 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile } from 'fs/promises';
 import path from 'path';
 import fs from 'fs';
-import { 
-  getLocationById, 
-  updateLocation, 
-  deleteLocation 
-} from '@/lib/db';
 import { generateUniqueFilename } from '@/lib/utils';
 
+// API Base URL
+const API_BASE_URL = 'http://localhost:5000/api';
+
+// Ensure uploads directory exists
 const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(params.id);
-    const location = getLocationById(id);
-    
-    if (!location) {
+    const locationId = parseInt(params.id);
+
+    if (isNaN(locationId)) {
       return NextResponse.json(
-        { error: 'Location not found' },
-        { status: 404 }
+        { error: 'Invalid location ID' },
+        { status: 400 }
       );
     }
     
-    return NextResponse.json({
-      id: location.id,
-      name: location.name,
-      description: location.description,
-      parentId: location.parent_id,
-      imagePath: location.image_path ? `/uploads/${location.image_path}` : null,
-      createdAt: location.created_at,
-      updatedAt: location.updated_at
-    });
-  } catch (error) {
-    console.error('Error fetching location:', error);
+    // Call Flask backend
+    const url = `${API_BASE_URL}/locations/${locationId}`;
+    console.log('Calling Flask API:', url);
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        return NextResponse.json(
+          { error: 'Location not found' },
+          { status: 404 }
+        );
+      }
+      
+      throw new Error(`Flask API error: ${response.status}`);
+    }
+    
+    const location = await response.json();
+    return NextResponse.json(location);
+  } catch (error: any) {
+    console.error('Error fetching location from Flask API:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch location' },
+      { error: `Failed to fetch location: ${error.message || 'Unknown error'}` },
       { status: 500 }
     );
   }
@@ -49,55 +60,42 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(params.id);
-    const formData = await request.formData();
-    const name = formData.get('name') as string;
-    const description = formData.get('description') as string;
-    const parentIdStr = formData.get('parentId') as string;
-    const parentId = parentIdStr ? parseInt(parentIdStr) : null;
-    const image = formData.get('image') as File;
-    
-    const existingLocation = getLocationById(id);
-    
-    if (!existingLocation) {
+    const locationId = parseInt(params.id);
+
+    if (isNaN(locationId)) {
       return NextResponse.json(
-        { error: 'Location not found' },
-        { status: 404 }
+        { error: 'Invalid location ID' },
+        { status: 400 }
       );
     }
     
-    let imagePath = existingLocation.image_path;
+    const formData = await request.formData();
+    // Create a new FormData to send to Flask
+    const flaskFormData = new FormData();
     
-    if (image) {
-      // Delete old image if it exists
-      if (imagePath && fs.existsSync(path.join(UPLOADS_DIR, imagePath))) {
-        fs.unlinkSync(path.join(UPLOADS_DIR, imagePath));
-      }
-      
-      const uniqueFilename = generateUniqueFilename(image.name);
-      const buffer = Buffer.from(await image.arrayBuffer());
-      
-      await writeFile(path.join(UPLOADS_DIR, uniqueFilename), buffer);
-      imagePath = uniqueFilename;
+    // Copy all fields from the request formData
+    for (const [key, value] of formData.entries()) {
+      flaskFormData.append(key, value);
     }
     
-    updateLocation(id, name, parentId, description || null, imagePath);
-    
-    const updatedLocation = getLocationById(id);
-    
-    return NextResponse.json({
-      id: updatedLocation.id,
-      name: updatedLocation.name,
-      description: updatedLocation.description,
-      parentId: updatedLocation.parent_id,
-      imagePath: updatedLocation.image_path ? `/uploads/${updatedLocation.image_path}` : null,
-      createdAt: updatedLocation.created_at,
-      updatedAt: updatedLocation.updated_at
+    // Call Flask backend
+    console.log(`Updating location ID ${locationId} in Flask API`);
+    const response = await fetch(`${API_BASE_URL}/locations/${locationId}`, {
+      method: 'PUT',
+      body: flaskFormData,
     });
-  } catch (error) {
-    console.error('Error updating location:', error);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Flask API error: ${response.status} - ${errorText}`);
+    }
+    
+    const updatedLocation = await response.json();
+    return NextResponse.json(updatedLocation);
+  } catch (error: any) {
+    console.error('Error updating location via Flask API:', error);
     return NextResponse.json(
-      { error: 'Failed to update location' },
+      { error: `Failed to update location: ${error.message || 'Unknown error'}` },
       { status: 500 }
     );
   }
@@ -108,29 +106,31 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(params.id);
-    
-    const existingLocation = getLocationById(id);
-    
-    if (!existingLocation) {
+    const locationId = parseInt(params.id);
+
+    if (isNaN(locationId)) {
       return NextResponse.json(
-        { error: 'Location not found' },
-        { status: 404 }
+        { error: 'Invalid location ID' },
+        { status: 400 }
       );
     }
     
-    // Delete associated image if it exists
-    if (existingLocation.image_path && fs.existsSync(path.join(UPLOADS_DIR, existingLocation.image_path))) {
-      fs.unlinkSync(path.join(UPLOADS_DIR, existingLocation.image_path));
+    // Call Flask backend
+    console.log(`Deleting location ID ${locationId} from Flask API`);
+    const response = await fetch(`${API_BASE_URL}/locations/${locationId}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Flask API error: ${response.status} - ${errorText}`);
     }
     
-    deleteLocation(id);
-    
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting location:', error);
+  } catch (error: any) {
+    console.error('Error deleting location via Flask API:', error);
     return NextResponse.json(
-      { error: 'Failed to delete location' },
+      { error: `Failed to delete location: ${error.message || 'Unknown error'}` },
       { status: 500 }
     );
   }

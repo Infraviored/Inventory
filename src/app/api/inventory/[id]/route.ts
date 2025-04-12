@@ -1,50 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
 import path from 'path';
 import fs from 'fs';
-import { 
-  getInventoryItemById, 
-  updateInventoryItem, 
-  deleteInventoryItem,
-  deleteItemTags,
-  addItemTag
-} from '@/lib/db';
-import { generateUniqueFilename, extractTags } from '@/lib/utils';
+import { generateUniqueFilename } from '@/lib/utils';
 
 const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// API Base URL
+const API_BASE_URL = 'http://localhost:5000/api';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(params.id);
-    const item = getInventoryItemById(id);
-    
-    if (!item) {
+    const itemId = parseInt(params.id);
+
+    if (isNaN(itemId)) {
       return NextResponse.json(
-        { error: 'Inventory item not found' },
-        { status: 404 }
+        { error: 'Invalid item ID' },
+        { status: 400 }
       );
     }
     
-    return NextResponse.json({
-      id: item.id,
-      name: item.name,
-      description: item.description,
-      quantity: item.quantity,
-      imagePath: item.image_path ? `/uploads/${item.image_path}` : null,
-      locationId: item.location_id,
-      locationName: item.location_name,
-      regionId: item.region_id,
-      regionName: item.region_name,
-      createdAt: item.created_at,
-      updatedAt: item.updated_at
-    });
-  } catch (error) {
-    console.error('Error fetching inventory item:', error);
+    // Call Flask backend
+    const url = `${API_BASE_URL}/inventory/${itemId}`;
+    console.log('Calling Flask API:', url);
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        return NextResponse.json(
+          { error: 'Inventory item not found' },
+          { status: 404 }
+        );
+      }
+      
+      throw new Error(`Flask API error: ${response.status}`);
+    }
+    
+    const item = await response.json();
+    return NextResponse.json(item);
+  } catch (error: any) {
+    console.error('Error fetching inventory item from Flask API:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch inventory item' },
+      { error: `Failed to fetch inventory item: ${error.message || 'Unknown error'}` },
       { status: 500 }
     );
   }
@@ -55,78 +58,42 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(params.id);
-    const formData = await request.formData();
-    const name = formData.get('name') as string;
-    const description = formData.get('description') as string;
-    const quantityStr = formData.get('quantity') as string;
-    const quantity = parseInt(quantityStr) || 1;
-    const locationIdStr = formData.get('locationId') as string;
-    const locationId = locationIdStr ? parseInt(locationIdStr) : null;
-    const regionIdStr = formData.get('regionId') as string;
-    const regionId = regionIdStr ? parseInt(regionIdStr) : null;
-    const image = formData.get('image') as File;
-    
-    const existingItem = getInventoryItemById(id);
-    
-    if (!existingItem) {
+    const itemId = parseInt(params.id);
+
+    if (isNaN(itemId)) {
       return NextResponse.json(
-        { error: 'Inventory item not found' },
-        { status: 404 }
+        { error: 'Invalid item ID' },
+        { status: 400 }
       );
     }
     
-    let imagePath = existingItem.image_path;
+    const formData = await request.formData();
+    // Create a new FormData to send to Flask
+    const flaskFormData = new FormData();
     
-    if (image) {
-      // Delete old image if it exists
-      if (imagePath && fs.existsSync(path.join(UPLOADS_DIR, imagePath))) {
-        fs.unlinkSync(path.join(UPLOADS_DIR, imagePath));
-      }
-      
-      const uniqueFilename = generateUniqueFilename(image.name);
-      const buffer = Buffer.from(await image.arrayBuffer());
-      
-      await writeFile(path.join(UPLOADS_DIR, uniqueFilename), buffer);
-      imagePath = uniqueFilename;
+    // Copy all fields from the request formData
+    for (const [key, value] of formData.entries()) {
+      flaskFormData.append(key, value);
     }
     
-    updateInventoryItem(
-      id,
-      name,
-      description || null,
-      quantity,
-      imagePath,
-      locationId,
-      regionId
-    );
-    
-    // Update tags
-    deleteItemTags(id);
-    const tags = extractTags(name, description);
-    for (const tag of tags) {
-      addItemTag(id, tag);
-    }
-    
-    const updatedItem = getInventoryItemById(id);
-    
-    return NextResponse.json({
-      id: updatedItem.id,
-      name: updatedItem.name,
-      description: updatedItem.description,
-      quantity: updatedItem.quantity,
-      imagePath: updatedItem.image_path ? `/uploads/${updatedItem.image_path}` : null,
-      locationId: updatedItem.location_id,
-      locationName: updatedItem.location_name,
-      regionId: updatedItem.region_id,
-      regionName: updatedItem.region_name,
-      createdAt: updatedItem.created_at,
-      updatedAt: updatedItem.updated_at
+    // Call Flask backend
+    console.log(`Updating inventory item ID ${itemId} in Flask API`);
+    const response = await fetch(`${API_BASE_URL}/inventory/${itemId}`, {
+      method: 'PUT',
+      body: flaskFormData,
     });
-  } catch (error) {
-    console.error('Error updating inventory item:', error);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Flask API error: ${response.status} - ${errorText}`);
+    }
+    
+    const updatedItem = await response.json();
+    return NextResponse.json(updatedItem);
+  } catch (error: any) {
+    console.error('Error updating inventory item via Flask API:', error);
     return NextResponse.json(
-      { error: 'Failed to update inventory item' },
+      { error: `Failed to update inventory item: ${error.message || 'Unknown error'}` },
       { status: 500 }
     );
   }
@@ -137,33 +104,31 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(params.id);
-    
-    const existingItem = getInventoryItemById(id);
-    
-    if (!existingItem) {
+    const itemId = parseInt(params.id);
+
+    if (isNaN(itemId)) {
       return NextResponse.json(
-        { error: 'Inventory item not found' },
-        { status: 404 }
+        { error: 'Invalid item ID' },
+        { status: 400 }
       );
     }
     
-    // Delete associated image if it exists
-    if (existingItem.image_path && fs.existsSync(path.join(UPLOADS_DIR, existingItem.image_path))) {
-      fs.unlinkSync(path.join(UPLOADS_DIR, existingItem.image_path));
+    // Call Flask backend
+    console.log(`Deleting inventory item ID ${itemId} from Flask API`);
+    const response = await fetch(`${API_BASE_URL}/inventory/${itemId}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Flask API error: ${response.status} - ${errorText}`);
     }
     
-    // Delete tags
-    deleteItemTags(id);
-    
-    // Delete item
-    deleteInventoryItem(id);
-    
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting inventory item:', error);
+  } catch (error: any) {
+    console.error('Error deleting inventory item via Flask API:', error);
     return NextResponse.json(
-      { error: 'Failed to delete inventory item' },
+      { error: `Failed to delete inventory item: ${error.message || 'Unknown error'}` },
       { status: 500 }
     );
   }

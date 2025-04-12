@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  getLocationRegions,
-  addLocationRegion
-} from '@/lib/memory-db';
+
+// API Base URL
+const API_BASE_URL = 'http://localhost:5000/api';
 
 export async function GET(
   request: NextRequest,
@@ -10,14 +9,30 @@ export async function GET(
 ) {
   try {
     const locationId = parseInt(params.id);
+
+    if (isNaN(locationId)) {
+      return NextResponse.json(
+        { error: 'Invalid location ID' },
+        { status: 400 }
+      );
+    }
     
-    const regions = getLocationRegions(locationId);
+    // Call Flask backend
+    const url = `${API_BASE_URL}/locations/${locationId}/regions`;
+    console.log('Calling Flask API for regions:', url);
     
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`Flask API error: ${response.status}`);
+    }
+    
+    const regions = await response.json();
     return NextResponse.json(regions);
-  } catch (error) {
-    console.error('Error fetching regions:', error);
+  } catch (error: any) {
+    console.error('Error fetching regions from Flask API:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch regions' },
+      { error: `Failed to fetch regions: ${error.message || 'Unknown error'}` },
       { status: 500 }
     );
   }
@@ -29,32 +44,38 @@ export async function POST(
 ) {
   try {
     const locationId = parseInt(params.id);
+
+    if (isNaN(locationId)) {
+      return NextResponse.json(
+        { error: 'Invalid location ID' },
+        { status: 400 }
+      );
+    }
+    
+    // Get data from request
     const data = await request.json();
     
-    const { name, x, y, width, height } = data;
+    // Call Flask backend
+    console.log(`Creating region for location ID ${locationId} in Flask API`);
+    const response = await fetch(`${API_BASE_URL}/locations/${locationId}/regions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
     
-    const regionId = addLocationRegion(
-      locationId,
-      name,
-      x,
-      y,
-      width,
-      height
-    );
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Flask API error: ${response.status} - ${errorText}`);
+    }
     
-    return NextResponse.json({
-      id: regionId,
-      locationId,
-      name,
-      x,
-      y,
-      width,
-      height
-    }, { status: 201 });
-  } catch (error) {
-    console.error('Error creating region:', error);
+    const newRegion = await response.json();
+    return NextResponse.json(newRegion, { status: 201 });
+  } catch (error: any) {
+    console.error('Error creating region via Flask API:', error);
     return NextResponse.json(
-      { error: 'Failed to create region' },
+      { error: `Failed to create region: ${error.message || 'Unknown error'}` },
       { status: 500 }
     );
   }

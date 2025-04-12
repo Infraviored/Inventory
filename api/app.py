@@ -228,28 +228,68 @@ def get_regions_route(location_id):
 @app.route('/api/locations/<int:location_id>/regions', methods=['POST'])
 def add_region_route(location_id):
     try:
-        data = request.json
+        print(f"Received region POST request for location {location_id}")
         
-        name = data.get('name')
-        x = data.get('x')
-        y = data.get('y')
-        width = data.get('width')
-        height = data.get('height')
+        # Check if location exists
+        location = get_location_by_id(location_id)
+        if not location:
+            print(f"Error: Location with ID {location_id} not found")
+            return jsonify({"error": f"Location with ID {location_id} not found"}), 404
         
-        region_id = add_location_region(location_id, name, x, y, width, height)
+        # Get region data from request
+        if request.is_json:
+            data = request.json
+            print(f"Received JSON data: {data}")
+        else:
+            print("Error: Request must be JSON")
+            return jsonify({"error": "Request must be JSON"}), 400
         
-        return jsonify({
-            'id': region_id,
-            'locationId': location_id,
-            'name': name,
-            'x': x,
-            'y': y,
-            'width': width,
-            'height': height
-        }), 201
+        # Validate required fields
+        required_fields = ['name', 'x', 'y', 'width', 'height']
+        for field in required_fields:
+            if field not in data:
+                print(f"Error: Missing required field '{field}'")
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+        
+        # Extract values
+        name = data['name']
+        x = data['x']
+        y = data['y']
+        width = data['width']
+        height = data['height']
+        
+        # Add region to database
+        try:
+            region_id = add_location_region(location_id, name, x, y, width, height)
+            print(f"Region created successfully with ID: {region_id}")
+        except Exception as dbErr:
+            print(f"Database error adding region: {dbErr}")
+            return jsonify({"error": f"Database error: {str(dbErr)}"}), 500
+        
+        # Get newly created region
+        new_region = get_region_by_id(region_id)
+        if not new_region:
+            print(f"Error: Failed to retrieve newly created region with ID {region_id}")
+            return jsonify({"error": "Region was created but could not be retrieved"}), 500
+        
+        # Return the region
+        response = {
+            'id': new_region['id'],
+            'locationId': new_region['location_id'],
+            'name': new_region['name'],
+            'x': new_region['x_coord'],
+            'y': new_region['y_coord'],
+            'width': new_region['width'],
+            'height': new_region['height'],
+            'createdAt': new_region['created_at'],
+            'updatedAt': new_region['updated_at']
+        }
+        
+        print(f"Returning newly created region: {response}")
+        return jsonify(response), 201
     except Exception as e:
-        print(f"Error creating region: {e}")
-        return jsonify({"error": "Failed to create region"}), 500
+        print(f"Unhandled error creating region: {e}")
+        return jsonify({"error": f"Failed to create region: {str(e)}"}), 500
 
 # Inventory routes
 @app.route('/api/inventory', methods=['GET'])
@@ -291,43 +331,91 @@ def get_inventory_route():
 @app.route('/api/inventory', methods=['POST'])
 def add_inventory_route():
     try:
+        print("Received inventory POST request")
+        
+        # Validate that required fields are present
+        if 'name' not in request.form:
+            print("Error: Missing required field: name")
+            return jsonify({"error": "Missing required field: name"}), 400
+        
         name = request.form.get('name')
         description = request.form.get('description')
-        quantity_str = request.form.get('quantity')
-        quantity = int(quantity_str) if quantity_str else 1
-        location_id_str = request.form.get('locationId')
-        location_id = int(location_id_str) if location_id_str else None
-        region_id_str = request.form.get('regionId')
-        region_id = int(region_id_str) if region_id_str else None
+        quantityStr = request.form.get('quantity')
+        quantity = int(quantityStr) if quantityStr else 1
+        locationIdStr = request.form.get('locationId')
+        locationId = int(locationIdStr) if locationIdStr else None
+        regionIdStr = request.form.get('regionId')
+        regionId = int(regionIdStr) if regionIdStr else None
         
-        image_path = None
+        # Validate location existence if provided
+        if locationId is not None:
+            location = get_location_by_id(locationId)
+            if not location:
+                print(f"Error: Location with ID {locationId} not found")
+                return jsonify({"error": f"Location with ID {locationId} not found"}), 404
+        
+        # Validate region existence if provided
+        if regionId is not None:
+            region = get_region_by_id(regionId)
+            if not region:
+                print(f"Error: Region with ID {regionId} not found")
+                return jsonify({"error": f"Region with ID {regionId} not found"}), 404
+        
+        imagePath = None
         if 'image' in request.files:
             image = request.files['image']
             if image.filename:
-                filename = generate_unique_filename(secure_filename(image.filename))
-                image_path = filename
-                image.save(UPLOADS_DIR / filename)
+                try:
+                    filename = generate_unique_filename(secure_filename(image.filename))
+                    imagePath = filename
+                    image.save(UPLOADS_DIR / filename)
+                except Exception as imgErr:
+                    print(f"Error saving image: {imgErr}")
+                    return jsonify({"error": f"Error saving image: {str(imgErr)}"}), 500
         
-        item_id = add_inventory_item(name, description, quantity, image_path, location_id, region_id)
+        # Add the item to the database
+        try:
+            itemId = add_inventory_item(
+                name, 
+                description or None, 
+                quantity, 
+                imagePath, 
+                locationId, 
+                regionId
+            )
+            print(f"Item created successfully with ID: {itemId}")
+        except Exception as dbErr:
+            print(f"Database error adding item: {dbErr}")
+            return jsonify({"error": f"Database error: {str(dbErr)}"}), 500
         
-        new_item = get_inventory_item_by_id(item_id)
+        # Get the newly created item
+        newItem = get_inventory_item_by_id(itemId)
+        if not newItem:
+            print(f"Error: Failed to retrieve newly created item with ID {itemId}")
+            return jsonify({"error": "Item was created but could not be retrieved"}), 500
         
-        return jsonify({
-            'id': new_item['id'],
-            'name': new_item['name'],
-            'description': new_item['description'],
-            'quantity': new_item['quantity'],
-            'imagePath': f"/uploads/{new_item['image_path']}" if new_item['image_path'] else None,
-            'locationId': new_item['location_id'],
-            'locationName': new_item['location_name'],
-            'regionId': new_item['region_id'],
-            'regionName': new_item['region_name'],
-            'createdAt': new_item['created_at'],
-            'updatedAt': new_item['updated_at']
-        }), 201
+        # Return the item with proper JSON formatting
+        response = {
+            'id': newItem['id'],
+            'name': newItem['name'],
+            'description': newItem['description'],
+            'quantity': newItem['quantity'],
+            'imagePath': f"/uploads/{newItem['image_path']}" if newItem['image_path'] else None,
+            'locationId': newItem['location_id'],
+            'locationName': newItem['location_name'],
+            'regionId': newItem['region_id'],
+            'regionName': newItem['region_name'],
+            'createdAt': newItem['created_at'],
+            'updatedAt': newItem['updated_at']
+        }
+        
+        print(f"Returning newly created item: {response}")
+        return jsonify(response), 201
     except Exception as e:
-        print(f"Error creating inventory item: {e}")
-        return jsonify({"error": "Failed to create inventory item"}), 500
+        print(f"Unhandled error creating inventory item: {e}")
+        return jsonify(
+            {"error": f"Failed to create inventory item: {str(e)}"}
+        ), 500
 
 @app.route('/api/inventory/<int:item_id>', methods=['GET'])
 def get_inventory_item_route(item_id):

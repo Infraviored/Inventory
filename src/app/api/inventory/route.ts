@@ -1,41 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
-import path from 'path';
-import { 
-  getInventoryItems, 
-  addInventoryItem,
-  getInventoryItemById
-} from '@/lib/memory-db';
-import { generateUniqueFilename } from '@/lib/utils';
-import fs from 'fs';
 
-const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
+// API Base URL
+const API_BASE_URL = 'http://localhost:5000/api';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const locationId = searchParams.get('locationId');
-    const regionId = searchParams.get('regionId');
     
-    let items = getInventoryItems();
-    
-    // Filter by location and region if provided
-    if (locationId) {
-      items = items.filter(item => item.locationId === parseInt(locationId));
+    // Build query string passing along any parameters
+    const params = new URLSearchParams();
+    for (const [key, value] of searchParams.entries()) {
+      params.append(key, value);
     }
     
-    if (regionId) {
-      items = items.filter(item => item.regionId === parseInt(regionId));
+    // Call Flask backend
+    const url = `${API_BASE_URL}/inventory${params.toString() ? `?${params.toString()}` : ''}`;
+    console.log('Calling Flask API:', url);
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`Flask API error: ${response.status}`);
     }
     
+    const items = await response.json();
     return NextResponse.json(items);
-  } catch (error) {
-    console.error('Error fetching inventory items:', error);
+  } catch (error: any) {
+    console.error('Error fetching inventory from Flask API:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch inventory items' },
+      { error: `Failed to fetch inventory items: ${error.message || 'Unknown error'}` },
       { status: 500 }
     );
   }
@@ -44,54 +37,32 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const name = formData.get('name') as string;
-    const description = formData.get('description') as string;
-    const quantityStr = formData.get('quantity') as string;
-    const quantity = parseInt(quantityStr) || 1;
-    const locationIdStr = formData.get('locationId') as string;
-    const locationId = locationIdStr ? parseInt(locationIdStr) : null;
-    const regionIdStr = formData.get('regionId') as string;
-    const regionId = regionIdStr ? parseInt(regionIdStr) : null;
-    const image = formData.get('image') as File;
+    // Create a new FormData to send to Flask
+    const flaskFormData = new FormData();
     
-    let imagePath = null;
-    
-    if (image) {
-      const uniqueFilename = generateUniqueFilename(image.name);
-      const buffer = Buffer.from(await image.arrayBuffer());
-      
-      await writeFile(path.join(UPLOADS_DIR, uniqueFilename), buffer);
-      imagePath = uniqueFilename;
+    // Copy all fields from the request formData
+    for (const [key, value] of formData.entries()) {
+      flaskFormData.append(key, value);
     }
     
-    const itemId = addInventoryItem(
-      name, 
-      description || null, 
-      quantity, 
-      imagePath, 
-      locationId, 
-      regionId
-    );
+    // Call Flask backend
+    console.log('Posting new inventory item to Flask API');
+    const response = await fetch(`${API_BASE_URL}/inventory`, {
+      method: 'POST',
+      body: flaskFormData,
+    });
     
-    const newItem = getInventoryItemById(itemId);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Flask API error: ${response.status} - ${errorText}`);
+    }
     
-    return NextResponse.json({
-      id: newItem.id,
-      name: newItem.name,
-      description: newItem.description,
-      quantity: newItem.quantity,
-      imagePath: newItem.imagePath ? `/uploads/${newItem.imagePath}` : null,
-      locationId: newItem.locationId,
-      locationName: newItem.locationName,
-      regionId: newItem.regionId,
-      regionName: newItem.regionName,
-      createdAt: newItem.createdAt,
-      updatedAt: newItem.updatedAt
-    }, { status: 201 });
-  } catch (error) {
-    console.error('Error creating inventory item:', error);
+    const newItem = await response.json();
+    return NextResponse.json(newItem, { status: 201 });
+  } catch (error: any) {
+    console.error('Error creating inventory item via Flask API:', error);
     return NextResponse.json(
-      { error: 'Failed to create inventory item' },
+      { error: `Failed to create inventory item: ${error.message || 'Unknown error'}` },
       { status: 500 }
     );
   }

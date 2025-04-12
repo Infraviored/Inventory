@@ -1,168 +1,131 @@
-# Home Inventory System
+# Home Inventory System - Technical Architecture
 
-Eine Anwendung zur Verwaltung von Haushaltsgegenständen und deren Standorten.
+## System Architecture
 
-## Funktionen
+The Home Inventory System follows a client-server architecture with clear separation of concerns:
 
-- Erfassung von Objekten und ihren Standorten (z.B. Schraubensortierer → Wohnzimmer, Schrank 1, Schublade 3)
-- Verwaltung von Lagerorten mit Bildern und Regionen
-- Fuzzy-Suche für Objekte (z.B. "Metallstab" findet "Alurohr")
-- Vorbereitung für Microcontroller-Integration zur LED-Aktivierung am richtigen Ort
-- Modernes Frontend mit Dark Mode und Tailwind CSS
+### Frontend (Client-side)
+- **Framework**: Next.js (React) with App Router
+- **UI Components**: Custom components built on top of a lightweight UI library
+- **State Management**: React hooks for local state and context for shared state
+- **Styling**: Tailwind CSS for utility-first styling approach
+- **API Integration**: Custom API client with TypeScript interfaces
+- **Image Processing**: Client-side image cropping and manipulation before upload
+- **Rendering Strategy**: Hybrid rendering with:
+  - Server Components for initial page loads
+  - Client Components for interactive elements
+  - Static generation for stable content
 
-## Technologien
+### Backend (Server-side)
+- **API Server**: Python Flask RESTful API
+- **Cross-Origin Support**: Flask-CORS middleware for frontend access
+- **File Handling**: Werkzeug utilities for secure file uploads
+- **Error Handling**: Comprehensive try-catch blocks with detailed error responses
+- **Response Format**: Standardized JSON responses with appropriate HTTP status codes
 
-- **Frontend**: Next.js mit Tailwind CSS
-- **Backend**: Python Flask API
-- **Datenbank**: SQLite
-- **Bildverwaltung**: Unterstützung für Kamera-Aufnahmen und Regionen-Mapping
+### Communication Pattern
+- **API Communication**: HTTP REST API with JSON payloads
+- **Data Validation**: Server-side validation of all incoming requests
+- **Error Handling**: Structured error responses with descriptive messages
+- **File Transfers**: Multi-part form data for image uploads
 
-## Installation
+## Data Storage
 
-### Voraussetzungen
+### Database Design
+- **Database Engine**: SQLite (file-based relational database)
+- **Schema Management**: SQL migration scripts in the `/migrations` directory
+- **Data Location**: Database file stored in the `/data` directory
+- **Initialization**: Automatic database initialization on first run
 
-- Node.js (>= 16.0.0)
-- Python 3 (>= 3.8)
-- npm oder pnpm
+### Database Schema
+The database consists of the following tables:
 
-### Schritte
+1. **locations**
+   - Storage for physical locations (rooms, furniture, containers)
+   - Hierarchical structure using parent_id self-reference
+   - Supports image paths for visual representation
+   - Tracks creation and modification timestamps
 
-1. Repository klonen:
-   ```
-   git clone https://github.com/Infraviored/Inventory.git
-   cd Inventory
-   ```
+2. **location_regions**
+   - Defines rectangular regions within location images
+   - Stores coordinates (x, y, width, height) for visual mapping
+   - Links to parent location via foreign key
+   - Used for precise item placement visualization
 
-2. Frontend-Abhängigkeiten installieren:
-   ```
-   npm install
-   ```
+3. **inventory_items**
+   - Core storage for inventory objects
+   - Links to locations and regions via foreign keys
+   - Stores metadata (name, description, quantity)
+   - Tracks image paths for visual representation
 
-3. Python-Umgebung einrichten:
-   ```
-   cd api
-   python -m venv venv
-   source venv/bin/activate  # Unter Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   cd ..
-   ```
+4. **item_tags**
+   - Auxiliary table for improved search functionality
+   - Stores normalized tags extracted from item names and descriptions
+   - Enables efficient fuzzy searching capabilities
 
-4. Anwendung starten:
-   ```
-   chmod +x start.sh  # Stellt sicher, dass das Startskript ausführbar ist
-   ./start.sh
-   ```
+### Data Persistence Strategies
+The system uses a single backend persistence strategy:
 
-Das Startskript installiert automatisch alle benötigten Abhängigkeiten, richtet die Datenbank ein und startet sowohl das Frontend als auch das Backend.
+1. **Backend Persistence**
+   - Primary storage via SQLite database file located in `/api/data/inventory.db`
+   - File system storage for uploaded images (in `/public/uploads`)
+   - Database initialized and migrated automatically on first run
 
-## Nutzung
+2. **Frontend-to-Backend Communication**
+   - All data operations go through Next.js API routes that proxy to the Flask backend
+   - No client-side data caching/persistence
+   - Single source of truth in the SQLite database
 
-Nach dem Start ist die Anwendung unter folgenden URLs verfügbar:
+3. **Image Storage**
+   - Images stored as files in the filesystem
+   - Unique filename generation with UUID to prevent collisions
+   - Path references stored in the database
+   - Automatic cleanup of orphaned images during deletion operations
 
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:5000/api
+**Note**: A backup of the previous implementation using localStorage is maintained in the `backup_local_storage` directory, which can be reinstated if needed for alternative deployment scenarios.
 
-### Lagerorte verwalten
+## Deployment
 
-1. Gehe zu "Lagerorte"
-2. Klicke auf "Neuen Lagerort hinzufügen"
-3. Gib einen Namen ein und lade optional ein Bild hoch
-4. Klicke auf "Speichern"
+The application is designed for flexible deployment options:
 
-### Regionen definieren
+### Development Environment
+- **Start Script**: `start.sh` for local development
+  - Automatically initializes database if needed
+  - Starts Flask backend on port 5000
+  - Starts Next.js frontend on port 3000
+  - Provides clean shutdown of both services
 
-1. Wähle einen Lagerort aus
-2. Klicke auf "Region hinzufügen"
-3. Zeichne ein Rechteck auf dem Bild und benenne es (z.B. "Fach 1")
-4. Speichere die Region
+### Reset and Fresh Start
+- **Reset Script**: `reset-and-start.sh`
+  - Stops any running instances
+  - Deletes the existing database
+  - Initializes a fresh database instance
+  - Starts both backend and frontend servers
 
-### Objekte hinzufügen
+### Production Deployment Options
+1. **Traditional Server**
+   - Backend: Flask behind a production WSGI server (Gunicorn/uWSGI)
+   - Frontend: Next.js with static export or Node.js server
+   - Database: SQLite or upgrade to PostgreSQL for higher concurrency
 
-1. Gehe zu "Objekt hinzufügen"
-2. Gib einen Namen ein
-3. Wähle optional einen Lagerort und eine Region aus
-4. Füge optional ein Bild, eine Beschreibung und die Anzahl hinzu
-5. Klicke auf "Speichern"
+2. **Containerized Deployment**
+   - Docker containers for isolated environments
+   - Docker Compose for multi-container orchestration
+   - Volume mounts for persistent data storage
 
-### Objekte suchen
+3. **Serverless Options**
+   - Frontend: Deploy to Vercel or Netlify
+   - Backend: API routes within Next.js or separate serverless functions
+   - Database: Migrate to a managed database service
 
-1. Gehe zur Suchseite
-2. Gib einen Suchbegriff ein (z.B. "Schraubenzieher" oder "Metall")
-3. Die Ergebnisse werden nach Relevanz sortiert angezeigt
+### Environment Considerations
+- **Data Persistence**: Ensure database file and uploads directory are properly persisted
+- **Network Configuration**: Configure CORS settings for production domains
+- **Security**: Implement appropriate access controls and authentication in production
+- **Scaling**: Consider database migration for high-traffic scenarios
 
-## API-Endpunkte
-
-### Lagerorte
-
-- `GET /api/locations` - Liste aller Lagerorte
-- `POST /api/locations` - Neuen Lagerort erstellen
-- `GET /api/locations/{id}` - Details eines Lagerorts
-- `PUT /api/locations/{id}` - Lagerort aktualisieren
-- `DELETE /api/locations/{id}` - Lagerort löschen
-- `GET /api/locations/{id}/breadcrumbs` - Pfad zu einem Lagerort
-
-### Regionen
-
-- `GET /api/locations/{id}/regions` - Regionen eines Lagerorts
-- `POST /api/locations/{id}/regions` - Neue Region erstellen
-
-### Inventar
-
-- `GET /api/inventory` - Liste aller Inventarobjekte
-- `POST /api/inventory` - Neues Inventarobjekt erstellen
-- `GET /api/inventory/{id}` - Details eines Inventarobjekts
-- `PUT /api/inventory/{id}` - Inventarobjekt aktualisieren
-- `DELETE /api/inventory/{id}` - Inventarobjekt löschen
-
-### Suche
-
-- `GET /api/search?q={query}` - Fuzzy-Suche nach Objekten
-
-### LED-Steuerung
-
-- `GET /api/led/{id}` - Informationen für LED-Aktivierung
-
-## Microcontroller-Integration
-
-Die Anwendung ist vorbereitet für die Integration mit Microcontrollern zur LED-Steuerung. Der Endpunkt `/api/led/{id}` liefert die notwendigen Informationen, um eine LED am richtigen Ort zu aktivieren.
-
-## Entwicklung
-
-### API-Tests
-
-Zum Testen der API-Endpunkte kann das mitgelieferte Testskript verwendet werden:
-
-```
-cd api
-python test_api.py
-```
-
-### Datenbankschema
-
-Das Datenbankschema wird automatisch beim ersten Start der Anwendung erstellt. Es umfasst folgende Tabellen:
-
-- `locations` - Lagerorte (Räume, Schränke, etc.)
-- `location_regions` - Regionen innerhalb von Lagerorten
-- `inventory_items` - Inventarobjekte
-- `item_tags` - Tags für die Fuzzy-Suche
-
-### Ordnerstruktur
-
-```
-Inventory/
-├── api/                  # Python Flask Backend
-│   ├── app.py            # Hauptanwendung und API-Endpunkte
-│   ├── database.py       # Datenbankfunktionen
-│   ├── requirements.txt  # Python-Abhängigkeiten
-│   └── test_api.py       # API-Testskript
-├── migrations/           # Datenbankmigrationen
-│   └── 0001_initial.sql  # Initiales Datenbankschema
-├── src/                  # Next.js Frontend
-│   ├── app/              # Next.js Seiten und API-Routen
-│   ├── components/       # React-Komponenten
-│   ├── hooks/            # React-Hooks
-│   └── lib/              # Hilfsfunktionen und API-Client
-├── start.sh              # Startskript für die Anwendung
-├── package.json          # Node.js-Abhängigkeiten
-└── README.md             # Diese Dokumentation
-```
+## System Requirements
+- **Server**: Any system capable of running Python 3.8+ and Node.js 16+
+- **Storage**: Minimal - starts at ~10MB for the application, scales with data volume
+- **Memory**: 512MB minimum, 1GB+ recommended for concurrent operations
+- **Network**: Standard HTTP/HTTPS ports (80/443) for production deployments

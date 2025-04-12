@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  searchItems
-} from '@/lib/memory-db';
+
+// API Base URL
+const API_BASE_URL = 'http://localhost:5000/api';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,19 +12,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
     
-    const results = searchItems(query);
+    // Call Flask backend
+    const url = `${API_BASE_URL}/search?q=${encodeURIComponent(query)}`;
+    console.log('Calling Flask API for search:', url);
     
-    // Transform the data to include full image paths
-    const transformedResults = results.map(item => ({
-      ...item,
-      imagePath: item.imagePath ? `/uploads/${item.imagePath}` : null,
-    }));
+    const response = await fetch(url);
     
-    return NextResponse.json(transformedResults);
-  } catch (error) {
-    console.error('Error searching items:', error);
+    if (!response.ok) {
+      throw new Error(`Flask API error: ${response.status}`);
+    }
+    
+    const results = await response.json();
+    return NextResponse.json(results);
+  } catch (error: any) {
+    console.error('Error searching items via Flask API:', error);
     return NextResponse.json(
-      { error: 'Failed to search items' },
+      { error: `Failed to search items: ${error.message || 'Unknown error'}` },
       { status: 500 }
     );
   }

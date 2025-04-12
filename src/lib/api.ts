@@ -1,7 +1,6 @@
 // API client for the Python Flask backend
-
-// Base URL for API requests
-const API_BASE_URL = 'http://localhost:5000/api';
+// All requests go through Next.js API routes which then proxy to the Flask backend
+// This keeps URLs relative and simplifies deployment
 
 // Types
 export interface Location {
@@ -41,7 +40,7 @@ export interface InventoryItem {
 
 // Locations API
 export async function getLocations(parentId?: number, rootOnly?: boolean): Promise<Location[]> {
-  let url = `${API_BASE_URL}/locations`;
+  let url = `/api/locations`;
   const params = new URLSearchParams();
   
   if (parentId !== undefined) {
@@ -59,63 +58,81 @@ export async function getLocations(parentId?: number, rootOnly?: boolean): Promi
   const response = await fetch(url);
   
   if (!response.ok) {
-    throw new Error('Failed to fetch locations');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
   
   return response.json();
 }
 
 export async function getLocationById(id: number): Promise<Location> {
-  const response = await fetch(`${API_BASE_URL}/locations/${id}`);
+  const response = await fetch(`/api/locations/${id}`);
   
   if (!response.ok) {
-    throw new Error('Failed to fetch location');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
   
   return response.json();
 }
 
 export async function addLocation(formData: FormData): Promise<Location> {
-  const response = await fetch(`${API_BASE_URL}/locations`, {
+  const response = await fetch(`/api/locations`, {
     method: 'POST',
     body: formData,
   });
   
   if (!response.ok) {
-    throw new Error('Failed to create location');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
   
   return response.json();
 }
 
 export async function updateLocation(id: number, formData: FormData): Promise<Location> {
-  const response = await fetch(`${API_BASE_URL}/locations/${id}`, {
+  const response = await fetch(`/api/locations/${id}`, {
     method: 'PUT',
     body: formData,
   });
   
   if (!response.ok) {
-    throw new Error('Failed to update location');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
   
   return response.json();
 }
 
 export async function deleteLocation(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/locations/${id}`, {
+  const response = await fetch(`/api/locations/${id}`, {
     method: 'DELETE',
   });
   
   if (!response.ok) {
-    throw new Error('Failed to delete location');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
 }
 
 export async function getLocationBreadcrumbs(id: number): Promise<{id: number, name: string}[]> {
-  const response = await fetch(`${API_BASE_URL}/locations/${id}/breadcrumbs`);
+  const response = await fetch(`/api/locations/${id}/breadcrumbs`);
   
   if (!response.ok) {
-    throw new Error('Failed to fetch breadcrumbs');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
   
   return response.json();
@@ -123,10 +140,13 @@ export async function getLocationBreadcrumbs(id: number): Promise<{id: number, n
 
 // Regions API
 export async function getLocationRegions(locationId: number): Promise<Region[]> {
-  const response = await fetch(`${API_BASE_URL}/locations/${locationId}/regions`);
+  const response = await fetch(`/api/locations/${locationId}/regions`);
   
   if (!response.ok) {
-    throw new Error('Failed to fetch regions');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
   
   return response.json();
@@ -140,7 +160,7 @@ export async function addLocationRegion(locationId: number, region: {
   height: number;
   color?: string;
 }): Promise<Region> {
-  const response = await fetch(`${API_BASE_URL}/locations/${locationId}/regions`, {
+  const response = await fetch(`/api/locations/${locationId}/regions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -149,7 +169,10 @@ export async function addLocationRegion(locationId: number, region: {
   });
   
   if (!response.ok) {
-    throw new Error('Failed to create region');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
   
   return response.json();
@@ -157,7 +180,7 @@ export async function addLocationRegion(locationId: number, region: {
 
 // Inventory API
 export async function getInventoryItems(locationId?: number, regionId?: number): Promise<InventoryItem[]> {
-  let url = `${API_BASE_URL}/inventory`;
+  let url = `/api/inventory`;
   const params = new URLSearchParams();
   
   if (locationId !== undefined) {
@@ -175,64 +198,82 @@ export async function getInventoryItems(locationId?: number, regionId?: number):
   const response = await fetch(url);
   
   if (!response.ok) {
-    throw new Error('Failed to fetch inventory items');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
   
   return response.json();
 }
 
 export async function getInventoryItemById(id: number): Promise<InventoryItem> {
-  const response = await fetch(`${API_BASE_URL}/inventory/${id}`);
+  const response = await fetch(`/api/inventory/${id}`);
   
   if (!response.ok) {
-    throw new Error('Failed to fetch inventory item');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
   
   return response.json();
 }
 
 export async function addInventoryItem(formData: FormData): Promise<InventoryItem> {
-  const response = await fetch(`${API_BASE_URL}/inventory`, {
+  const response = await fetch(`/api/inventory`, {
     method: 'POST',
     body: formData,
   });
   
   if (!response.ok) {
-    throw new Error('Failed to create inventory item');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
   
   return response.json();
 }
 
 export async function updateInventoryItem(id: number, formData: FormData): Promise<InventoryItem> {
-  const response = await fetch(`${API_BASE_URL}/inventory/${id}`, {
+  const response = await fetch(`/api/inventory/${id}`, {
     method: 'PUT',
     body: formData,
   });
   
   if (!response.ok) {
-    throw new Error('Failed to update inventory item');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
   
   return response.json();
 }
 
 export async function deleteInventoryItem(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/inventory/${id}`, {
+  const response = await fetch(`/api/inventory/${id}`, {
     method: 'DELETE',
   });
   
   if (!response.ok) {
-    throw new Error('Failed to delete inventory item');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
 }
 
 // Search API
 export async function searchItems(query: string): Promise<InventoryItem[]> {
-  const response = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}`);
+  const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
   
   if (!response.ok) {
-    throw new Error('Failed to search items');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
   
   return response.json();
@@ -245,10 +286,13 @@ export async function getLedData(itemId: number): Promise<{
   region: { id: number; name: string; x: number; y: number; width: number; height: number };
   ledPosition: { x: number; y: number };
 }> {
-  const response = await fetch(`${API_BASE_URL}/led/${itemId}`);
+  const response = await fetch(`/api/led/${itemId}`);
   
   if (!response.ok) {
-    throw new Error('Failed to fetch LED data');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+    console.error('API request failed:', errorMessage);
+    throw new Error(errorMessage);
   }
   
   return response.json();

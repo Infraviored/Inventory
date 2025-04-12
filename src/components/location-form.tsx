@@ -49,22 +49,29 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
       
       // Add regions data if available
       if (regions.length > 0) {
+        console.log('Saving location with regions:', regions);
         formData.append('regions', JSON.stringify(regions));
       }
       
+      console.log('Submitting location form data');
       const response = await fetch('/api/locations', {
         method: 'POST',
         body: formData,
       });
       
       if (!response.ok) {
-        throw new Error('Failed to create location');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+        console.error('API request failed:', errorMessage);
+        throw new Error(errorMessage);
       }
       
       const data = await response.json();
+      console.log('Location created successfully:', data);
       
       // If we have regions, save them
       if (regions.length > 0 && data.id) {
+        console.log(`Saving ${regions.length} regions for location ID ${data.id}`);
         const regionsPromises = regions.map(region => 
           fetch(`/api/locations/${data.id}/regions`, {
             method: 'POST',
@@ -75,7 +82,15 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
           })
         );
         
-        await Promise.all(regionsPromises);
+        const regionsResults = await Promise.all(regionsPromises);
+        
+        // Check if any region creation failed
+        const failedRegions = regionsResults.filter(res => !res.ok);
+        if (failedRegions.length > 0) {
+          console.error(`${failedRegions.length} regions failed to save`);
+        } else {
+          console.log('All regions saved successfully');
+        }
       }
       
       setName('');
@@ -100,11 +115,15 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
 
   const handleDefineRegions = () => {
     if (imagePreview) {
+      console.log('Opening RegionMapper with image:', imagePreview);
       setShowRegionMapper(true);
+    } else {
+      console.error('Cannot define regions: No image available');
     }
   };
 
   const handleRegionsComplete = (definedRegions: Array<{name: string, x: number, y: number, width: number, height: number}>) => {
+    console.log('Regions defined:', definedRegions);
     setRegions(definedRegions);
     setShowRegionMapper(false);
   };

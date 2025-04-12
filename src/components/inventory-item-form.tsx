@@ -117,8 +117,15 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
         await onSubmit(formData);
       } else {
         // If no onSubmit provided, call the API directly
-        await addInventoryItem(formData);
-        router.push('/inventory');
+        try {
+          const response = await addInventoryItem(formData);
+          console.log('Item added successfully:', response);
+          router.push('/inventory');
+        } catch (apiError: any) {
+          console.error('API Error:', apiError);
+          setError(`Failed to add item: ${apiError.message || 'Unknown error'}`);
+          return;
+        }
       }
       
       // Reset form after successful submission
@@ -130,7 +137,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
       setImage(null);
     } catch (err) {
       console.error('Error submitting form:', err);
-      setError('Failed to submit form');
+      setError(`Failed to submit form: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setSubmitting(false);
     }
