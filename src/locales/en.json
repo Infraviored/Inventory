@@ -1,0 +1,87 @@
+{
+  "app": {
+    "title": "Homeventory",
+    "tagline": "Manage your home inventory with ease"
+  },
+  "navigation": {
+    "home": "Home",
+    "inventory": "Inventory",
+    "locations": "Locations",
+    "addItem": "Add Item",
+    "search": "Search"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "loading": "Loading...",
+    "noResults": "No results found",
+    "required": "Required",
+    "optional": "Optional",
+    "error": "Error",
+    "success": "Success",
+    "confirm": "Confirm",
+    "activateLed": "Activate LED"
+  },
+  "locations": {
+    "title": "Locations",
+    "addNew": "Add New Location",
+    "name": "Name",
+    "description": "Description",
+    "type": "Type",
+    "image": "Image",
+    "noLocations": "No locations found. Add a new location to get started.",
+    "deleteConfirm": "Are you sure you want to delete this location? This will also delete all child locations and items stored here.",
+    "types": {
+      "room": "Room",
+      "cabinet": "Cabinet",
+      "drawer": "Drawer",
+      "shelf": "Shelf",
+      "box": "Box",
+      "other": "Other",
+      "selectType": "Select type..."
+    }
+  },
+  "regions": {
+    "title": "Region Mapper",
+    "addNew": "Add Region",
+    "name": "Name this region",
+    "instructions": "Click and drag on the image to define a region. After drawing, you'll be prompted to name the region.",
+    "snapping": "Regions will automatically snap to nearby edges for precise alignment.",
+    "duplicateMode": "Use Duplicate Mode to create multiple regions of the same size.",
+    "multiRegion": "Use the + 3 Regions buttons to quickly create 3 identical regions in a row or column.",
+    "definedRegions": "Defined Regions",
+    "noRegions": "No regions defined yet. Draw a region on the image to get started.",
+    "duplicateModeOn": "Duplicate Mode: ON",
+    "duplicateModeOff": "Duplicate Mode: OFF",
+    "add3Vertical": "+ 3 Vertical Regions",
+    "add3Horizontal": "+ 3 Horizontal Regions",
+    "color": "Color:"
+  },
+  "inventory": {
+    "title": "Inventory Items",
+    "addNew": "Add New Item",
+    "name": "Name",
+    "description": "Description",
+    "quantity": "Quantity",
+    "location": "Location",
+    "region": "Region",
+    "image": "Image",
+    "noItems": "No items found. Add a new item to get started.",
+    "deleteConfirm": "Are you sure you want to delete this item?",
+    "selectLocation": "-- Select Location --",
+    "selectRegion": "-- Select Region --",
+    "noRegionsDefined": "No regions defined for this location. Add regions first.",
+    "switchToCarousel": "Switch to Carousel",
+    "switchToDropdown": "Switch to Dropdown"
+  },
+  "search": {
+    "title": "Search Inventory",
+    "placeholder": "Search for items (e.g., screwdriver, metal rod)",
+    "searching": "Searching...",
+    "noResults": "No items found matching \"{query}\".",
+    "results": "Search Results"
+  }
+}

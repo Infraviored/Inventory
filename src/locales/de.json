@@ -1,0 +1,87 @@
+{
+  "app": {
+    "title": "Homeventory",
+    "tagline": "Verwalten Sie Ihr Hausinventar mit Leichtigkeit"
+  },
+  "navigation": {
+    "home": "Startseite",
+    "inventory": "Inventar",
+    "locations": "Lagerorte",
+    "addItem": "Objekt hinzufügen",
+    "search": "Suche"
+  },
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "view": "Ansehen",
+    "loading": "Wird geladen...",
+    "noResults": "Keine Ergebnisse gefunden",
+    "required": "Erforderlich",
+    "optional": "Optional",
+    "error": "Fehler",
+    "success": "Erfolg",
+    "confirm": "Bestätigen",
+    "activateLed": "LED aktivieren"
+  },
+  "locations": {
+    "title": "Lagerorte",
+    "addNew": "Neuen Lagerort hinzufügen",
+    "name": "Name",
+    "description": "Beschreibung",
+    "type": "Typ",
+    "image": "Bild",
+    "noLocations": "Keine Lagerorte gefunden. Fügen Sie einen neuen Lagerort hinzu, um zu beginnen.",
+    "deleteConfirm": "Sind Sie sicher, dass Sie diesen Lagerort löschen möchten? Dies löscht auch alle untergeordneten Lagerorte und dort gelagerten Objekte.",
+    "types": {
+      "room": "Raum",
+      "cabinet": "Schrank",
+      "drawer": "Schublade",
+      "shelf": "Regal",
+      "box": "Box",
+      "other": "Sonstiges",
+      "selectType": "Bitte wählen..."
+    }
+  },
+  "regions": {
+    "title": "Region Mapper",
+    "addNew": "Region hinzufügen",
+    "name": "Region benennen",
+    "instructions": "Klicken und ziehen Sie auf dem Bild, um eine Region zu definieren. Nach dem Zeichnen werden Sie aufgefordert, die Region zu benennen.",
+    "snapping": "Regionen werden automatisch an nahe gelegenen Kanten ausgerichtet, um eine präzise Ausrichtung zu ermöglichen.",
+    "duplicateMode": "Verwenden Sie den Duplikationsmodus, um mehrere Regionen gleicher Größe zu erstellen.",
+    "multiRegion": "Verwenden Sie die + 3 Regionen-Schaltflächen, um schnell 3 identische Regionen in einer Reihe oder Spalte zu erstellen.",
+    "definedRegions": "Definierte Regionen",
+    "noRegions": "Noch keine Regionen definiert. Zeichnen Sie eine Region auf dem Bild, um zu beginnen.",
+    "duplicateModeOn": "Duplikationsmodus: AN",
+    "duplicateModeOff": "Duplikationsmodus: AUS",
+    "add3Vertical": "+ 3 Vertikale Regionen",
+    "add3Horizontal": "+ 3 Horizontale Regionen",
+    "color": "Farbe:"
+  },
+  "inventory": {
+    "title": "Inventarobjekte",
+    "addNew": "Neues Objekt hinzufügen",
+    "name": "Name",
+    "description": "Beschreibung",
+    "quantity": "Anzahl",
+    "location": "Lagerort",
+    "region": "Region",
+    "image": "Bild",
+    "noItems": "Keine Objekte gefunden. Fügen Sie ein neues Objekt hinzu, um zu beginnen.",
+    "deleteConfirm": "Sind Sie sicher, dass Sie dieses Objekt löschen möchten?",
+    "selectLocation": "-- Lagerort auswählen --",
+    "selectRegion": "-- Region auswählen --",
+    "noRegionsDefined": "Keine Regionen für diesen Lagerort definiert. Fügen Sie zuerst Regionen hinzu.",
+    "switchToCarousel": "Zu Karussell wechseln",
+    "switchToDropdown": "Zu Dropdown wechseln"
+  },
+  "search": {
+    "title": "Inventar durchsuchen",
+    "placeholder": "Nach Objekten suchen (z.B. Schraubenzieher, Metallstab)",
+    "searching": "Suche läuft...",
+    "noResults": "Keine Objekte gefunden, die \"{query}\" entsprechen.",
+    "results": "Suchergebnisse"
+  }
+}
