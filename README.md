@@ -29,8 +29,8 @@ Eine Anwendung zur Verwaltung von Haushaltsgegenständen und deren Standorten.
 
 1. Repository klonen:
    ```
-   git clone <repository-url>
-   cd home-inventory
+   git clone https://github.com/Infraviored/Inventory.git
+   cd Inventory
    ```
 
 2. Frontend-Abhängigkeiten installieren:
@@ -49,8 +49,11 @@ Eine Anwendung zur Verwaltung von Haushaltsgegenständen und deren Standorten.
 
 4. Anwendung starten:
    ```
+   chmod +x start.sh  # Stellt sicher, dass das Startskript ausführbar ist
    ./start.sh
    ```
+
+Das Startskript installiert automatisch alle benötigten Abhängigkeiten, richtet die Datenbank ein und startet sowohl das Frontend als auch das Backend.
 
 ## Nutzung
 
@@ -142,3 +145,24 @@ Das Datenbankschema wird automatisch beim ersten Start der Anwendung erstellt. E
 - `location_regions` - Regionen innerhalb von Lagerorten
 - `inventory_items` - Inventarobjekte
 - `item_tags` - Tags für die Fuzzy-Suche
+
+### Ordnerstruktur
+
+```
+Inventory/
+├── api/                  # Python Flask Backend
+│   ├── app.py            # Hauptanwendung und API-Endpunkte
+│   ├── database.py       # Datenbankfunktionen
+│   ├── requirements.txt  # Python-Abhängigkeiten
+│   └── test_api.py       # API-Testskript
+├── migrations/           # Datenbankmigrationen
+│   └── 0001_initial.sql  # Initiales Datenbankschema
+├── src/                  # Next.js Frontend
+│   ├── app/              # Next.js Seiten und API-Routen
+│   ├── components/       # React-Komponenten
+│   ├── hooks/            # React-Hooks
+│   └── lib/              # Hilfsfunktionen und API-Client
+├── start.sh              # Startskript für die Anwendung
+├── package.json          # Node.js-Abhängigkeiten
+└── README.md             # Diese Dokumentation
+```
