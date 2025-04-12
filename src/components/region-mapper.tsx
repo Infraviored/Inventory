@@ -17,6 +17,9 @@ export default function RegionMapper({ locationId, imagePath }: RegionMapperProp
   const [currentY, setCurrentY] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [regionName, setRegionName] = useState('');
+  const [lastCreatedRegion, setLastCreatedRegion] = useState<{width: number, height: number} | null>(null);
+  const [duplicateMode, setDuplicateMode] = useState(false);
+  const [regionColor, setRegionColor] = useState('#3b82f6'); // Default blue color
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
@@ -63,8 +66,14 @@ export default function RegionMapper({ locationId, imagePath }: RegionMapperProp
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    setCurrentX(x);
-    setCurrentY(y);
+    if (duplicateMode && lastCreatedRegion) {
+      // In duplicate mode, maintain the size of the last created region
+      setCurrentX(x);
+      setCurrentY(y);
+    } else {
+      setCurrentX(x);
+      setCurrentY(y);
+    }
   };
 
   // Handle mouse up (finish drawing)
@@ -73,8 +82,19 @@ export default function RegionMapper({ locationId, imagePath }: RegionMapperProp
     
     setDrawing(false);
     
+    let width, height;
+    
+    if (duplicateMode && lastCreatedRegion) {
+      // Use the dimensions from the last created region
+      width = lastCreatedRegion.width;
+      height = lastCreatedRegion.height;
+    } else {
+      width = Math.abs(currentX - startX);
+      height = Math.abs(currentY - startY);
+    }
+    
     // Only show form if the rectangle has a minimum size
-    if (Math.abs(currentX - startX) > 10 && Math.abs(currentY - startY) > 10) {
+    if (width > 10 && height > 10) {
       setShowForm(true);
     }
   };
@@ -83,16 +103,28 @@ export default function RegionMapper({ locationId, imagePath }: RegionMapperProp
   const getRectStyle = () => {
     if (!drawing && !showForm) return { display: 'none' };
     
-    const left = Math.min(startX, currentX);
-    const top = Math.min(startY, currentY);
-    const width = Math.abs(currentX - startX);
-    const height = Math.abs(currentY - startY);
+    let left, top, width, height;
+    
+    if (duplicateMode && lastCreatedRegion) {
+      // In duplicate mode, use the last region's dimensions but position at current mouse
+      left = startX;
+      top = startY;
+      width = lastCreatedRegion.width;
+      height = lastCreatedRegion.height;
+    } else {
+      left = Math.min(startX, currentX);
+      top = Math.min(startY, currentY);
+      width = Math.abs(currentX - startX);
+      height = Math.abs(currentY - startY);
+    }
     
     return {
       left: `${left}px`,
       top: `${top}px`,
       width: `${width}px`,
       height: `${height}px`,
+      borderColor: regionColor,
+      backgroundColor: `${regionColor}33`, // Add transparency
     };
   };
 
@@ -106,13 +138,23 @@ export default function RegionMapper({ locationId, imagePath }: RegionMapperProp
     }
     
     try {
-      const left = Math.min(startX, currentX);
-      const top = Math.min(startY, currentY);
-      const width = Math.abs(currentX - startX);
-      const height = Math.abs(currentY - startY);
+      let left, top, width, height;
       
-      // Snap to nearby regions (simple implementation)
-      const snapThreshold = 10;
+      if (duplicateMode && lastCreatedRegion) {
+        // In duplicate mode, use the last region's dimensions but position at current mouse
+        left = startX;
+        top = startY;
+        width = lastCreatedRegion.width;
+        height = lastCreatedRegion.height;
+      } else {
+        left = Math.min(startX, currentX);
+        top = Math.min(startY, currentY);
+        width = Math.abs(currentX - startX);
+        height = Math.abs(currentY - startY);
+      }
+      
+      // Snap to nearby regions (improved implementation)
+      const snapThreshold = 15; // Increased threshold for better snapping
       let snappedLeft = left;
       let snappedTop = top;
       let snappedRight = left + width;
@@ -123,6 +165,14 @@ export default function RegionMapper({ locationId, imagePath }: RegionMapperProp
         if (Math.abs(left - region.x) < snapThreshold) {
           snappedLeft = region.x;
         }
+        // Snap right edge to left edge of existing region
+        if (Math.abs(left + width - region.x) < snapThreshold) {
+          snappedRight = region.x;
+        }
+        // Snap left edge to right edge of existing region
+        if (Math.abs(left - (region.x + region.width)) < snapThreshold) {
+          snappedLeft = region.x + region.width;
+        }
         // Snap right edge
         if (Math.abs(left + width - (region.x + region.width)) < snapThreshold) {
           snappedRight = region.x + region.width;
@@ -130,6 +180,14 @@ export default function RegionMapper({ locationId, imagePath }: RegionMapperProp
         // Snap top edge
         if (Math.abs(top - region.y) < snapThreshold) {
           snappedTop = region.y;
+        }
+        // Snap bottom edge to top edge of existing region
+        if (Math.abs(top + height - region.y) < snapThreshold) {
+          snappedBottom = region.y;
+        }
+        // Snap top edge to bottom edge of existing region
+        if (Math.abs(top - (region.y + region.height)) < snapThreshold) {
+          snappedTop = region.y + region.height;
         }
         // Snap bottom edge
         if (Math.abs(top + height - (region.y + region.height)) < snapThreshold) {
@@ -140,17 +198,38 @@ export default function RegionMapper({ locationId, imagePath }: RegionMapperProp
       const snappedWidth = snappedRight - snappedLeft;
       const snappedHeight = snappedBottom - snappedTop;
       
+      // Store the dimensions for potential duplication
+      setLastCreatedRegion({
+        width: snappedWidth,
+        height: snappedHeight
+      });
+      
       const newRegion = await addLocationRegion(locationId, {
         name: regionName,
         x: snappedLeft,
         y: snappedTop,
         width: snappedWidth,
         height: snappedHeight,
+        color: regionColor.replace('#', '')
       });
       
       setRegions([...regions, newRegion]);
       setShowForm(false);
-      setRegionName('');
+      
+      // If we're in duplicate mode, keep the name for the next region
+      // and increment any number at the end
+      if (duplicateMode) {
+        const match = regionName.match(/^(.*?)(\d+)$/);
+        if (match) {
+          const baseName = match[1];
+          const number = parseInt(match[2], 10);
+          setRegionName(`${baseName}${number + 1}`);
+        } else {
+          setRegionName(regionName);
+        }
+      } else {
+        setRegionName('');
+      }
     } catch (err) {
       console.error('Error creating region:', err);
       setError('Failed to create region');
@@ -163,11 +242,97 @@ export default function RegionMapper({ locationId, imagePath }: RegionMapperProp
     setRegionName('');
   };
 
+  // Toggle duplicate mode
+  const toggleDuplicateMode = () => {
+    setDuplicateMode(!duplicateMode);
+  };
+
+  // Create multiple regions in a row or column
+  const createMultipleRegions = async (count: number, direction: 'horizontal' | 'vertical') => {
+    if (!lastCreatedRegion) {
+      alert('Please create at least one region first');
+      return;
+    }
+    
+    try {
+      const lastRegion = regions[regions.length - 1];
+      const baseName = lastRegion.name.match(/^(.*?)(\d+)$/) 
+        ? lastRegion.name.match(/^(.*?)(\d+)$/)[1] 
+        : lastRegion.name;
+      
+      const newRegions = [];
+      
+      for (let i = 1; i <= count; i++) {
+        let x = lastRegion.x;
+        let y = lastRegion.y;
+        
+        if (direction === 'horizontal') {
+          x = lastRegion.x + (lastRegion.width * i);
+        } else {
+          y = lastRegion.y + (lastRegion.height * i);
+        }
+        
+        const newRegion = await addLocationRegion(locationId, {
+          name: `${baseName}${regions.length + i}`,
+          x,
+          y,
+          width: lastRegion.width,
+          height: lastRegion.height,
+          color: regionColor.replace('#', '')
+        });
+        
+        newRegions.push(newRegion);
+      }
+      
+      setRegions([...regions, ...newRegions]);
+    } catch (err) {
+      console.error('Error creating multiple regions:', err);
+      setError('Failed to create multiple regions');
+    }
+  };
+
   return (
     <div className="container mx-auto p-4">
       <h2 className="text-2xl font-bold mb-4">Region Mapper</h2>
       
       {error && <div className="p-4 text-red-500 mb-4">Error: {error}</div>}
+      
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button
+          onClick={toggleDuplicateMode}
+          className={`px-3 py-1 rounded text-white ${duplicateMode ? 'bg-green-600' : 'bg-blue-500'}`}
+        >
+          {duplicateMode ? 'Duplicate Mode: ON' : 'Duplicate Mode: OFF'}
+        </button>
+        
+        {lastCreatedRegion && (
+          <>
+            <button
+              onClick={() => createMultipleRegions(3, 'vertical')}
+              className="px-3 py-1 rounded bg-purple-500 text-white"
+            >
+              + 3 Vertikale Regionen
+            </button>
+            <button
+              onClick={() => createMultipleRegions(3, 'horizontal')}
+              className="px-3 py-1 rounded bg-purple-500 text-white"
+            >
+              + 3 Horizontale Regionen
+            </button>
+          </>
+        )}
+        
+        <div className="flex items-center">
+          <label htmlFor="regionColor" className="mr-2 text-sm">Farbe:</label>
+          <input
+            type="color"
+            id="regionColor"
+            value={regionColor}
+            onChange={(e) => setRegionColor(e.target.value)}
+            className="w-8 h-8 p-0 border-0"
+          />
+        </div>
+      </div>
       
       <div 
         ref={containerRef}
@@ -190,15 +355,18 @@ export default function RegionMapper({ locationId, imagePath }: RegionMapperProp
         {regions.map((region) => (
           <div
             key={region.id}
-            className="absolute border-2 border-blue-500 bg-blue-200 bg-opacity-30"
+            className="absolute border-2 bg-opacity-30"
             style={{
               left: `${region.x}px`,
               top: `${region.y}px`,
               width: `${region.width}px`,
               height: `${region.height}px`,
+              borderColor: region.color ? `#${region.color}` : '#3b82f6',
+              backgroundColor: region.color ? `#${region.color}33` : '#3b82f633',
             }}
           >
-            <span className="absolute bottom-0 left-0 bg-blue-500 text-white text-xs px-1">
+            <span className="absolute bottom-0 left-0 text-white text-xs px-1"
+                  style={{ backgroundColor: region.color ? `#${region.color}` : '#3b82f6' }}>
               {region.name}
             </span>
           </div>
@@ -206,7 +374,7 @@ export default function RegionMapper({ locationId, imagePath }: RegionMapperProp
         
         {/* Drawing rectangle */}
         <div
-          className="absolute border-2 border-green-500 bg-green-200 bg-opacity-30"
+          className="absolute border-2 bg-opacity-30"
           style={getRectStyle()}
         />
       </div>
@@ -243,7 +411,9 @@ export default function RegionMapper({ locationId, imagePath }: RegionMapperProp
       <div className="mb-4">
         <h3 className="text-lg font-semibold mb-2">Instructions</h3>
         <p className="mb-2">Click and drag on the image to define a region. After drawing, you'll be prompted to name the region.</p>
-        <p>Regions will automatically snap to nearby edges for precise alignment.</p>
+        <p className="mb-2">Regions will automatically snap to nearby edges for precise alignment.</p>
+        <p className="mb-2">Use <strong>Duplicate Mode</strong> to create multiple regions of the same size.</p>
+        <p>Use the <strong>+ 3 Regionen</strong> buttons to quickly create 3 identical regions in a row or column.</p>
       </div>
       
       <div>
