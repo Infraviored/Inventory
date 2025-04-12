@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getLocations, getLocationRegions, Location, Region } from '@/lib/api';
 import ImageInput from './image-input';
+import LocationCarousel from './location-carousel';
 
 interface InventoryItemFormProps {
   onSubmit: (formData: FormData) => Promise<void>;
@@ -26,6 +27,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useCarouselView, setUseCarouselView] = useState(false);
 
   // Fetch locations
   useEffect(() => {
@@ -124,6 +126,10 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
     }
   };
 
+  const handleLocationSelect = (id: number) => {
+    setLocationId(id);
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && <div className="p-3 bg-red-100 text-red-700 rounded">{error}</div>}
@@ -170,22 +176,41 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
       </div>
       
       <div>
-        <label htmlFor="location" className="block text-sm font-medium mb-1">
-          Location (Optional)
-        </label>
-        <select
-          id="location"
-          value={locationId || ''}
-          onChange={(e) => setLocationId(e.target.value ? parseInt(e.target.value) : undefined)}
-          className="w-full border rounded px-3 py-2"
-        >
-          <option value="">-- Select Location --</option>
-          {locations.map((location) => (
-            <option key={location.id} value={location.id}>
-              {location.name}
-            </option>
-          ))}
-        </select>
+        <div className="flex justify-between items-center mb-1">
+          <label htmlFor="location" className="block text-sm font-medium">
+            Location (Optional)
+          </label>
+          <button
+            type="button"
+            onClick={() => setUseCarouselView(!useCarouselView)}
+            className="text-sm text-blue-500 hover:text-blue-700"
+          >
+            {useCarouselView ? 'Switch to Dropdown' : 'Switch to Carousel'}
+          </button>
+        </div>
+        
+        {useCarouselView ? (
+          <div className="mb-4">
+            <LocationCarousel 
+              onSelectLocation={handleLocationSelect}
+              selectedLocationId={locationId}
+            />
+          </div>
+        ) : (
+          <select
+            id="location"
+            value={locationId || ''}
+            onChange={(e) => setLocationId(e.target.value ? parseInt(e.target.value) : undefined)}
+            className="w-full border rounded px-3 py-2"
+          >
+            <option value="">-- Select Location --</option>
+            {locations.map((location) => (
+              <option key={location.id} value={location.id}>
+                {location.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       
       {locationId && (
@@ -193,24 +218,49 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
           <label htmlFor="region" className="block text-sm font-medium mb-1">
             Region (Optional)
           </label>
-          <select
-            id="region"
-            value={regionId || ''}
-            onChange={(e) => setRegionId(e.target.value ? parseInt(e.target.value) : undefined)}
-            className="w-full border rounded px-3 py-2"
-            disabled={regions.length === 0}
-          >
-            <option value="">-- Select Region --</option>
-            {regions.map((region) => (
-              <option key={region.id} value={region.id}>
-                {region.name}
-              </option>
-            ))}
-          </select>
-          {regions.length === 0 && locationId && (
-            <p className="text-sm text-gray-500 mt-1">
-              No regions defined for this location. Add regions first.
-            </p>
+          {regions.length > 0 ? (
+            <div className="grid grid-cols-2 gap-2">
+              {regions.map((region) => (
+                <div 
+                  key={region.id}
+                  onClick={() => setRegionId(region.id)}
+                  className={`border rounded p-2 cursor-pointer ${
+                    regionId === region.id ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                  }`}
+                >
+                  <div className="text-sm font-medium">{region.name}</div>
+                  <div 
+                    className="mt-1 w-full h-4 rounded"
+                    style={{ 
+                      backgroundColor: region.color ? `#${region.color}` : '#3b82f6',
+                      opacity: 0.7
+                    }}
+                  ></div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div>
+              <select
+                id="region"
+                value={regionId || ''}
+                onChange={(e) => setRegionId(e.target.value ? parseInt(e.target.value) : undefined)}
+                className="w-full border rounded px-3 py-2"
+                disabled={regions.length === 0}
+              >
+                <option value="">-- Select Region --</option>
+                {regions.map((region) => (
+                  <option key={region.id} value={region.id}>
+                    {region.name}
+                  </option>
+                ))}
+              </select>
+              {regions.length === 0 && locationId && (
+                <p className="text-sm text-gray-500 mt-1">
+                  No regions defined for this location. Add regions first.
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}
