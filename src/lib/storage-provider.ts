@@ -98,7 +98,7 @@ const browserStorage = {
     
     locations.push(newLocation);
     browserStorage.setStorageData('locations', locations);
-    return newLocation.id;
+    return newLocation; // Return the full location object instead of just the ID
   },
 
   // Function to update a location
@@ -203,7 +203,7 @@ const browserStorage = {
     
     regions.push(newRegion);
     browserStorage.setStorageData('regions', regions);
-    return newRegion.id;
+    return newRegion; // Return the full region object instead of just the ID
   },
 
   // Function to delete a region
@@ -376,14 +376,14 @@ export class StorageProvider {
     imagePath: string | null;
     locationType?: string | null;
   }) {
-    const id = await browserStorage.addLocation(
+    const newLocation = await browserStorage.addLocation(
       location.name,
       location.parentId,
       location.description,
       location.imagePath,
       location.locationType
     );
-    return browserStorage.getLocationById(id);
+    return newLocation; // Now returns the full location object
   }
 
   async updateLocation(id: number, formData: FormData) {
@@ -427,7 +427,7 @@ export class StorageProvider {
     height: number;
     color?: string;
   }) {
-    const id = await browserStorage.addLocationRegion(
+    const newRegion = await browserStorage.addLocationRegion(
       locationId, 
       region.name, 
       region.x, 
@@ -436,7 +436,7 @@ export class StorageProvider {
       region.height,
       region.color
     );
-    return browserStorage.getRegionById(id);
+    return newRegion; // Now returns the full region object
   }
 
   // Inventory API
