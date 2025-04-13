@@ -118,7 +118,7 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
   const handleDefineRegions = () => {
     if (imagePreview) {
       console.log('Opening RegionMapper with image:', imagePreview);
-      setShowRegionMapper(true);
+      setShowRegionMapper(!showRegionMapper);
     } else {
       console.error('Cannot define regions: No image available');
     }
@@ -175,55 +175,80 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
           />
         </div>
         
-        <ImageInput 
-          onImageChange={handleImageChange}
-          label={`${t('locations.image')} (${t('common.optional')})`}
-          initialPreview={imagePreview}
-        />
-        
-        {imagePreview && !showRegionMapper && (
-          <div className="mt-4 p-4 border-2 border-primary border-dashed rounded-md bg-primary/5">
-            <div className="flex flex-col items-center space-y-3">
-              <h3 className="font-medium text-center">{t('regions.title')} {t('common.available')}!</h3>
-              <p className="text-sm text-center">{t('regions.instructions')}</p>
-              <Button 
-                type="button" 
-                variant="default" 
-                onClick={handleDefineRegions}
-                className="w-full"
-              >
-                {t('regions.addNew')}
-              </Button>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="image">{`${t('locations.image')} (${t('common.optional')})`}</Label>
+            <div className="relative">
+              <ImageInput 
+                onImageChange={handleImageChange}
+                initialPreview={imagePreview}
+                hideLabel={true}
+              />
+              
+              {imagePreview && (
+                <div className="mt-4 relative">
+                  <div className="relative border rounded-md overflow-hidden">
+                    <img 
+                      src={imagePreview} 
+                      alt={t('locations.image')} 
+                      className="max-w-full h-auto"
+                    />
+                    
+                    {/* In-place region mapper overlay */}
+                    {showRegionMapper && (
+                      <div className="absolute inset-0 bg-black/50 z-10">
+                        <div className="absolute inset-0">
+                          <RegionMapper
+                            imageSrc={imagePreview}
+                            onComplete={handleRegionsComplete}
+                            initialRegions={regions}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Region indicators when not in edit mode */}
+                    {!showRegionMapper && regions.map((region, index) => (
+                      <div 
+                        key={index}
+                        className="absolute border-2 border-primary bg-primary/30"
+                        style={{
+                          left: `${region.x}px`,
+                          top: `${region.y}px`,
+                          width: `${region.width}px`,
+                          height: `${region.height}px`,
+                        }}
+                      >
+                        <div className="absolute top-0 left-0 px-1 py-0.5 text-xs bg-primary text-primary-foreground">
+                          {region.name}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Region controls */}
+                  <div className="mt-2 flex justify-between items-center">
+                    <div>
+                      {regions.length > 0 && (
+                        <div className="text-sm text-muted-foreground">
+                          {t('regions.definedRegions')}: {regions.length}
+                        </div>
+                      )}
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant={showRegionMapper ? "secondary" : "outline"} 
+                      size="sm"
+                      onClick={handleDefineRegions}
+                    >
+                      {showRegionMapper ? t('common.done') : (regions.length > 0 ? t('common.edit') : t('regions.addNew'))}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        )}
-        
-        {showRegionMapper && imagePreview && (
-          <RegionMapper
-            imageSrc={imagePreview}
-            onComplete={handleRegionsComplete}
-            initialRegions={regions}
-          />
-        )}
-        
-        {regions.length > 0 && !showRegionMapper && (
-          <div className="p-4 border rounded-md bg-muted">
-            <h3 className="font-medium mb-2">{t('regions.definedRegions')} ({regions.length})</h3>
-            <ul className="list-disc pl-5 space-y-1">
-              {regions.map((region, index) => (
-                <li key={index}>{region.name}</li>
-              ))}
-            </ul>
-            <Button 
-              type="button" 
-              variant="link" 
-              onClick={handleDefineRegions}
-              className="mt-2 p-0 h-auto"
-            >
-              {t('common.edit')}
-            </Button>
-          </div>
-        )}
+        </div>
         
         <Button type="submit" disabled={isSubmitting} className="w-full">
           {isSubmitting ? t('common.loading') : t('common.save')}
