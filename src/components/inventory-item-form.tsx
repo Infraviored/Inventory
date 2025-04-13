@@ -5,6 +5,7 @@ import { getLocations, getLocationRegions, addInventoryItem, Location, Region } 
 import { ImageInput } from './image-input';
 import LocationCarousel from './location-carousel';
 import { useRouter } from 'next/navigation';
+import { useLanguage } from '@/lib/language';
 
 interface InventoryItemFormProps {
   onSubmit?: (formData: FormData) => Promise<void>;
@@ -19,6 +20,7 @@ interface InventoryItemFormProps {
 
 export default function InventoryItemForm({ onSubmit, initialData }: InventoryItemFormProps) {
   const router = useRouter();
+  const { t } = useLanguage();
   const [name, setName] = useState(initialData?.name || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [quantity, setQuantity] = useState(initialData?.quantity || 1);
@@ -42,14 +44,14 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
         setLocations(data);
       } catch (err) {
         console.error('Error fetching locations:', err);
-        setError('Failed to fetch locations');
+        setError(t('common.error') + ': ' + t('locations.title'));
       } finally {
         setLoading(false);
       }
     };
     
     fetchLocations();
-  }, []);
+  }, [t]);
 
   // Fetch regions when location changes
   useEffect(() => {
@@ -71,20 +73,20 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
         }
       } catch (err) {
         console.error('Error fetching regions:', err);
-        setError('Failed to fetch regions');
+        setError(t('common.error') + ': ' + t('regions.title'));
       } finally {
         setLoading(false);
       }
     };
     
     fetchRegions();
-  }, [locationId]);
+  }, [locationId, regionId, t]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!name.trim()) {
-      alert('Please enter an item name');
+      alert(t('inventory.name') + ' ' + t('common.required'));
       return;
     }
     
@@ -123,7 +125,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
           router.push('/inventory');
         } catch (apiError: any) {
           console.error('API Error:', apiError);
-          setError(`Failed to add item: ${apiError.message || 'Unknown error'}`);
+          setError(`${t('common.error')}: ${apiError.message || t('common.error')}`);
           return;
         }
       }
@@ -137,7 +139,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
       setImage(null);
     } catch (err) {
       console.error('Error submitting form:', err);
-      setError(`Failed to submit form: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(`${t('common.error')}: ${err instanceof Error ? err.message : t('common.error')}`);
     } finally {
       setSubmitting(false);
     }
@@ -153,7 +155,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
       
       <div>
         <label htmlFor="name" className="block text-sm font-medium mb-1">
-          Name <span className="text-red-500">*</span>
+          {t('inventory.name')} <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
@@ -167,7 +169,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
       
       <div>
         <label htmlFor="description" className="block text-sm font-medium mb-1">
-          Description (Optional)
+          {t('inventory.description')} ({t('common.optional')})
         </label>
         <textarea
           id="description"
@@ -180,7 +182,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
       
       <div>
         <label htmlFor="quantity" className="block text-sm font-medium mb-1">
-          Quantity
+          {t('inventory.quantity')}
         </label>
         <input
           type="number"
@@ -195,14 +197,14 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
       <div>
         <div className="flex justify-between items-center mb-1">
           <label htmlFor="location" className="block text-sm font-medium">
-            Location (Optional)
+            {t('inventory.location')} ({t('common.optional')})
           </label>
           <button
             type="button"
             onClick={() => setUseCarouselView(!useCarouselView)}
             className="text-sm text-blue-500 hover:text-blue-700"
           >
-            {useCarouselView ? 'Switch to Dropdown' : 'Switch to Carousel'}
+            {useCarouselView ? t('inventory.switchToDropdown') : t('inventory.switchToCarousel')}
           </button>
         </div>
         
@@ -220,7 +222,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
             onChange={(e) => setLocationId(e.target.value ? parseInt(e.target.value) : undefined)}
             className="w-full border rounded px-3 py-2"
           >
-            <option value="">-- Select Location --</option>
+            <option value="">{t('inventory.selectLocation')}</option>
             {locations.map((location) => (
               <option key={location.id} value={location.id}>
                 {location.name}
@@ -233,7 +235,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
       {locationId && (
         <div>
           <label htmlFor="region" className="block text-sm font-medium mb-1">
-            Region (Optional)
+            {t('inventory.region')} ({t('common.optional')})
           </label>
           {regions.length > 0 ? (
             <div className="grid grid-cols-2 gap-2">
@@ -265,7 +267,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
                 className="w-full border rounded px-3 py-2"
                 disabled={regions.length === 0}
               >
-                <option value="">-- Select Region --</option>
+                <option value="">{t('inventory.selectRegion')}</option>
                 {regions.map((region) => (
                   <option key={region.id} value={region.id}>
                     {region.name}
@@ -274,7 +276,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
               </select>
               {regions.length === 0 && locationId && (
                 <p className="text-sm text-gray-500 mt-1">
-                  No regions defined for this location. Add regions first.
+                  {t('inventory.noRegionsDefined')}
                 </p>
               )}
             </div>
@@ -284,7 +286,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
       
       <div>
         <label className="block text-sm font-medium mb-1">
-          Image (Optional)
+          {t('inventory.image')} ({t('common.optional')})
         </label>
         <ImageInput onImageChange={(file) => setImage(file)} />
       </div>
@@ -295,7 +297,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
           className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
           disabled={submitting}
         >
-          {submitting ? 'Saving...' : 'Save Item'}
+          {submitting ? `${t('common.loading')}...` : t('common.save')}
         </button>
       </div>
     </form>

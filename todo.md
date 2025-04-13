@@ -17,11 +17,11 @@
 - [x] Test region mapper functionality
 
 ## Language Support
-- [ ] Implement language support system (EN/DE)
-- [ ] Create/update language files for English
-- [ ] Create/update language files for German
-- [ ] Ensure all UI components support localization
-- [ ] Add language toggle functionality
+- [x] Implement language support system (EN/DE)
+- [x] Create/update language files for English
+- [x] Create/update language files for German
+- [x] Ensure all UI components support localization
+- [x] Add language toggle functionality
 
 ## Testing and Finalization
 - [ ] Test all implemented features

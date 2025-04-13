@@ -23,7 +23,8 @@
     "error": "Fehler",
     "success": "Erfolg",
     "confirm": "Bestätigen",
-    "activateLed": "LED aktivieren"
+    "activateLed": "LED aktivieren",
+    "available": "Verfügbar"
   },
   "locations": {
     "title": "Lagerorte",

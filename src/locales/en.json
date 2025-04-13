@@ -23,7 +23,8 @@
     "error": "Error",
     "success": "Success",
     "confirm": "Confirm",
-    "activateLed": "Activate LED"
+    "activateLed": "Activate LED",
+    "available": "Available"
   },
   "locations": {
     "title": "Locations",
