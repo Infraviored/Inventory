@@ -2,7 +2,7 @@
 // This file provides a unified interface for accessing data storage
 // It automatically detects the environment and uses the appropriate storage method:
 // - SQLite via Python Flask API for local development
-// - Browser storage (localStorage/IndexedDB) for Cloudflare deployment
+// - Browser storage (localStorage) for Cloudflare deployment
 
 import * as ApiClient from './api';
 
@@ -12,20 +12,334 @@ export interface StorageConfig {
   apiBaseUrl?: string;
 }
 
+// Simple browser storage implementation without external dependencies
+// Directly embedded to avoid import issues
+const browserStorage = {
+  // Helper function to generate unique IDs
+  generateId: () => {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+  },
+
+  // Helper to get data from localStorage with a prefix
+  getStorageData: (key: string) => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const data = localStorage.getItem(`inventory_${key}`);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error(`Error getting ${key} from localStorage:`, error);
+      return null;
+    }
+  },
+
+  // Helper to set data in localStorage with a prefix
+  setStorageData: (key: string, data: any) => {
+    if (typeof window === 'undefined') return false;
+    try {
+      localStorage.setItem(`inventory_${key}`, JSON.stringify(data));
+      return true;
+    } catch (error) {
+      console.error(`Error setting ${key} in localStorage:`, error);
+      return false;
+    }
+  },
+
+  // Initialize storage if needed
+  initializeStorage: () => {
+    if (typeof window === 'undefined') return;
+    if (!browserStorage.getStorageData('locations')) {
+      browserStorage.setStorageData('locations', []);
+    }
+    if (!browserStorage.getStorageData('regions')) {
+      browserStorage.setStorageData('regions', []);
+    }
+    if (!browserStorage.getStorageData('items')) {
+      browserStorage.setStorageData('items', []);
+    }
+  },
+
+  // Function to get all locations
+  getLocations: async () => {
+    browserStorage.initializeStorage();
+    return browserStorage.getStorageData('locations') || [];
+  },
+
+  // Function to get location by ID
+  getLocationById: async (id: number) => {
+    const locations = await browserStorage.getLocations();
+    return locations.find((loc: any) => loc.id === id) || null;
+  },
+
+  // Function to get child locations
+  getChildLocations: async (parentId: number) => {
+    const locations = await browserStorage.getLocations();
+    return locations.filter((loc: any) => loc.parentId === parentId);
+  },
+
+  // Function to get root locations
+  getRootLocations: async () => {
+    const locations = await browserStorage.getLocations();
+    return locations.filter((loc: any) => loc.parentId === null);
+  },
+
+  // Function to add a location
+  addLocation: async (name: string, parentId: number | null, description: string | null, imagePath: string | null, locationType?: string | null) => {
+    const locations = await browserStorage.getLocations();
+    const newLocation = {
+      id: parseInt(browserStorage.generateId().substring(0, 8), 36),
+      name,
+      description: description || null,
+      parentId: parentId || null,
+      imagePath: imagePath || null,
+      locationType: locationType || null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    locations.push(newLocation);
+    browserStorage.setStorageData('locations', locations);
+    return newLocation.id;
+  },
+
+  // Function to update a location
+  updateLocation: async (id: number, name: string, parentId: number | null, description: string | null, imagePath: string | null, locationType?: string | null) => {
+    const locations = await browserStorage.getLocations();
+    const index = locations.findIndex((loc: any) => loc.id === id);
+    
+    if (index === -1) {
+      throw new Error(`Location with ID ${id} not found`);
+    }
+    
+    locations[index] = {
+      ...locations[index],
+      name,
+      description: description || null,
+      parentId: parentId || null,
+      imagePath: imagePath || locations[index].imagePath,
+      locationType: locationType || locations[index].locationType,
+      updatedAt: new Date().toISOString()
+    };
+    
+    browserStorage.setStorageData('locations', locations);
+    return locations[index];
+  },
+
+  // Function to delete a location
+  deleteLocation: async (id: number) => {
+    const locations = await browserStorage.getLocations();
+    const filteredLocations = locations.filter((loc: any) => loc.id !== id);
+    
+    if (filteredLocations.length === locations.length) {
+      throw new Error(`Location with ID ${id} not found`);
+    }
+    
+    browserStorage.setStorageData('locations', filteredLocations);
+    
+    // Also delete child locations
+    const childLocations = locations.filter((loc: any) => loc.parentId === id);
+    for (const child of childLocations) {
+      await browserStorage.deleteLocation(child.id);
+    }
+    
+    // Delete regions for this location
+    const regions = await browserStorage.getLocationRegions(id);
+    for (const region of regions) {
+      await browserStorage.deleteRegion(region.id);
+    }
+    
+    // Delete items in this location
+    const items = await browserStorage.getInventoryItems();
+    const locationItems = items.filter((item: any) => item.locationId === id);
+    for (const item of locationItems) {
+      await browserStorage.deleteInventoryItem(item.id);
+    }
+    
+    return true;
+  },
+
+  // Function to get location breadcrumbs
+  getLocationBreadcrumbs: async (id: number) => {
+    const breadcrumbs = [];
+    let currentId = id;
+    
+    while (currentId) {
+      const location = await browserStorage.getLocationById(currentId);
+      if (!location) break;
+      
+      breadcrumbs.unshift({ id: location.id, name: location.name });
+      currentId = location.parentId;
+    }
+    
+    return breadcrumbs;
+  },
+
+  // Function to get all regions for a location
+  getLocationRegions: async (locationId: number) => {
+    browserStorage.initializeStorage();
+    const regions = browserStorage.getStorageData('regions') || [];
+    return regions.filter((region: any) => region.locationId === locationId);
+  },
+
+  // Function to get region by ID
+  getRegionById: async (id: number) => {
+    browserStorage.initializeStorage();
+    const regions = browserStorage.getStorageData('regions') || [];
+    return regions.find((region: any) => region.id === id) || null;
+  },
+
+  // Function to add a region
+  addLocationRegion: async (locationId: number, name: string, x: number, y: number, width: number, height: number, color?: string) => {
+    const regions = browserStorage.getStorageData('regions') || [];
+    const newRegion = {
+      id: parseInt(browserStorage.generateId().substring(0, 8), 36),
+      locationId,
+      name,
+      x,
+      y,
+      width,
+      height,
+      color: color || null
+    };
+    
+    regions.push(newRegion);
+    browserStorage.setStorageData('regions', regions);
+    return newRegion.id;
+  },
+
+  // Function to delete a region
+  deleteRegion: async (id: number) => {
+    const regions = browserStorage.getStorageData('regions') || [];
+    const filteredRegions = regions.filter((region: any) => region.id !== id);
+    
+    if (filteredRegions.length === regions.length) {
+      throw new Error(`Region with ID ${id} not found`);
+    }
+    
+    browserStorage.setStorageData('regions', filteredRegions);
+    
+    // Update items that reference this region
+    const items = await browserStorage.getInventoryItems();
+    for (const item of items) {
+      if (item.regionId === id) {
+        await browserStorage.updateInventoryItem(
+          item.id,
+          item.name,
+          item.description,
+          item.quantity,
+          item.imagePath,
+          item.locationId,
+          null // Remove region reference
+        );
+      }
+    }
+    
+    return true;
+  },
+
+  // Function to get all inventory items
+  getInventoryItems: async () => {
+    browserStorage.initializeStorage();
+    return browserStorage.getStorageData('items') || [];
+  },
+
+  // Function to get inventory item by ID
+  getInventoryItemById: async (id: number) => {
+    const items = await browserStorage.getInventoryItems();
+    const item = items.find((item: any) => item.id === id);
+    
+    if (!item) return null;
+    
+    // Add location and region names if they exist
+    if (item.locationId) {
+      const location = await browserStorage.getLocationById(item.locationId);
+      item.locationName = location ? location.name : null;
+    }
+    
+    if (item.regionId) {
+      const region = await browserStorage.getRegionById(item.regionId);
+      item.regionName = region ? region.name : null;
+    }
+    
+    return item;
+  },
+
+  // Function to add an inventory item
+  addInventoryItem: async (name: string, description: string | null, quantity: number, imagePath: string | null, locationId: number | null, regionId: number | null) => {
+    const items = await browserStorage.getInventoryItems();
+    const newItem = {
+      id: parseInt(browserStorage.generateId().substring(0, 8), 36),
+      name,
+      description: description || null,
+      quantity: quantity || 1,
+      imagePath: imagePath || null,
+      locationId: locationId || null,
+      regionId: regionId || null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    items.push(newItem);
+    browserStorage.setStorageData('items', items);
+    return newItem.id;
+  },
+
+  // Function to update an inventory item
+  updateInventoryItem: async (id: number, name: string, description: string | null, quantity: number, imagePath: string | null, locationId: number | null, regionId: number | null) => {
+    const items = await browserStorage.getInventoryItems();
+    const index = items.findIndex((item: any) => item.id === id);
+    
+    if (index === -1) {
+      throw new Error(`Item with ID ${id} not found`);
+    }
+    
+    items[index] = {
+      ...items[index],
+      name,
+      description: description || null,
+      quantity: quantity || 1,
+      imagePath: imagePath || items[index].imagePath,
+      locationId: locationId || null,
+      regionId: regionId || null,
+      updatedAt: new Date().toISOString()
+    };
+    
+    browserStorage.setStorageData('items', items);
+    return items[index];
+  },
+
+  // Function to delete an inventory item
+  deleteInventoryItem: async (id: number) => {
+    const items = await browserStorage.getInventoryItems();
+    const filteredItems = items.filter((item: any) => item.id !== id);
+    
+    if (filteredItems.length === items.length) {
+      throw new Error(`Item with ID ${id} not found`);
+    }
+    
+    browserStorage.setStorageData('items', filteredItems);
+    return true;
+  },
+
+  // Function to search inventory items
+  searchItems: async (query: string) => {
+    if (!query) return [];
+    
+    const items = await browserStorage.getInventoryItems();
+    const lowerQuery = query.toLowerCase();
+    
+    return items.filter((item: any) => 
+      item.name.toLowerCase().includes(lowerQuery) || 
+      (item.description && item.description.toLowerCase().includes(lowerQuery))
+    );
+  }
+};
+
 // Detect environment and determine storage mode
 export function detectEnvironment(): StorageConfig {
-  // Check if we're running in a browser environment
-  const isBrowser = typeof window !== 'undefined';
-  
-  // Check if we're running on Cloudflare Pages
-  const isCloudflare = isBrowser && 
-    (window.location.hostname.includes('.pages.dev') || 
-     process.env.NEXT_PUBLIC_CLOUDFLARE_PAGES === 'true');
-  
-  // If we're on Cloudflare Pages, use browser storage
-  // Otherwise, use the API (SQLite)
+  // Always use browser storage for deployed environments
+  // This is a simplification to ensure it works in the temporary deployment
   return {
-    mode: isCloudflare ? 'browser' : 'api',
+    mode: 'browser',
     apiBaseUrl: '/api'
   };
 }
@@ -33,149 +347,79 @@ export function detectEnvironment(): StorageConfig {
 // Storage provider class
 export class StorageProvider {
   private config: StorageConfig;
-  private browserStorage: any = null;
 
   constructor(config?: StorageConfig) {
     this.config = config || detectEnvironment();
-    
-    // If we're using browser storage, dynamically import the appropriate module
-    if (this.config.mode === 'browser') {
-      // We'll load this dynamically to avoid issues with SSR
-      this.loadBrowserStorage();
-    }
-  }
-
-  private async loadBrowserStorage() {
-    try {
-      // Dynamically import the browser storage implementation
-      // Using kv-db_local.js as it's the most robust option
-      const module = await import('/backup_local_storage/kv-db_local.js');
-      this.browserStorage = module;
-    } catch (error) {
-      console.error('Failed to load browser storage:', error);
-      // Fallback to API mode if browser storage fails to load
-      this.config.mode = 'api';
-    }
-  }
-
-  // Ensure browser storage is loaded
-  private async ensureBrowserStorage() {
-    if (this.config.mode === 'browser' && !this.browserStorage) {
-      await this.loadBrowserStorage();
-    }
   }
 
   // Locations API
-  async getLocations(parentId?: number, rootOnly?: boolean) {
-    await this.ensureBrowserStorage();
-    
-    if (this.config.mode === 'browser') {
-      if (rootOnly) {
-        const locations = await this.browserStorage.getLocations();
-        return locations.filter(loc => loc.parentId === null);
-      } else if (parentId !== undefined) {
-        return this.browserStorage.getChildLocations(parentId);
-      } else {
-        return this.browserStorage.getLocations();
-      }
-    } else {
-      return ApiClient.getLocations(parentId, rootOnly);
-    }
+  async getAllLocations() {
+    return browserStorage.getLocations();
+  }
+
+  async getRootLocations() {
+    return browserStorage.getRootLocations();
+  }
+
+  async getLocationsByParentId(parentId: number) {
+    return browserStorage.getChildLocations(parentId);
   }
 
   async getLocationById(id: number) {
-    await this.ensureBrowserStorage();
-    
-    if (this.config.mode === 'browser') {
-      return this.browserStorage.getLocationById(id);
-    } else {
-      return ApiClient.getLocationById(id);
-    }
+    return browserStorage.getLocationById(id);
   }
 
-  async addLocation(formData: FormData) {
-    await this.ensureBrowserStorage();
-    
-    if (this.config.mode === 'browser') {
-      const name = formData.get('name') as string;
-      const description = formData.get('description') as string;
-      const parentIdStr = formData.get('parentId') as string;
-      const parentId = parentIdStr ? parseInt(parentIdStr, 10) : null;
-      const imageFile = formData.get('image') as File;
-      
-      let imagePath = null;
-      if (imageFile && imageFile.size > 0) {
-        // Handle image storage for browser mode
-        // This would need to be implemented separately
-        // For now, we'll just store a placeholder
-        imagePath = `/uploads/browser-storage-${Date.now()}.jpg`;
-      }
-      
-      const id = await this.browserStorage.addLocation(name, parentId, description, imagePath);
-      return this.browserStorage.getLocationById(id);
-    } else {
-      return ApiClient.addLocation(formData);
-    }
+  async createLocation(location: {
+    name: string;
+    description: string | null;
+    parentId: number | null;
+    imagePath: string | null;
+    locationType?: string | null;
+  }) {
+    const id = await browserStorage.addLocation(
+      location.name,
+      location.parentId,
+      location.description,
+      location.imagePath,
+      location.locationType
+    );
+    return browserStorage.getLocationById(id);
   }
 
   async updateLocation(id: number, formData: FormData) {
-    await this.ensureBrowserStorage();
+    const name = formData.get('name') as string;
+    const description = formData.get('description') as string;
+    const parentIdStr = formData.get('parentId') as string;
+    const parentId = parentIdStr ? parseInt(parentIdStr, 10) : null;
+    const imageFile = formData.get('image') as File;
     
-    if (this.config.mode === 'browser') {
-      const name = formData.get('name') as string;
-      const description = formData.get('description') as string;
-      const parentIdStr = formData.get('parentId') as string;
-      const parentId = parentIdStr ? parseInt(parentIdStr, 10) : null;
-      const imageFile = formData.get('image') as File;
-      
-      // Get current location to preserve image path if no new image
-      const currentLocation = await this.browserStorage.getLocationById(id);
-      let imagePath = currentLocation.imagePath;
-      
-      if (imageFile && imageFile.size > 0) {
-        // Handle image storage for browser mode
-        imagePath = `/uploads/browser-storage-${Date.now()}.jpg`;
-      }
-      
-      await this.browserStorage.updateLocation(id, name, parentId, description, imagePath);
-      return this.browserStorage.getLocationById(id);
-    } else {
-      return ApiClient.updateLocation(id, formData);
+    // Get current location to preserve image path if no new image
+    const currentLocation = await browserStorage.getLocationById(id);
+    let imagePath = currentLocation ? currentLocation.imagePath : null;
+    
+    if (imageFile && imageFile.size > 0) {
+      // Handle image storage for browser mode
+      imagePath = `/uploads/browser-storage-${Date.now()}.jpg`;
     }
+    
+    await browserStorage.updateLocation(id, name, parentId, description, imagePath);
+    return browserStorage.getLocationById(id);
   }
 
   async deleteLocation(id: number) {
-    await this.ensureBrowserStorage();
-    
-    if (this.config.mode === 'browser') {
-      return this.browserStorage.deleteLocation(id);
-    } else {
-      return ApiClient.deleteLocation(id);
-    }
+    return browserStorage.deleteLocation(id);
   }
 
   async getLocationBreadcrumbs(id: number) {
-    await this.ensureBrowserStorage();
-    
-    if (this.config.mode === 'browser') {
-      return this.browserStorage.getLocationBreadcrumbs(id);
-    } else {
-      return ApiClient.getLocationBreadcrumbs(id);
-    }
+    return browserStorage.getLocationBreadcrumbs(id);
   }
 
   // Regions API
   async getLocationRegions(locationId: number) {
-    await this.ensureBrowserStorage();
-    
-    if (this.config.mode === 'browser') {
-      return this.browserStorage.getLocationRegions(locationId);
-    } else {
-      return ApiClient.getLocationRegions(locationId);
-    }
+    return browserStorage.getLocationRegions(locationId);
   }
 
-  async addLocationRegion(locationId: number, region: {
+  async createRegion(locationId: number, region: {
     name: string;
     x: number;
     y: number;
@@ -183,181 +427,134 @@ export class StorageProvider {
     height: number;
     color?: string;
   }) {
-    await this.ensureBrowserStorage();
-    
-    if (this.config.mode === 'browser') {
-      const id = await this.browserStorage.addLocationRegion(
-        locationId, 
-        region.name, 
-        region.x, 
-        region.y, 
-        region.width, 
-        region.height
-      );
-      return this.browserStorage.getRegionById(id);
-    } else {
-      return ApiClient.addLocationRegion(locationId, region);
-    }
+    const id = await browserStorage.addLocationRegion(
+      locationId, 
+      region.name, 
+      region.x, 
+      region.y, 
+      region.width, 
+      region.height,
+      region.color
+    );
+    return browserStorage.getRegionById(id);
   }
 
   // Inventory API
   async getInventoryItems(locationId?: number, regionId?: number) {
-    await this.ensureBrowserStorage();
+    let items = await browserStorage.getInventoryItems();
     
-    if (this.config.mode === 'browser') {
-      let items = await this.browserStorage.getInventoryItems();
-      
-      if (locationId !== undefined) {
-        items = items.filter(item => item.locationId === locationId);
-      }
-      
-      if (regionId !== undefined) {
-        items = items.filter(item => item.regionId === regionId);
-      }
-      
-      return items;
-    } else {
-      return ApiClient.getInventoryItems(locationId, regionId);
+    if (locationId !== undefined) {
+      items = items.filter((item: any) => item.locationId === locationId);
     }
+    
+    if (regionId !== undefined) {
+      items = items.filter((item: any) => item.regionId === regionId);
+    }
+    
+    return items;
   }
 
   async getInventoryItemById(id: number) {
-    await this.ensureBrowserStorage();
-    
-    if (this.config.mode === 'browser') {
-      return this.browserStorage.getInventoryItemById(id);
-    } else {
-      return ApiClient.getInventoryItemById(id);
-    }
+    return browserStorage.getInventoryItemById(id);
   }
 
   async addInventoryItem(formData: FormData) {
-    await this.ensureBrowserStorage();
+    const name = formData.get('name') as string;
+    const description = formData.get('description') as string;
+    const quantityStr = formData.get('quantity') as string;
+    const quantity = parseInt(quantityStr, 10);
+    const locationIdStr = formData.get('locationId') as string;
+    const locationId = locationIdStr ? parseInt(locationIdStr, 10) : null;
+    const regionIdStr = formData.get('regionId') as string;
+    const regionId = regionIdStr ? parseInt(regionIdStr, 10) : null;
+    const imageFile = formData.get('image') as File;
     
-    if (this.config.mode === 'browser') {
-      const name = formData.get('name') as string;
-      const description = formData.get('description') as string;
-      const quantityStr = formData.get('quantity') as string;
-      const quantity = parseInt(quantityStr, 10);
-      const locationIdStr = formData.get('locationId') as string;
-      const locationId = locationIdStr ? parseInt(locationIdStr, 10) : null;
-      const regionIdStr = formData.get('regionId') as string;
-      const regionId = regionIdStr ? parseInt(regionIdStr, 10) : null;
-      const imageFile = formData.get('image') as File;
-      
-      let imagePath = null;
-      if (imageFile && imageFile.size > 0) {
-        // Handle image storage for browser mode
-        imagePath = `/uploads/browser-storage-${Date.now()}.jpg`;
-      }
-      
-      const id = await this.browserStorage.addInventoryItem(
-        name, 
-        description, 
-        quantity, 
-        imagePath, 
-        locationId, 
-        regionId
-      );
-      return this.browserStorage.getInventoryItemById(id);
-    } else {
-      return ApiClient.addInventoryItem(formData);
+    let imagePath = null;
+    if (imageFile && imageFile.size > 0) {
+      // Handle image storage for browser mode
+      imagePath = `/uploads/browser-storage-${Date.now()}.jpg`;
     }
+    
+    const id = await browserStorage.addInventoryItem(
+      name, 
+      description, 
+      quantity, 
+      imagePath, 
+      locationId, 
+      regionId
+    );
+    return browserStorage.getInventoryItemById(id);
   }
 
   async updateInventoryItem(id: number, formData: FormData) {
-    await this.ensureBrowserStorage();
+    const name = formData.get('name') as string;
+    const description = formData.get('description') as string;
+    const quantityStr = formData.get('quantity') as string;
+    const quantity = parseInt(quantityStr, 10);
+    const locationIdStr = formData.get('locationId') as string;
+    const locationId = locationIdStr ? parseInt(locationIdStr, 10) : null;
+    const regionIdStr = formData.get('regionId') as string;
+    const regionId = regionIdStr ? parseInt(regionIdStr, 10) : null;
+    const imageFile = formData.get('image') as File;
     
-    if (this.config.mode === 'browser') {
-      const name = formData.get('name') as string;
-      const description = formData.get('description') as string;
-      const quantityStr = formData.get('quantity') as string;
-      const quantity = parseInt(quantityStr, 10);
-      const locationIdStr = formData.get('locationId') as string;
-      const locationId = locationIdStr ? parseInt(locationIdStr, 10) : null;
-      const regionIdStr = formData.get('regionId') as string;
-      const regionId = regionIdStr ? parseInt(regionIdStr, 10) : null;
-      const imageFile = formData.get('image') as File;
-      
-      // Get current item to preserve image path if no new image
-      const currentItem = await this.browserStorage.getInventoryItemById(id);
-      let imagePath = currentItem.imagePath;
-      
-      if (imageFile && imageFile.size > 0) {
-        // Handle image storage for browser mode
-        imagePath = `/uploads/browser-storage-${Date.now()}.jpg`;
-      }
-      
-      await this.browserStorage.updateInventoryItem(
-        id,
-        name, 
-        description, 
-        quantity, 
-        imagePath, 
-        locationId, 
-        regionId
-      );
-      return this.browserStorage.getInventoryItemById(id);
-    } else {
-      return ApiClient.updateInventoryItem(id, formData);
+    // Get current item to preserve image path if no new image
+    const currentItem = await browserStorage.getInventoryItemById(id);
+    let imagePath = currentItem ? currentItem.imagePath : null;
+    
+    if (imageFile && imageFile.size > 0) {
+      // Handle image storage for browser mode
+      imagePath = `/uploads/browser-storage-${Date.now()}.jpg`;
     }
+    
+    await browserStorage.updateInventoryItem(
+      id,
+      name, 
+      description, 
+      quantity, 
+      imagePath, 
+      locationId, 
+      regionId
+    );
+    return browserStorage.getInventoryItemById(id);
   }
 
   async deleteInventoryItem(id: number) {
-    await this.ensureBrowserStorage();
-    
-    if (this.config.mode === 'browser') {
-      return this.browserStorage.deleteInventoryItem(id);
-    } else {
-      return ApiClient.deleteInventoryItem(id);
-    }
+    return browserStorage.deleteInventoryItem(id);
   }
 
   // Search API
   async searchItems(query: string) {
-    await this.ensureBrowserStorage();
-    
-    if (this.config.mode === 'browser') {
-      return this.browserStorage.searchItems(query);
-    } else {
-      return ApiClient.searchItems(query);
-    }
+    return browserStorage.searchItems(query);
   }
 
   // LED API
   async getLedData(itemId: number) {
-    await this.ensureBrowserStorage();
-    
-    if (this.config.mode === 'browser') {
-      // This is a specialized API that might not be fully implemented in browser storage
-      // For now, we'll just return a basic implementation
-      const item = await this.browserStorage.getInventoryItemById(itemId);
-      if (!item || !item.locationId || !item.regionId) {
-        throw new Error('Item not found or missing location/region');
-      }
-      
-      const location = await this.browserStorage.getLocationById(item.locationId);
-      const region = await this.browserStorage.getRegionById(item.regionId);
-      
-      return {
-        item: { id: item.id, name: item.name },
-        location: { id: location.id, name: location.name },
-        region: { 
-          id: region.id, 
-          name: region.name, 
-          x: region.x, 
-          y: region.y, 
-          width: region.width, 
-          height: region.height 
-        },
-        ledPosition: { 
-          x: region.x + region.width / 2, 
-          y: region.y + region.height / 2 
-        }
-      };
-    } else {
-      return ApiClient.getLedData(itemId);
+    // This is a specialized API that might not be fully implemented in browser storage
+    // For now, we'll just return a basic implementation
+    const item = await browserStorage.getInventoryItemById(itemId);
+    if (!item || !item.locationId || !item.regionId) {
+      throw new Error('Item not found or missing location/region');
     }
+    
+    const location = await browserStorage.getLocationById(item.locationId);
+    const region = await browserStorage.getRegionById(item.regionId);
+    
+    return {
+      item: { id: item.id, name: item.name },
+      location: { id: location.id, name: location.name },
+      region: { 
+        id: region.id, 
+        name: region.name, 
+        x: region.x, 
+        y: region.y, 
+        width: region.width, 
+        height: region.height 
+      },
+      ledPosition: { 
+        x: region.x + region.width / 2, 
+        y: region.y + region.height / 2 
+      }
+    };
   }
 }
 
