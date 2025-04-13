@@ -20,7 +20,6 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showRegionMapper, setShowRegionMapper] = useState(false);
   const [regions, setRegions] = useState<Array<{name: string, x: number, y: number, width: number, height: number}>>([]);
   const [locationType, setLocationType] = useState<string>('');
   const router = useRouter();
@@ -99,7 +98,6 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
       setImagePreview(null);
       setRegions([]);
       setLocationType('');
-      setShowRegionMapper(false);
       
       if (onSuccess) {
         onSuccess();
@@ -113,19 +111,9 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
     }
   };
 
-  const handleDefineRegions = () => {
-    if (imagePreview) {
-      console.log('Opening RegionMapper with image:', imagePreview);
-      setShowRegionMapper(true);
-    } else {
-      console.error('Cannot define regions: No image available');
-    }
-  };
-
   const handleRegionsComplete = (definedRegions: Array<{name: string, x: number, y: number, width: number, height: number}>) => {
     console.log('Regions defined:', definedRegions);
     setRegions(definedRegions);
-    setShowRegionMapper(false);
   };
 
   return (
@@ -173,55 +161,21 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
           />
         </div>
         
-        <ImageInput 
-          onImageChange={handleImageChange}
-          label="Bild (optional)"
-          initialPreview={imagePreview}
-        />
-        
-        {imagePreview && !showRegionMapper && (
-          <div className="mt-4 p-4 border-2 border-primary border-dashed rounded-md bg-primary/5">
-            <div className="flex flex-col items-center space-y-3">
-              <h3 className="font-medium text-center">Region Mapping verfügbar!</h3>
-              <p className="text-sm text-center">Sie können jetzt Regionen in Ihrem Bild definieren, um später Inventar-Positionen genauer zu verfolgen.</p>
-              <Button 
-                type="button" 
-                variant="default" 
-                onClick={handleDefineRegions}
-                className="w-full"
-              >
-                Regionen auf dem Bild definieren
-              </Button>
-            </div>
-          </div>
-        )}
-        
-        {showRegionMapper && imagePreview && (
-          <RegionMapper
-            imageSrc={imagePreview}
-            onComplete={handleRegionsComplete}
-            initialRegions={regions}
+        <div className="space-y-4">
+          <ImageInput 
+            onImageChange={handleImageChange}
+            label="Bild (optional)"
+            initialPreview={imagePreview}
           />
-        )}
-        
-        {regions.length > 0 && !showRegionMapper && (
-          <div className="p-4 border rounded-md bg-muted">
-            <h3 className="font-medium mb-2">Definierte Regionen ({regions.length})</h3>
-            <ul className="list-disc pl-5 space-y-1">
-              {regions.map((region, index) => (
-                <li key={index}>{region.name}</li>
-              ))}
-            </ul>
-            <Button 
-              type="button" 
-              variant="link" 
-              onClick={handleDefineRegions}
-              className="mt-2 p-0 h-auto"
-            >
-              Regionen bearbeiten
-            </Button>
-          </div>
-        )}
+          
+          {imagePreview && (
+            <RegionMapper
+              imageSrc={imagePreview}
+              onComplete={handleRegionsComplete}
+              initialRegions={regions}
+            />
+          )}
+        </div>
         
         <Button type="submit" disabled={isSubmitting} className="w-full">
           {isSubmitting ? 'Wird gespeichert...' : 'Speichern'}

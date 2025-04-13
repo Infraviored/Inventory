@@ -5,7 +5,7 @@ import { getLocationRegions, addLocationRegion, Region } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Copy, Move, Square, Trash } from 'lucide-react';
+import { Copy, Move, Square, Trash, Plus } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 
 // This is the component used by location-form.tsx
@@ -52,6 +52,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     width: 100,
     height: 100
   });
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
 
   // Drawing state
   const [startPoint, setStartPoint] = useState<{x: number, y: number} | null>(null);
@@ -60,6 +61,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
 
   // Load image dimensions on mount
   useEffect(() => {
@@ -86,6 +88,14 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     console.log('RegionMapper initialized with image:', imageSrc);
     console.log('Initial regions:', initialRegions);
   }, [imageSrc, initialRegions]);
+
+  // Update parent component with regions whenever they change
+  useEffect(() => {
+    const formattedRegions = regions.map(({ name, x, y, width, height }) => ({
+      name, x, y, width, height
+    }));
+    onComplete(formattedRegions);
+  }, [regions, onComplete]);
 
   // Handle mouse down (start drawing or select region)
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -128,6 +138,12 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
           setRegions(prev => prev.map(r => ({ ...r, isSelected: false })).concat(newRegion));
           setSelectedRegionId(newRegion.id);
           setRegionName('');
+          
+          // Position the form menu next to the region
+          setMenuPosition({
+            x: left + width + 10,
+            y: top
+          });
           setShowForm(true);
           
           console.log(`Created region: ${width}x${height} at (${left},${top})`);
@@ -159,6 +175,12 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       })));
       setSelectedRegionId(clickedRegion.id);
       setRegionName(clickedRegion.name);
+      
+      // Position the form menu next to the region
+      setMenuPosition({
+        x: clickedRegion.x + clickedRegion.width + 10,
+        y: clickedRegion.y
+      });
     } else {
       // Clicked outside any region, deselect all
       setRegions(regions.map(r => ({ ...r, isSelected: false, isDragging: false })));
@@ -191,10 +213,21 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       // Update region position
       setRegions(regions.map(r => {
         if (r.id === draggingRegion.id) {
+          const newX = Math.max(0, Math.min(r.x + deltaX, imageSize.width - r.width));
+          const newY = Math.max(0, Math.min(r.y + deltaY, imageSize.height - r.height));
+          
+          // Update menu position if this is the selected region
+          if (r.id === selectedRegionId && showForm) {
+            setMenuPosition({
+              x: newX + r.width + 10,
+              y: newY
+            });
+          }
+          
           return {
             ...r,
-            x: Math.max(0, Math.min(r.x + deltaX, imageSize.width - r.width)),
-            y: Math.max(0, Math.min(r.y + deltaY, imageSize.height - r.height))
+            x: newX,
+            y: newY
           };
         }
         return r;
@@ -208,6 +241,15 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
         if (r.id === resizingRegion.id) {
           const newWidth = Math.max(20, x - r.x);
           const newHeight = Math.max(20, y - r.y);
+          
+          // Update menu position if this is the selected region
+          if (r.id === selectedRegionId && showForm) {
+            setMenuPosition({
+              x: r.x + newWidth + 10,
+              y: r.y
+            });
+          }
+          
           return {
             ...r,
             width: newWidth,
@@ -252,6 +294,12 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     setRegions(prev => prev.map(r => ({ ...r, isSelected: false })).concat(newRegion));
     setSelectedRegionId(newRegion.id);
     setRegionName('');
+    
+    // Position the form menu next to the region
+    setMenuPosition({
+      x: x + width + 10,
+      y: y
+    });
     setShowForm(true);
   };
 
@@ -304,6 +352,12 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       prev.map(r => ({ ...r, isSelected: false })).concat(newRegion)
     );
     setSelectedRegionId(newRegion.id);
+    
+    // Position the form menu next to the new region
+    setMenuPosition({
+      x: newRegion.x + newRegion.width + 10,
+      y: newRegion.y
+    });
   };
 
   // Toggle resize mode for a region
@@ -326,21 +380,17 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     }));
   };
 
-  // Complete the mapping process
-  const handleComplete = () => {
-    // Check if all regions have names
-    const unnamedRegions = regions.filter(r => !r.name.trim());
-    if (unnamedRegions.length > 0) {
-      setError(`Please name all regions (${unnamedRegions.length} unnamed)`);
-      return;
-    }
+  // Add a new region button handler
+  const handleAddRegion = (e: React.MouseEvent) => {
+    if (!containerRef.current) return;
     
-    const formattedRegions = regions.map(({ name, x, y, width, height }) => ({
-      name, x, y, width, height
-    }));
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     
-    console.log('Completing region mapping with:', formattedRegions);
-    onComplete(formattedRegions);
+    setIsCreating(true);
+    setStartPoint({ x, y });
+    setCurrentPoint({ x, y });
   };
 
   // Calculate styles for the currently drawing rectangle
@@ -360,6 +410,38 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     };
   };
 
+  // Calculate form position to ensure it stays within viewport
+  const getFormPosition = () => {
+    if (!containerRef.current) return { left: '0px', top: '0px' };
+    
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const formWidth = 250; // Approximate width of the form
+    const formHeight = 200; // Approximate height of the form
+    
+    // Check if form would go outside the container on the right
+    let left = menuPosition.x;
+    if (left + formWidth > containerRect.width) {
+      // Place form on the left side of the region instead
+      const selectedRegion = regions.find(r => r.id === selectedRegionId);
+      if (selectedRegion) {
+        left = Math.max(0, selectedRegion.x - formWidth - 10);
+      } else {
+        left = Math.max(0, containerRect.width - formWidth);
+      }
+    }
+    
+    // Check if form would go outside the container on the bottom
+    let top = menuPosition.y;
+    if (top + formHeight > containerRect.height) {
+      top = Math.max(0, containerRect.height - formHeight);
+    }
+    
+    return {
+      left: `${left}px`,
+      top: `${top}px`,
+    };
+  };
+
   return (
     <div className="space-y-4 border rounded-md p-4 bg-muted/50">
       <div className="flex justify-between items-center">
@@ -375,280 +457,203 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
               setCurrentPoint(null);
             }}
           >
-            <Square className="h-4 w-4 mr-1" />
-            {isCreating ? "Beenden" : "Region zeichnen"}
+            <Plus className="h-4 w-4 mr-1" />
+            {isCreating ? "Beenden" : "Region hinzufügen"}
           </Button>
         </div>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          {error && (
-            <div className="p-2 mb-2 bg-red-100 text-red-700 rounded-md text-sm">
-              {error}
+      <div className="relative">
+        <div 
+          ref={containerRef} 
+          className="relative overflow-hidden border rounded-md"
+          style={{ cursor: isCreating ? 'crosshair' : 'default' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          <img 
+            ref={imageRef}
+            src={imageSrc}
+            alt="Image to define regions on"
+            className="max-w-full h-auto"
+            onLoad={handleImageLoad}
+            onError={() => {
+              console.error('Failed to load image:', imageSrc);
+              setError('Failed to load image. Please try again with a different image.');
+            }}
+          />
+          
+          {/* Currently drawing rectangle */}
+          {isCreating && startPoint && (
+            <div 
+              className="absolute border-2 border-primary bg-primary/20 pointer-events-none"
+              style={getDrawingRectStyle()}
+            >
+              {currentPoint && (
+                <div className="absolute bottom-0 right-0 bg-background/90 text-xs px-1 py-0.5 rounded">
+                  {Math.abs(currentPoint.x - startPoint.x)}×{Math.abs(currentPoint.y - startPoint.y)}
+                </div>
+              )}
             </div>
           )}
           
-          <div 
-            ref={containerRef} 
-            className="relative overflow-hidden border rounded-md"
-            style={{ cursor: isCreating ? 'crosshair' : 'default' }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-          >
-            <img 
-              ref={imageRef}
-              src={imageSrc}
-              alt="Image to define regions on"
-              className="max-w-full h-auto"
-              onLoad={handleImageLoad}
-              onError={() => {
-                console.error('Failed to load image:', imageSrc);
-                setError('Failed to load image. Please try again with a different image.');
+          {/* Existing regions */}
+          {regions.map((region) => (
+            <div 
+              key={region.id}
+              className={`absolute border-2 ${region.isSelected ? 'border-yellow-500' : 'border-primary'} 
+                          ${region.isSelected ? 'bg-yellow-500/20' : 'bg-primary/20'} flex items-center justify-center`}
+              style={{
+                left: `${region.x}px`,
+                top: `${region.y}px`,
+                width: `${region.width}px`,
+                height: `${region.height}px`,
               }}
-            />
-            
-            {/* Currently drawing rectangle */}
-            {isCreating && startPoint && (
-              <div 
-                className="absolute border-2 border-primary bg-primary/20 pointer-events-none"
-                style={getDrawingRectStyle()}
-              >
-                {currentPoint && (
-                  <div className="absolute bottom-0 right-0 bg-background/90 text-xs px-1 py-0.5 rounded">
-                    {Math.abs(currentPoint.x - startPoint.x)}×{Math.abs(currentPoint.y - startPoint.y)}
-                  </div>
-                )}
-              </div>
-            )}
-            
-            {/* Existing regions */}
-            {regions.map((region) => (
-              <div 
-                key={region.id}
-                className={`absolute border-2 ${region.isSelected ? 'border-yellow-500' : 'border-primary'} 
-                            ${region.isSelected ? 'bg-yellow-500/20' : 'bg-primary/20'} flex items-center justify-center`}
-                style={{
-                  left: `${region.x}px`,
-                  top: `${region.y}px`,
-                  width: `${region.width}px`,
-                  height: `${region.height}px`,
-                }}
-              >
-                <span className={`bg-background/90 px-1 py-0.5 rounded text-xs ${region.name ? '' : 'text-muted-foreground'}`}>
-                  {region.name || 'Unnamed'}
-                </span>
-                
-                {region.isSelected && (
-                  <div className="absolute -top-7 left-0 right-0 flex justify-center space-x-1">
-                    <button 
-                      className="bg-background border rounded-md p-1 hover:bg-muted"
-                      onClick={() => handleToggleDrag(region.id)}
-                      title="Move region"
-                    >
-                      <Move className="h-3 w-3" />
-                    </button>
-                    <button 
-                      className="bg-background border rounded-md p-1 hover:bg-muted"
-                      onClick={() => handleToggleResize(region.id)}
-                      title="Resize region"
-                    >
-                      <Square className="h-3 w-3" />
-                    </button>
-                    <button 
-                      className="bg-background border rounded-md p-1 hover:bg-muted"
-                      onClick={() => handleCopyRegion(region.id)}
-                      title="Copy region"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </button>
-                    <button 
-                      className="bg-background border rounded-md p-1 hover:bg-muted text-red-500 hover:text-red-700"
-                      onClick={() => handleRemoveRegion(region.id)}
-                      title="Delete region"
-                    >
-                      <Trash className="h-3 w-3" />
-                    </button>
-                  </div>
-                )}
-                
-                {/* Size indicator */}
-                <div className="absolute bottom-0 right-0 bg-background/90 text-xs px-1 py-0.5 rounded">
-                  {Math.round(region.width)}×{Math.round(region.height)}
-                </div>
-                
-                {/* Resize handle */}
-                {region.isSelected && (
-                  <div 
-                    className="absolute bottom-0 right-0 w-4 h-4 bg-yellow-500 border border-background rounded-sm cursor-se-resize"
-                    style={{ transform: 'translate(50%, 50%)' }}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-          
-          {/* Image and drawing information */}
-          <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-            <div>
-              Image dimensions: {imageSize.width}×{imageSize.height}
-            </div>
-            {isCreating && startPoint && currentPoint && (
-              <div>
-                Drawing: {Math.abs(currentPoint.x - startPoint.x)}×{Math.abs(currentPoint.y - startPoint.y)} at 
-                ({Math.min(startPoint.x, currentPoint.x)}, {Math.min(startPoint.y, currentPoint.y)})
-              </div>
-            )}
-          </div>
-        </div>
-        
-        <div className="space-y-4">
-          {/* Manual region creation */}
-          <div className="p-3 border rounded-md space-y-3">
-            <h4 className="font-medium text-sm">Region erstellen</h4>
-            
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="region-x" className="text-xs">X-Position</Label>
-                <Input
-                  id="region-x"
-                  type="number"
-                  min="0"
-                  max={imageSize.width}
-                  value={manualDimensions.x}
-                  onChange={(e) => setManualDimensions({...manualDimensions, x: parseInt(e.target.value) || 0})}
-                  className="h-8"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="region-y" className="text-xs">Y-Position</Label>
-                <Input
-                  id="region-y"
-                  type="number"
-                  min="0"
-                  max={imageSize.height}
-                  value={manualDimensions.y}
-                  onChange={(e) => setManualDimensions({...manualDimensions, y: parseInt(e.target.value) || 0})}
-                  className="h-8"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="region-width" className="text-xs">Breite</Label>
-                <Input
-                  id="region-width"
-                  type="number"
-                  min="20"
-                  max={imageSize.width}
-                  value={manualDimensions.width}
-                  onChange={(e) => setManualDimensions({...manualDimensions, width: parseInt(e.target.value) || 100})}
-                  className="h-8"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="region-height" className="text-xs">Höhe</Label>
-                <Input
-                  id="region-height"
-                  type="number"
-                  min="20"
-                  max={imageSize.height}
-                  value={manualDimensions.height}
-                  onChange={(e) => setManualDimensions({...manualDimensions, height: parseInt(e.target.value) || 100})}
-                  className="h-8"
-                />
-              </div>
-            </div>
-            
-            <Button 
-              type="button" 
-              size="sm" 
-              className="w-full"
-              onClick={handleCreateManualRegion}
             >
-              Region erstellen
-            </Button>
-          </div>
-          
-          {/* Region naming form */}
-          {showForm && selectedRegionId && (
-            <form onSubmit={handleNameRegion} className="p-3 border rounded-md space-y-3">
-              <h4 className="font-medium text-sm">Region benennen</h4>
-              <div className="space-y-2">
-                <Label htmlFor="region-name" className="text-xs">Name der Region</Label>
-                <Input
-                  id="region-name"
-                  value={regionName}
-                  onChange={(e) => setRegionName(e.target.value)}
-                  placeholder="Namen eingeben"
-                  required
-                  className="h-8"
-                />
+              <span className={`bg-background/90 px-1 py-0.5 rounded text-xs ${region.name ? '' : 'text-muted-foreground'}`}>
+                {region.name || 'Unnamed'}
+              </span>
+              
+              {region.isSelected && (
+                <div className="absolute -top-7 left-0 right-0 flex justify-center space-x-1">
+                  <button 
+                    className="bg-background border rounded-md p-1 hover:bg-muted"
+                    onClick={() => handleToggleDrag(region.id)}
+                    title="Move region"
+                  >
+                    <Move className="h-3 w-3" />
+                  </button>
+                  <button 
+                    className="bg-background border rounded-md p-1 hover:bg-muted"
+                    onClick={() => handleToggleResize(region.id)}
+                    title="Resize region"
+                  >
+                    <Square className="h-3 w-3" />
+                  </button>
+                  <button 
+                    className="bg-background border rounded-md p-1 hover:bg-muted"
+                    onClick={() => handleCopyRegion(region.id)}
+                    title="Copy region"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                  <button 
+                    className="bg-background border rounded-md p-1 hover:bg-muted text-red-500 hover:text-red-700"
+                    onClick={() => handleRemoveRegion(region.id)}
+                    title="Delete region"
+                  >
+                    <Trash className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+              
+              {/* Size indicator */}
+              <div className="absolute bottom-0 right-0 bg-background/90 text-xs px-1 py-0.5 rounded">
+                {Math.round(region.width)}×{Math.round(region.height)}
               </div>
               
-              <div className="flex space-x-2">
-                <Button type="submit" size="sm" className="flex-1">Speichern</Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => {
-                  setShowForm(false);
-                  // If the region is new and has no name, remove it
-                  const region = regions.find(r => r.id === selectedRegionId);
-                  if (region && !region.name) {
-                    handleRemoveRegion(selectedRegionId);
-                  }
-                }} className="flex-1">Abbrechen</Button>
-              </div>
-            </form>
-          )}
+              {/* Resize handle */}
+              {region.isSelected && (
+                <div 
+                  className="absolute bottom-0 right-0 w-4 h-4 bg-yellow-500 border border-background rounded-sm cursor-se-resize"
+                  style={{
+                    transform: 'translate(50%, 50%)'
+                  }}
+                />
+              )}
+            </div>
+          ))}
           
-          {/* Regions list */}
-          {regions.length > 0 && (
-            <div className="p-3 border rounded-md space-y-3">
-              <h4 className="font-medium text-sm">Definierte Regionen ({regions.length})</h4>
-              <div className="max-h-60 overflow-y-auto">
-                <ul className="space-y-2">
-                  {regions.map((region) => (
-                    <li 
-                      key={region.id} 
-                      className={`flex justify-between items-center p-2 rounded-md cursor-pointer
-                                ${region.isSelected ? 'bg-yellow-500/10 border border-yellow-500' : 'bg-background hover:bg-muted'}`}
-                      onClick={() => {
-                        setRegions(regions.map(r => ({...r, isSelected: r.id === region.id})));
-                        setSelectedRegionId(region.id);
-                        setRegionName(region.name);
-                        if (!region.name) {
-                          setShowForm(true);
-                        }
-                      }}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <div 
-                          className="w-3 h-3 rounded-sm bg-primary"
-                          style={{backgroundColor: region.isSelected ? 'rgb(234 179 8)' : ''}}
-                        />
-                        <span className={`text-sm ${!region.name && 'text-muted-foreground italic'}`}>
-                          {region.name || 'Unnamed'}
-                        </span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {Math.round(region.width)}×{Math.round(region.height)}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+          {/* Region naming form - positioned next to the selected region */}
+          {showForm && selectedRegionId && (
+            <div 
+              ref={formRef}
+              className="absolute z-10 bg-background border rounded-md shadow-md p-3 w-60"
+              style={getFormPosition()}
+            >
+              <form onSubmit={handleNameRegion} className="space-y-3">
+                <h4 className="font-medium text-sm">Region benennen</h4>
+                {error && (
+                  <div className="p-2 bg-red-100 text-red-700 rounded-md text-xs">
+                    {error}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="region-name" className="text-xs">Name der Region</Label>
+                  <Input
+                    id="region-name"
+                    value={regionName}
+                    onChange={(e) => setRegionName(e.target.value)}
+                    placeholder="Namen eingeben"
+                    required
+                    className="h-8"
+                    autoFocus
+                  />
+                </div>
+                
+                <div className="flex space-x-2">
+                  <Button type="submit" size="sm" className="flex-1">Speichern</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => {
+                    setShowForm(false);
+                    // If the region is new and has no name, remove it
+                    const region = regions.find(r => r.id === selectedRegionId);
+                    if (region && !region.name) {
+                      handleRemoveRegion(selectedRegionId);
+                    }
+                  }} className="flex-1">Abbrechen</Button>
+                </div>
+              </form>
             </div>
           )}
-          
-          {/* Finish button */}
-          <Button 
-            type="button" 
-            onClick={handleComplete}
-            className="w-full"
-            disabled={regions.length === 0 || regions.some(r => !r.name.trim())}
-          >
-            Regionen übernehmen
-          </Button>
         </div>
+        
+        {/* Region list - shown below the image */}
+        {regions.length > 0 && (
+          <div className="mt-4 p-3 border rounded-md space-y-3">
+            <h4 className="font-medium text-sm">Definierte Regionen ({regions.length})</h4>
+            <div className="max-h-40 overflow-y-auto">
+              <ul className="space-y-2">
+                {regions.map((region) => (
+                  <li 
+                    key={region.id} 
+                    className={`flex justify-between items-center p-2 rounded-md cursor-pointer
+                              ${region.isSelected ? 'bg-yellow-500/10 border border-yellow-500' : 'bg-background hover:bg-muted'}`}
+                    onClick={() => {
+                      setRegions(regions.map(r => ({...r, isSelected: r.id === region.id})));
+                      setSelectedRegionId(region.id);
+                      setRegionName(region.name);
+                      
+                      // Position the form menu next to the region
+                      setMenuPosition({
+                        x: region.x + region.width + 10,
+                        y: region.y
+                      });
+                      
+                      if (!region.name) {
+                        setShowForm(true);
+                      }
+                    }}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <div 
+                        className="w-3 h-3 rounded-sm bg-primary"
+                        style={{backgroundColor: region.isSelected ? 'rgb(234 179 8)' : ''}}
+                      />
+                      <span className={`text-sm ${!region.name && 'text-muted-foreground italic'}`}>
+                        {region.name || 'Unnamed'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {Math.round(region.width)}×{Math.round(region.height)}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

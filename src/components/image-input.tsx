@@ -130,11 +130,6 @@ export function ImageInput({ onImageChange, label = 'Bild', initialPreview = nul
                 Entfernen
               </Button>
             </div>
-            
-            <div className="p-3 border border-blue-200 rounded-md bg-blue-50 text-blue-800 text-sm">
-              <p className="font-medium">Bild erfolgreich hochgeladen!</p>
-              <p>Sie können jetzt Regionen auf diesem Bild definieren, indem Sie auf "Regionen auf dem Bild definieren" klicken.</p>
-            </div>
           </div>
         )}
       </div>
