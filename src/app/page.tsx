@@ -79,106 +79,105 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-        
-        {/* Search Results */}
-        {searchResults.length > 0 && (
-          <div className="mt-8 space-y-6">
-            <h2 className="text-2xl font-semibold text-center">{t('search.results')} ({searchResults.length})</h2>
-            <div className="grid gap-4">
-              {searchResults.map((item) => (
-                <Card key={item.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="flex flex-col sm:flex-row">
-                    {item.imagePath && (
-                      <div className="w-full sm:w-32 h-32 flex-shrink-0">
-                        <img 
-                          src={item.imagePath} 
-                          alt={item.name} 
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+      
+      {/* Search Results */}
+      {searchResults.length > 0 && (
+        <div className="mt-8 space-y-6">
+          <h2 className="text-2xl font-semibold text-center">{t('search.results')} ({searchResults.length})</h2>
+          <div className="grid gap-4">
+            {searchResults.map((item) => (
+              <Card key={item.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                <div className="flex flex-col sm:flex-row">
+                  {item.imagePath && (
+                    <div className="w-full sm:w-32 h-32 flex-shrink-0">
+                      <img 
+                        src={item.imagePath} 
+                        alt={item.name} 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <div className="flex-1 p-4">
+                    <div className="flex justify-between items-start">
+                      <h3 className="font-semibold text-lg">{item.name}</h3>
+                      <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                        {t('items.quantity')}: {item.quantity}
+                      </span>
+                    </div>
+                    {item.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
+                        {item.description}
+                      </p>
                     )}
-                    <div className="flex-1 p-4">
-                      <div className="flex justify-between items-start">
-                        <h3 className="font-semibold text-lg">{item.name}</h3>
-                        <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded-full">
-                          {t('items.quantity')}: {item.quantity}
+                    {(item.locationName || item.regionName) && (
+                      <div className="flex items-center mt-3 text-sm">
+                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md flex items-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          {item.locationName && <span>{item.locationName}</span>}
+                          {item.regionName && <span> / {item.regionName}</span>}
                         </span>
                       </div>
-                      {item.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
-                          {item.description}
-                        </p>
-                      )}
-                      {(item.locationName || item.regionName) && (
-                        <div className="flex items-center mt-3 text-sm">
-                          <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            {item.locationName && <span>{item.locationName}</span>}
-                            {item.regionName && <span> / {item.regionName}</span>}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex sm:flex-col justify-between p-4 bg-muted/20 gap-2">
-                      <Link href={`/items/${item.id}`}>
-                        <Button variant="outline" size="sm" className="w-full">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
-                          {t('common.edit')}
-                        </Button>
-                      </Link>
-                      <Link href={`/items/${item.id}/locate`}>
-                        <Button variant="outline" size="sm" className="w-full">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                          </svg>
-                          {t('items.locate')}
-                        </Button>
-                      </Link>
-                      <Button variant="outline" size="sm" className="w-full text-red-600 hover:text-red-700 hover:bg-red-50">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        {t('common.delete')}
-                      </Button>
-                    </div>
+                    )}
                   </div>
-                </Card>
-              ))}
-            </div>
-            <div className="flex justify-center mt-6">
-              <Link href="/inventory">
-                <Button variant="outline" size="lg" className="px-8">
-                  {t('inventory.viewAll')}
-                </Button>
-              </Link>
-            </div>
+                  <div className="flex sm:flex-col justify-between p-4 bg-muted/20 gap-2">
+                    <Link href={`/items/${item.id}`}>
+                      <Button variant="outline" size="sm" className="w-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                        {t('common.edit')}
+                      </Button>
+                    </Link>
+                    <Link href={`/items/${item.id}/locate`}>
+                      <Button variant="outline" size="sm" className="w-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                        </svg>
+                        {t('items.locate')}
+                      </Button>
+                    </Link>
+                    <Button variant="outline" size="sm" className="w-full text-red-600 hover:text-red-700 hover:bg-red-50">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      {t('common.delete')}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
           </div>
-        )}
-        
-        {/* No Results */}
-        {searchQuery && searchResults.length === 0 && !isSearching && (
-          <div className="mt-8 text-center p-8 border rounded-lg bg-muted/10">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-              <Search className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-xl font-medium mb-2">{t('search.noResultsTitle')}</h3>
-            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              {t('search.noResults')}
-            </p>
-            <Link href="/add-item">
-              <Button size="lg">
-                <Plus className="mr-2 h-4 w-4" />
-                {t('items.addNew')}
+          <div className="flex justify-center mt-6">
+            <Link href="/inventory">
+              <Button variant="outline" size="lg" className="px-8">
+                {t('inventory.viewAll')}
               </Button>
             </Link>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+      
+      {/* No Results */}
+      {searchQuery && searchResults.length === 0 && !isSearching && (
+        <div className="mt-8 text-center p-8 border rounded-lg bg-muted/10">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+            <Search className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-xl font-medium mb-2">{t('search.noResultsTitle')}</h3>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            {t('search.noResults')}
+          </p>
+          <Link href="/add-item">
+            <Button size="lg">
+              <Plus className="mr-2 h-4 w-4" />
+              {t('items.addNew')}
+            </Button>
+          </Link>
+        </div>
+      )}
       
       {/* Quick Actions */}
       {!searchResults.length && (
