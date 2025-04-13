@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Copy, Move, Square, Trash } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
+import { useLanguage } from '@/lib/language';
 
 // This is the component used by location-form.tsx
 interface RegionMapperFormProps {
@@ -28,6 +29,8 @@ interface ActiveRegion {
 }
 
 export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: RegionMapperFormProps) {
+  const { t } = useLanguage();
+  
   // Region state
   const [regions, setRegions] = useState<ActiveRegion[]>(
     initialRegions.map((r, i) => ({
@@ -260,7 +263,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     e.preventDefault();
     
     if (!regionName.trim()) {
-      setError('Please enter a region name');
+      setError(t('regions.name') + ' ' + t('common.required'));
       return;
     }
     
@@ -331,7 +334,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     // Check if all regions have names
     const unnamedRegions = regions.filter(r => !r.name.trim());
     if (unnamedRegions.length > 0) {
-      setError(`Please name all regions (${unnamedRegions.length} unnamed)`);
+      setError(`${t('regions.name')} ${t('common.required')} (${unnamedRegions.length} ${t('regions.noRegions')})`);
       return;
     }
     
@@ -363,7 +366,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
   return (
     <div className="space-y-4 border rounded-md p-4 bg-muted/50">
       <div className="flex justify-between items-center">
-        <h3 className="font-medium">Regionen definieren</h3>
+        <h3 className="font-medium">{t('regions.title')}</h3>
         <div className="flex space-x-2">
           <Button 
             type="button" 
@@ -376,7 +379,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
             }}
           >
             <Square className="h-4 w-4 mr-1" />
-            {isCreating ? "Beenden" : "Region zeichnen"}
+            {isCreating ? t('common.cancel') : t('regions.addNew')}
           </Button>
         </div>
       </div>
@@ -406,7 +409,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
               onLoad={handleImageLoad}
               onError={() => {
                 console.error('Failed to load image:', imageSrc);
-                setError('Failed to load image. Please try again with a different image.');
+                setError(t('common.error') + ': ' + t('locations.image'));
               }}
             />
             
@@ -438,7 +441,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                 }}
               >
                 <span className={`bg-background/90 px-1 py-0.5 rounded text-xs ${region.name ? '' : 'text-muted-foreground'}`}>
-                  {region.name || 'Unnamed'}
+                  {region.name || t('regions.name')}
                 </span>
                 
                 {region.isSelected && (
@@ -493,11 +496,11 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
           {/* Image and drawing information */}
           <div className="mt-2 flex justify-between text-xs text-muted-foreground">
             <div>
-              Image dimensions: {imageSize.width}×{imageSize.height}
+              {t('locations.image')} {t('regions.title')}: {imageSize.width}×{imageSize.height}
             </div>
             {isCreating && startPoint && currentPoint && (
               <div>
-                Drawing: {Math.abs(currentPoint.x - startPoint.x)}×{Math.abs(currentPoint.y - startPoint.y)} at 
+                {t('regions.title')}: {Math.abs(currentPoint.x - startPoint.x)}×{Math.abs(currentPoint.y - startPoint.y)} at 
                 ({Math.min(startPoint.x, currentPoint.x)}, {Math.min(startPoint.y, currentPoint.y)})
               </div>
             )}
@@ -507,7 +510,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
         <div className="space-y-4">
           {/* Manual region creation */}
           <div className="p-3 border rounded-md space-y-3">
-            <h4 className="font-medium text-sm">Region erstellen</h4>
+            <h4 className="font-medium text-sm">{t('regions.addNew')}</h4>
             
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
@@ -535,7 +538,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="region-width" className="text-xs">Breite</Label>
+                <Label htmlFor="region-width" className="text-xs">{t('regions.title')} {t('regions.addNew')}</Label>
                 <Input
                   id="region-width"
                   type="number"
@@ -547,7 +550,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="region-height" className="text-xs">Höhe</Label>
+                <Label htmlFor="region-height" className="text-xs">{t('regions.title')} {t('regions.addNew')}</Label>
                 <Input
                   id="region-height"
                   type="number"
@@ -566,28 +569,28 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
               className="w-full"
               onClick={handleCreateManualRegion}
             >
-              Region erstellen
+              {t('regions.addNew')}
             </Button>
           </div>
           
           {/* Region naming form */}
           {showForm && selectedRegionId && (
             <form onSubmit={handleNameRegion} className="p-3 border rounded-md space-y-3">
-              <h4 className="font-medium text-sm">Region benennen</h4>
+              <h4 className="font-medium text-sm">{t('regions.name')}</h4>
               <div className="space-y-2">
-                <Label htmlFor="region-name" className="text-xs">Name der Region</Label>
+                <Label htmlFor="region-name" className="text-xs">{t('regions.name')}</Label>
                 <Input
                   id="region-name"
                   value={regionName}
                   onChange={(e) => setRegionName(e.target.value)}
-                  placeholder="Namen eingeben"
+                  placeholder={t('regions.name')}
                   required
                   className="h-8"
                 />
               </div>
               
               <div className="flex space-x-2">
-                <Button type="submit" size="sm" className="flex-1">Speichern</Button>
+                <Button type="submit" size="sm" className="flex-1">{t('common.save')}</Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => {
                   setShowForm(false);
                   // If the region is new and has no name, remove it
@@ -595,7 +598,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                   if (region && !region.name) {
                     handleRemoveRegion(selectedRegionId);
                   }
-                }} className="flex-1">Abbrechen</Button>
+                }} className="flex-1">{t('common.cancel')}</Button>
               </div>
             </form>
           )}
@@ -603,7 +606,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
           {/* Regions list */}
           {regions.length > 0 && (
             <div className="p-3 border rounded-md space-y-3">
-              <h4 className="font-medium text-sm">Definierte Regionen ({regions.length})</h4>
+              <h4 className="font-medium text-sm">{t('regions.definedRegions')} ({regions.length})</h4>
               <div className="max-h-60 overflow-y-auto">
                 <ul className="space-y-2">
                   {regions.map((region) => (
@@ -626,7 +629,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                           style={{backgroundColor: region.isSelected ? 'rgb(234 179 8)' : ''}}
                         />
                         <span className={`text-sm ${!region.name && 'text-muted-foreground italic'}`}>
-                          {region.name || 'Unnamed'}
+                          {region.name || t('regions.name')}
                         </span>
                       </div>
                       <div className="text-xs text-muted-foreground">
@@ -646,7 +649,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
             className="w-full"
             disabled={regions.length === 0 || regions.some(r => !r.name.trim())}
           >
-            Regionen übernehmen
+            {t('common.save')}
           </Button>
         </div>
       </div>
@@ -661,6 +664,7 @@ interface RegionMapperProps {
 }
 
 export default function RegionMapperOriginal({ locationId, imagePath }: RegionMapperProps) {
+  const { t } = useLanguage();
   // Original implementation continues below...
   const [regions, setRegions] = useState<Region[]>([]);
   const [loading, setLoading] = useState(true);
@@ -677,21 +681,21 @@ export default function RegionMapperOriginal({ locationId, imagePath }: RegionMa
         setRegions(data);
       } catch (err) {
         console.error('Error fetching regions:', err);
-        setError('Failed to fetch regions');
+        setError(t('common.error'));
       } finally {
         setLoading(false);
       }
     };
     
     fetchRegions();
-  }, [locationId]);
+  }, [locationId, t]);
 
   return (
     <div>
       <div className="text-center p-4">
-        {loading && <div>Loading regions...</div>}
+        {loading && <div>{t('common.loading')}</div>}
         {error && <div className="text-red-500">{error}</div>}
-        {!loading && !error && regions.length === 0 && <div>No regions defined yet</div>}
+        {!loading && !error && regions.length === 0 && <div>{t('regions.noRegions')}</div>}
       </div>
       <img src={imagePath} alt="Location" className="max-w-full h-auto border rounded-md" />
     </div>
