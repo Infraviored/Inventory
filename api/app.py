@@ -4,16 +4,17 @@ import os
 import uuid
 from werkzeug.utils import secure_filename
 from pathlib import Path
+import json
 from database import (
     init_db, get_locations, get_location_by_id, add_location, update_location, delete_location,
-    get_location_regions, get_region_by_id, add_location_region, update_location_region, delete_location_region,
+    get_location_regions, get_region_by_id, add_location_region, delete_location_region,
     get_inventory_items, get_inventory_item_by_id, add_inventory_item, update_inventory_item, delete_inventory_item,
     search_items, get_location_breadcrumbs
 )
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='../public')
-CORS(app)  # Enable CORS for all routes
+CORS(app)
 
 # Ensure uploads directory exists
 UPLOADS_DIR = Path('../public/uploads')
@@ -24,9 +25,49 @@ init_db()
 
 # Helper function to generate unique filenames
 def generate_unique_filename(original_filename):
-    """Generate a unique filename by adding a UUID"""
     filename, ext = os.path.splitext(original_filename)
     return f"{filename}_{uuid.uuid4().hex}{ext}"
+
+# Helper function to handle image uploads
+def handle_image_upload(image_file, old_image_path=None):
+    if not image_file or not image_file.filename:
+        return old_image_path
+        
+    # Delete old image if it exists
+    if old_image_path and os.path.exists(UPLOADS_DIR / old_image_path):
+        os.remove(UPLOADS_DIR / old_image_path)
+    
+    filename = generate_unique_filename(secure_filename(image_file.filename))
+    image_file.save(UPLOADS_DIR / filename)
+    return filename
+
+# Helper function to format location data
+def format_location(location):
+    return {
+        'id': location['id'],
+        'name': location['name'],
+        'description': location['description'],
+        'parentId': location['parent_id'],
+        'imagePath': f"/uploads/{location['image_path']}" if location['image_path'] else None,
+        'createdAt': location['created_at'],
+        'updatedAt': location['updated_at']
+    }
+
+# Helper function to format inventory item data
+def format_inventory_item(item):
+    return {
+        'id': item['id'],
+        'name': item['name'],
+        'description': item['description'],
+        'quantity': item['quantity'],
+        'imagePath': f"/uploads/{item['image_path']}" if item['image_path'] else None,
+        'locationId': item['location_id'],
+        'locationName': item['location_name'],
+        'regionId': item['region_id'],
+        'regionName': item['region_name'],
+        'createdAt': item['created_at'],
+        'updatedAt': item['updated_at']
+    }
 
 # Serve static files
 @app.route('/uploads/<path:filename>')
@@ -47,20 +88,7 @@ def get_locations_route():
         else:
             locations = get_locations()
         
-        # Transform the data to include full image paths
-        transformed_locations = []
-        for location in locations:
-            transformed_locations.append({
-                'id': location['id'],
-                'name': location['name'],
-                'description': location['description'],
-                'parentId': location['parent_id'],
-                'imagePath': f"/uploads/{location['image_path']}" if location['image_path'] else None,
-                'createdAt': location['created_at'],
-                'updatedAt': location['updated_at']
-            })
-        
-        return jsonify(transformed_locations)
+        return jsonify([format_location(location) for location in locations])
     except Exception as e:
         print(f"Error fetching locations: {e}")
         return jsonify({"error": "Failed to fetch locations"}), 500
@@ -68,117 +96,105 @@ def get_locations_route():
 @app.route('/api/locations', methods=['POST'])
 def add_location_route():
     try:
+        # Validate required fields
+        if 'name' not in request.form:
+            return jsonify({"error": "Missing required field: name"}), 400
+        
         name = request.form.get('name')
         description = request.form.get('description')
         parent_id_str = request.form.get('parentId')
         parent_id = int(parent_id_str) if parent_id_str else None
+        location_type = request.form.get('locationType')
         
-        image_path = None
-        if 'image' in request.files:
-            image = request.files['image']
-            if image.filename:
-                filename = generate_unique_filename(secure_filename(image.filename))
-                image_path = filename
-                image.save(UPLOADS_DIR / filename)
+        # Process regions data if available
+        regions_data = []
+        regions_json = request.form.get('regions')
+        if regions_json:
+            try:
+                regions_data = json.loads(regions_json)
+                if not isinstance(regions_data, list):
+                    regions_data = []
+            except json.JSONDecodeError:
+                regions_data = []
         
+        # Handle image upload
+        image_path = handle_image_upload(request.files.get('image'))
+        
+        # Create the location
         location_id = add_location(name, parent_id, description, image_path)
+        
+        # Add regions if provided
+        if regions_data and location_id:
+            for region in regions_data:
+                if all(key in region for key in ['name', 'x', 'y', 'width', 'height']):
+                    add_location_region(
+                        location_id,
+                        region['name'],
+                        region['x'],
+                        region['y'],
+                        region['width'],
+                        region['height']
+                    )
         
         new_location = get_location_by_id(location_id)
         
-        return jsonify({
-            'id': new_location['id'],
-            'name': new_location['name'],
-            'description': new_location['description'],
-            'parentId': new_location['parent_id'],
-            'imagePath': f"/uploads/{new_location['image_path']}" if new_location['image_path'] else None,
-            'createdAt': new_location['created_at'],
-            'updatedAt': new_location['updated_at']
-        }), 201
+        # Get the regions for this location
+        location_regions = []
+        regions = get_location_regions(location_id)
+        location_regions = [{
+            'id': r['id'],
+            'name': r['name'],
+            'x': r['x_coord'],
+            'y': r['y_coord'],
+            'width': r['width'],
+            'height': r['height']
+        } for r in regions]
+        
+        response = format_location(new_location)
+        response['regions'] = location_regions
+        response['locationType'] = location_type
+        
+        return jsonify(response), 201
     except Exception as e:
         print(f"Error creating location: {e}")
-        return jsonify({"error": "Failed to create location"}), 500
+        return jsonify({"error": f"Failed to create location: {str(e)}"}), 500
 
-@app.route('/api/locations/<int:location_id>', methods=['GET'])
-def get_location_route(location_id):
+@app.route('/api/locations/<int:location_id>', methods=['GET', 'PUT', 'DELETE'])
+def location_route(location_id):
     try:
         location = get_location_by_id(location_id)
         
         if not location:
             return jsonify({"error": "Location not found"}), 404
         
-        return jsonify({
-            'id': location['id'],
-            'name': location['name'],
-            'description': location['description'],
-            'parentId': location['parent_id'],
-            'imagePath': f"/uploads/{location['image_path']}" if location['image_path'] else None,
-            'createdAt': location['created_at'],
-            'updatedAt': location['updated_at']
-        })
+        if request.method == 'GET':
+            return jsonify(format_location(location))
+            
+        elif request.method == 'PUT':
+            name = request.form.get('name')
+            description = request.form.get('description')
+            parent_id_str = request.form.get('parentId')
+            parent_id = int(parent_id_str) if parent_id_str else None
+            
+            # Handle image upload
+            image_path = handle_image_upload(request.files.get('image'), location['image_path'])
+            
+            update_location(location_id, name, parent_id, description, image_path)
+            updated_location = get_location_by_id(location_id)
+            
+            return jsonify(format_location(updated_location))
+            
+        elif request.method == 'DELETE':
+            # Delete associated image if it exists
+            if location['image_path'] and os.path.exists(UPLOADS_DIR / location['image_path']):
+                os.remove(UPLOADS_DIR / location['image_path'])
+            
+            delete_location(location_id)
+            return jsonify({"success": True})
+            
     except Exception as e:
-        print(f"Error fetching location: {e}")
-        return jsonify({"error": "Failed to fetch location"}), 500
-
-@app.route('/api/locations/<int:location_id>', methods=['PUT'])
-def update_location_route(location_id):
-    try:
-        location = get_location_by_id(location_id)
-        
-        if not location:
-            return jsonify({"error": "Location not found"}), 404
-        
-        name = request.form.get('name')
-        description = request.form.get('description')
-        parent_id_str = request.form.get('parentId')
-        parent_id = int(parent_id_str) if parent_id_str else None
-        
-        image_path = location['image_path']
-        if 'image' in request.files:
-            image = request.files['image']
-            if image.filename:
-                # Delete old image if it exists
-                if image_path and os.path.exists(UPLOADS_DIR / image_path):
-                    os.remove(UPLOADS_DIR / image_path)
-                
-                filename = generate_unique_filename(secure_filename(image.filename))
-                image_path = filename
-                image.save(UPLOADS_DIR / filename)
-        
-        update_location(location_id, name, parent_id, description, image_path)
-        
-        updated_location = get_location_by_id(location_id)
-        
-        return jsonify({
-            'id': updated_location['id'],
-            'name': updated_location['name'],
-            'description': updated_location['description'],
-            'parentId': updated_location['parent_id'],
-            'imagePath': f"/uploads/{updated_location['image_path']}" if updated_location['image_path'] else None,
-            'createdAt': updated_location['created_at'],
-            'updatedAt': updated_location['updated_at']
-        })
-    except Exception as e:
-        print(f"Error updating location: {e}")
-        return jsonify({"error": "Failed to update location"}), 500
-
-@app.route('/api/locations/<int:location_id>', methods=['DELETE'])
-def delete_location_route(location_id):
-    try:
-        location = get_location_by_id(location_id)
-        
-        if not location:
-            return jsonify({"error": "Location not found"}), 404
-        
-        # Delete associated image if it exists
-        if location['image_path'] and os.path.exists(UPLOADS_DIR / location['image_path']):
-            os.remove(UPLOADS_DIR / location['image_path'])
-        
-        delete_location(location_id)
-        
-        return jsonify({"success": True})
-    except Exception as e:
-        print(f"Error deleting location: {e}")
-        return jsonify({"error": "Failed to delete location"}), 500
+        print(f"Error handling location: {e}")
+        return jsonify({"error": f"Failed to {request.method.lower()} location"}), 500
 
 @app.route('/api/locations/<int:location_id>/breadcrumbs', methods=['GET'])
 def get_breadcrumbs_route(location_id):
@@ -188,29 +204,23 @@ def get_breadcrumbs_route(location_id):
         if not breadcrumbs:
             return jsonify({"error": "Location not found"}), 404
         
-        # Transform the data
-        transformed_breadcrumbs = []
-        for location in breadcrumbs:
-            transformed_breadcrumbs.append({
-                'id': location['id'],
-                'name': location['name']
-            })
-        
-        return jsonify(transformed_breadcrumbs)
+        return jsonify([{'id': location['id'], 'name': location['name']} for location in breadcrumbs])
     except Exception as e:
         print(f"Error fetching breadcrumbs: {e}")
         return jsonify({"error": "Failed to fetch breadcrumbs"}), 500
 
 # Region routes
-@app.route('/api/locations/<int:location_id>/regions', methods=['GET'])
-def get_regions_route(location_id):
+@app.route('/api/locations/<int:location_id>/regions', methods=['GET', 'POST'])
+def regions_route(location_id):
     try:
-        regions = get_location_regions(location_id)
+        # Check if location exists
+        location = get_location_by_id(location_id)
+        if not location:
+            return jsonify({"error": f"Location with ID {location_id} not found"}), 404
         
-        # Transform the data
-        transformed_regions = []
-        for region in regions:
-            transformed_regions.append({
+        if request.method == 'GET':
+            regions = get_location_regions(location_id)
+            transformed_regions = [{
                 'id': region['id'],
                 'locationId': region['location_id'],
                 'name': region['name'],
@@ -218,298 +228,145 @@ def get_regions_route(location_id):
                 'y': region['y_coord'],
                 'width': region['width'],
                 'height': region['height']
-            })
-        
-        return jsonify(transformed_regions)
-    except Exception as e:
-        print(f"Error fetching regions: {e}")
-        return jsonify({"error": "Failed to fetch regions"}), 500
-
-@app.route('/api/locations/<int:location_id>/regions', methods=['POST'])
-def add_region_route(location_id):
-    try:
-        print(f"Received region POST request for location {location_id}")
-        
-        # Check if location exists
-        location = get_location_by_id(location_id)
-        if not location:
-            print(f"Error: Location with ID {location_id} not found")
-            return jsonify({"error": f"Location with ID {location_id} not found"}), 404
-        
-        # Get region data from request
-        if request.is_json:
+            } for region in regions]
+            
+            return jsonify(transformed_regions)
+            
+        elif request.method == 'POST':
+            if not request.is_json:
+                return jsonify({"error": "Request must be JSON"}), 400
+                
             data = request.json
-            print(f"Received JSON data: {data}")
-        else:
-            print("Error: Request must be JSON")
-            return jsonify({"error": "Request must be JSON"}), 400
-        
-        # Validate required fields
-        required_fields = ['name', 'x', 'y', 'width', 'height']
-        for field in required_fields:
-            if field not in data:
-                print(f"Error: Missing required field '{field}'")
-                return jsonify({"error": f"Missing required field: {field}"}), 400
-        
-        # Extract values
-        name = data['name']
-        x = data['x']
-        y = data['y']
-        width = data['width']
-        height = data['height']
-        
-        # Add region to database
-        try:
-            region_id = add_location_region(location_id, name, x, y, width, height)
-            print(f"Region created successfully with ID: {region_id}")
-        except Exception as dbErr:
-            print(f"Database error adding region: {dbErr}")
-            return jsonify({"error": f"Database error: {str(dbErr)}"}), 500
-        
-        # Get newly created region
-        new_region = get_region_by_id(region_id)
-        if not new_region:
-            print(f"Error: Failed to retrieve newly created region with ID {region_id}")
-            return jsonify({"error": "Region was created but could not be retrieved"}), 500
-        
-        # Return the region
-        response = {
-            'id': new_region['id'],
-            'locationId': new_region['location_id'],
-            'name': new_region['name'],
-            'x': new_region['x_coord'],
-            'y': new_region['y_coord'],
-            'width': new_region['width'],
-            'height': new_region['height'],
-            'createdAt': new_region['created_at'],
-            'updatedAt': new_region['updated_at']
-        }
-        
-        print(f"Returning newly created region: {response}")
-        return jsonify(response), 201
+            
+            # Validate required fields
+            required_fields = ['name', 'x', 'y', 'width', 'height']
+            for field in required_fields:
+                if field not in data:
+                    return jsonify({"error": f"Missing required field: {field}"}), 400
+            
+            # Add region to database
+            region_id = add_location_region(
+                location_id, 
+                data['name'], 
+                data['x'], 
+                data['y'], 
+                data['width'], 
+                data['height']
+            )
+            
+            # Get newly created region
+            new_region = get_region_by_id(region_id)
+            
+            response = {
+                'id': new_region['id'],
+                'locationId': new_region['location_id'],
+                'name': new_region['name'],
+                'x': new_region['x_coord'],
+                'y': new_region['y_coord'],
+                'width': new_region['width'],
+                'height': new_region['height'],
+                'createdAt': new_region['created_at'],
+                'updatedAt': new_region['updated_at']
+            }
+            
+            return jsonify(response), 201
+            
     except Exception as e:
-        print(f"Unhandled error creating region: {e}")
-        return jsonify({"error": f"Failed to create region: {str(e)}"}), 500
+        print(f"Error handling regions: {e}")
+        return jsonify({"error": f"Failed to {request.method.lower()} regions"}), 500
 
 # Inventory routes
-@app.route('/api/inventory', methods=['GET'])
-def get_inventory_route():
+@app.route('/api/inventory', methods=['GET', 'POST'])
+def inventory_route():
     try:
-        location_id = request.args.get('locationId')
-        region_id = request.args.get('regionId')
-        
-        if location_id:
-            location_id = int(location_id)
-        
-        if region_id:
-            region_id = int(region_id)
-        
-        items = get_inventory_items(location_id, region_id)
-        
-        # Transform the data
-        transformed_items = []
-        for item in items:
-            transformed_items.append({
-                'id': item['id'],
-                'name': item['name'],
-                'description': item['description'],
-                'quantity': item['quantity'],
-                'imagePath': f"/uploads/{item['image_path']}" if item['image_path'] else None,
-                'locationId': item['location_id'],
-                'locationName': item['location_name'],
-                'regionId': item['region_id'],
-                'regionName': item['region_name'],
-                'createdAt': item['created_at'],
-                'updatedAt': item['updated_at']
-            })
-        
-        return jsonify(transformed_items)
-    except Exception as e:
-        print(f"Error fetching inventory items: {e}")
-        return jsonify({"error": "Failed to fetch inventory items"}), 500
-
-@app.route('/api/inventory', methods=['POST'])
-def add_inventory_route():
-    try:
-        print("Received inventory POST request")
-        
-        # Validate that required fields are present
-        if 'name' not in request.form:
-            print("Error: Missing required field: name")
-            return jsonify({"error": "Missing required field: name"}), 400
-        
-        name = request.form.get('name')
-        description = request.form.get('description')
-        quantityStr = request.form.get('quantity')
-        quantity = int(quantityStr) if quantityStr else 1
-        locationIdStr = request.form.get('locationId')
-        locationId = int(locationIdStr) if locationIdStr else None
-        regionIdStr = request.form.get('regionId')
-        regionId = int(regionIdStr) if regionIdStr else None
-        
-        # Validate location existence if provided
-        if locationId is not None:
-            location = get_location_by_id(locationId)
-            if not location:
-                print(f"Error: Location with ID {locationId} not found")
-                return jsonify({"error": f"Location with ID {locationId} not found"}), 404
-        
-        # Validate region existence if provided
-        if regionId is not None:
-            region = get_region_by_id(regionId)
-            if not region:
-                print(f"Error: Region with ID {regionId} not found")
-                return jsonify({"error": f"Region with ID {regionId} not found"}), 404
-        
-        imagePath = None
-        if 'image' in request.files:
-            image = request.files['image']
-            if image.filename:
-                try:
-                    filename = generate_unique_filename(secure_filename(image.filename))
-                    imagePath = filename
-                    image.save(UPLOADS_DIR / filename)
-                except Exception as imgErr:
-                    print(f"Error saving image: {imgErr}")
-                    return jsonify({"error": f"Error saving image: {str(imgErr)}"}), 500
-        
-        # Add the item to the database
-        try:
-            itemId = add_inventory_item(
-                name, 
-                description or None, 
-                quantity, 
-                imagePath, 
-                locationId, 
-                regionId
-            )
-            print(f"Item created successfully with ID: {itemId}")
-        except Exception as dbErr:
-            print(f"Database error adding item: {dbErr}")
-            return jsonify({"error": f"Database error: {str(dbErr)}"}), 500
-        
-        # Get the newly created item
-        newItem = get_inventory_item_by_id(itemId)
-        if not newItem:
-            print(f"Error: Failed to retrieve newly created item with ID {itemId}")
-            return jsonify({"error": "Item was created but could not be retrieved"}), 500
-        
-        # Return the item with proper JSON formatting
-        response = {
-            'id': newItem['id'],
-            'name': newItem['name'],
-            'description': newItem['description'],
-            'quantity': newItem['quantity'],
-            'imagePath': f"/uploads/{newItem['image_path']}" if newItem['image_path'] else None,
-            'locationId': newItem['location_id'],
-            'locationName': newItem['location_name'],
-            'regionId': newItem['region_id'],
-            'regionName': newItem['region_name'],
-            'createdAt': newItem['created_at'],
-            'updatedAt': newItem['updated_at']
-        }
-        
-        print(f"Returning newly created item: {response}")
-        return jsonify(response), 201
-    except Exception as e:
-        print(f"Unhandled error creating inventory item: {e}")
-        return jsonify(
-            {"error": f"Failed to create inventory item: {str(e)}"}
-        ), 500
-
-@app.route('/api/inventory/<int:item_id>', methods=['GET'])
-def get_inventory_item_route(item_id):
-    try:
-        item = get_inventory_item_by_id(item_id)
-        
-        if not item:
-            return jsonify({"error": "Inventory item not found"}), 404
-        
-        return jsonify({
-            'id': item['id'],
-            'name': item['name'],
-            'description': item['description'],
-            'quantity': item['quantity'],
-            'imagePath': f"/uploads/{item['image_path']}" if item['image_path'] else None,
-            'locationId': item['location_id'],
-            'locationName': item['location_name'],
-            'regionId': item['region_id'],
-            'regionName': item['region_name'],
-            'createdAt': item['created_at'],
-            'updatedAt': item['updated_at']
-        })
-    except Exception as e:
-        print(f"Error fetching inventory item: {e}")
-        return jsonify({"error": "Failed to fetch inventory item"}), 500
-
-@app.route('/api/inventory/<int:item_id>', methods=['PUT'])
-def update_inventory_item_route(item_id):
-    try:
-        item = get_inventory_item_by_id(item_id)
-        
-        if not item:
-            return jsonify({"error": "Inventory item not found"}), 404
-        
-        name = request.form.get('name')
-        description = request.form.get('description')
-        quantity_str = request.form.get('quantity')
-        quantity = int(quantity_str) if quantity_str else 1
-        location_id_str = request.form.get('locationId')
-        location_id = int(location_id_str) if location_id_str else None
-        region_id_str = request.form.get('regionId')
-        region_id = int(region_id_str) if region_id_str else None
-        
-        image_path = item['image_path']
-        if 'image' in request.files:
-            image = request.files['image']
-            if image.filename:
-                # Delete old image if it exists
-                if image_path and os.path.exists(UPLOADS_DIR / image_path):
-                    os.remove(UPLOADS_DIR / image_path)
+        if request.method == 'GET':
+            location_id = request.args.get('locationId')
+            region_id = request.args.get('regionId')
+            
+            if location_id:
+                location_id = int(location_id)
+            
+            if region_id:
+                region_id = int(region_id)
+            
+            items = get_inventory_items(location_id, region_id)
+            return jsonify([format_inventory_item(item) for item in items])
+            
+        elif request.method == 'POST':
+            # Validate required fields
+            if 'name' not in request.form:
+                return jsonify({"error": "Missing required field: name"}), 400
+            
+            name = request.form.get('name')
+            description = request.form.get('description')
+            quantity = int(request.form.get('quantity', 1))
+            location_id = int(request.form.get('locationId')) if request.form.get('locationId') else None
+            region_id = int(request.form.get('regionId')) if request.form.get('regionId') else None
+            
+            # Validate location and region if provided
+            if location_id and not get_location_by_id(location_id):
+                return jsonify({"error": f"Location with ID {location_id} not found"}), 404
                 
-                filename = generate_unique_filename(secure_filename(image.filename))
-                image_path = filename
-                image.save(UPLOADS_DIR / filename)
-        
-        update_inventory_item(item_id, name, description, quantity, image_path, location_id, region_id)
-        
-        updated_item = get_inventory_item_by_id(item_id)
-        
-        return jsonify({
-            'id': updated_item['id'],
-            'name': updated_item['name'],
-            'description': updated_item['description'],
-            'quantity': updated_item['quantity'],
-            'imagePath': f"/uploads/{updated_item['image_path']}" if updated_item['image_path'] else None,
-            'locationId': updated_item['location_id'],
-            'locationName': updated_item['location_name'],
-            'regionId': updated_item['region_id'],
-            'regionName': updated_item['region_name'],
-            'createdAt': updated_item['created_at'],
-            'updatedAt': updated_item['updated_at']
-        })
+            if region_id and not get_region_by_id(region_id):
+                return jsonify({"error": f"Region with ID {region_id} not found"}), 404
+            
+            # Handle image upload
+            image_path = handle_image_upload(request.files.get('image'))
+            
+            # Add the item to the database
+            item_id = add_inventory_item(
+                name, 
+                description, 
+                quantity, 
+                image_path, 
+                location_id, 
+                region_id
+            )
+            
+            new_item = get_inventory_item_by_id(item_id)
+            return jsonify(format_inventory_item(new_item)), 201
+            
     except Exception as e:
-        print(f"Error updating inventory item: {e}")
-        return jsonify({"error": "Failed to update inventory item"}), 500
+        print(f"Error handling inventory: {e}")
+        return jsonify({"error": f"Failed to {request.method.lower()} inventory"}), 500
 
-@app.route('/api/inventory/<int:item_id>', methods=['DELETE'])
-def delete_inventory_item_route(item_id):
+@app.route('/api/inventory/<int:item_id>', methods=['GET', 'PUT', 'DELETE'])
+def inventory_item_route(item_id):
     try:
         item = get_inventory_item_by_id(item_id)
         
         if not item:
             return jsonify({"error": "Inventory item not found"}), 404
         
-        # Delete associated image if it exists
-        if item['image_path'] and os.path.exists(UPLOADS_DIR / item['image_path']):
-            os.remove(UPLOADS_DIR / item['image_path'])
-        
-        delete_inventory_item(item_id)
-        
-        return jsonify({"success": True})
+        if request.method == 'GET':
+            return jsonify(format_inventory_item(item))
+            
+        elif request.method == 'PUT':
+            name = request.form.get('name')
+            description = request.form.get('description')
+            quantity = int(request.form.get('quantity', 1))
+            location_id = int(request.form.get('locationId')) if request.form.get('locationId') else None
+            region_id = int(request.form.get('regionId')) if request.form.get('regionId') else None
+            
+            # Handle image upload
+            image_path = handle_image_upload(request.files.get('image'), item['image_path'])
+            
+            update_inventory_item(item_id, name, description, quantity, image_path, location_id, region_id)
+            updated_item = get_inventory_item_by_id(item_id)
+            
+            return jsonify(format_inventory_item(updated_item))
+            
+        elif request.method == 'DELETE':
+            # Delete associated image if it exists
+            if item['image_path'] and os.path.exists(UPLOADS_DIR / item['image_path']):
+                os.remove(UPLOADS_DIR / item['image_path'])
+            
+            delete_inventory_item(item_id)
+            return jsonify({"success": True})
+            
     except Exception as e:
-        print(f"Error deleting inventory item: {e}")
-        return jsonify({"error": "Failed to delete inventory item"}), 500
+        print(f"Error handling inventory item: {e}")
+        return jsonify({"error": f"Failed to {request.method.lower()} inventory item"}), 500
 
 # Search route
 @app.route('/api/search', methods=['GET'])
@@ -521,25 +378,7 @@ def search_route():
             return jsonify([])
         
         results = search_items(query)
-        
-        # Transform the data
-        transformed_results = []
-        for item in results:
-            transformed_results.append({
-                'id': item['id'],
-                'name': item['name'],
-                'description': item['description'],
-                'quantity': item['quantity'],
-                'imagePath': f"/uploads/{item['image_path']}" if item['image_path'] else None,
-                'locationId': item['location_id'],
-                'locationName': item['location_name'],
-                'regionId': item['region_id'],
-                'regionName': item['region_name'],
-                'createdAt': item['created_at'],
-                'updatedAt': item['updated_at']
-            })
-        
-        return jsonify(transformed_results)
+        return jsonify([format_inventory_item(item) for item in results])
     except Exception as e:
         print(f"Error searching items: {e}")
         return jsonify({"error": "Failed to search items"}), 500
@@ -581,7 +420,6 @@ def led_route(item_id):
                 'width': region['width'],
                 'height': region['height']
             },
-            # Center point of the region (for LED positioning)
             'ledPosition': {
                 'x': region['x_coord'] + (region['width'] / 2),
                 'y': region['y_coord'] + (region['height'] / 2)

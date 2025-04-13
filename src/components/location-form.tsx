@@ -180,14 +180,20 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
         />
         
         {imagePreview && !showRegionMapper && (
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={handleDefineRegions}
-            className="w-full"
-          >
-            Regionen auf dem Bild definieren
-          </Button>
+          <div className="mt-4 p-4 border-2 border-primary border-dashed rounded-md bg-primary/5">
+            <div className="flex flex-col items-center space-y-3">
+              <h3 className="font-medium text-center">Region Mapping verfügbar!</h3>
+              <p className="text-sm text-center">Sie können jetzt Regionen in Ihrem Bild definieren, um später Inventar-Positionen genauer zu verfolgen.</p>
+              <Button 
+                type="button" 
+                variant="default" 
+                onClick={handleDefineRegions}
+                className="w-full"
+              >
+                Regionen auf dem Bild definieren
+              </Button>
+            </div>
+          </div>
         )}
         
         {showRegionMapper && imagePreview && (

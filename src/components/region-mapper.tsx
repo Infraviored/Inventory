@@ -5,6 +5,8 @@ import { getLocationRegions, addLocationRegion, Region } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Copy, Move, Square, Trash } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
 
 // This is the component used by location-form.tsx
 interface RegionMapperFormProps {
@@ -13,96 +15,248 @@ interface RegionMapperFormProps {
   initialRegions?: Array<{name: string, x: number, y: number, width: number, height: number}>;
 }
 
+interface ActiveRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  id: string;
+  name: string;
+  isSelected: boolean;
+  isResizing: boolean;
+  isDragging: boolean;
+}
+
 export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: RegionMapperFormProps) {
-  const [regions, setRegions] = useState<Array<{name: string, x: number, y: number, width: number, height: number}>>(initialRegions);
-  const [drawing, setDrawing] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [startY, setStartY] = useState(0);
-  const [currentX, setCurrentX] = useState(0);
-  const [currentY, setCurrentY] = useState(0);
+  // Region state
+  const [regions, setRegions] = useState<ActiveRegion[]>(
+    initialRegions.map((r, i) => ({
+      ...r,
+      id: `region-${i}-${Date.now()}`,
+      isSelected: false,
+      isResizing: false,
+      isDragging: false,
+    }))
+  );
+  
+  // UI state
+  const [isCreating, setIsCreating] = useState(false);
+  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [regionName, setRegionName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const [manualDimensions, setManualDimensions] = useState({
+    x: 10,
+    y: 10,
+    width: 100,
+    height: 100
+  });
+
+  // Drawing state
+  const [startPoint, setStartPoint] = useState<{x: number, y: number} | null>(null);
+  const [currentPoint, setCurrentPoint] = useState<{x: number, y: number} | null>(null);
+  
+  // Refs
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
-  // Log on mount to verify component is initialized correctly
+  // Load image dimensions on mount
+  useEffect(() => {
+    if (imageRef.current && imageRef.current.complete) {
+      setImageSize({
+        width: imageRef.current.naturalWidth,
+        height: imageRef.current.naturalHeight
+      });
+    }
+  }, [imageSrc]);
+
+  // Handle image load
+  const handleImageLoad = () => {
+    if (imageRef.current) {
+      setImageSize({
+        width: imageRef.current.naturalWidth,
+        height: imageRef.current.naturalHeight
+      });
+    }
+  };
+
+  // Logging for debugging
   useEffect(() => {
     console.log('RegionMapper initialized with image:', imageSrc);
     console.log('Initial regions:', initialRegions);
   }, [imageSrc, initialRegions]);
 
-  // Handle mouse down (start drawing)
+  // Handle mouse down (start drawing or select region)
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!containerRef.current || !imageRef.current) {
-      console.error('Container or image ref not available');
+    if (!containerRef.current) return;
+    
+    e.preventDefault();
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // If we're in creation mode, set start point
+    if (isCreating) {
+      if (!startPoint) {
+        // First click - start drawing
+        setStartPoint({ x, y });
+        setCurrentPoint({ x, y });
+        console.log(`Started drawing at (${x}, ${y})`);
+      } else {
+        // Second click - finish drawing
+        const width = Math.abs(x - startPoint.x);
+        const height = Math.abs(y - startPoint.y);
+        
+        if (width > 10 && height > 10) {
+          const left = Math.min(startPoint.x, x);
+          const top = Math.min(startPoint.y, y);
+
+          // Create the new region temporarily
+          const newRegion: ActiveRegion = {
+            id: `region-${Date.now()}`,
+            name: '',
+            x: left,
+            y: top,
+            width,
+            height,
+            isSelected: true,
+            isResizing: false,
+            isDragging: false
+          };
+          
+          setRegions(prev => prev.map(r => ({ ...r, isSelected: false })).concat(newRegion));
+          setSelectedRegionId(newRegion.id);
+          setRegionName('');
+          setShowForm(true);
+          
+          console.log(`Created region: ${width}x${height} at (${left},${top})`);
+        } else {
+          console.log('Region too small, ignoring');
+        }
+        
+        // Reset drawing state
+        setStartPoint(null);
+        setCurrentPoint(null);
+      }
       return;
     }
     
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    // If we're not creating, check if we clicked on a region
+    const clickedRegion = regions.find(region => 
+      x >= region.x && 
+      x <= (region.x + region.width) && 
+      y >= region.y && 
+      y <= (region.y + region.height)
+    );
     
-    setStartX(x);
-    setStartY(y);
-    setCurrentX(x);
-    setCurrentY(y);
-    setDrawing(true);
-    console.log(`Started drawing at (${x}, ${y})`);
-  };
-
-  // Handle mouse move (update rectangle)
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!drawing || !containerRef.current) return;
-    
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    setCurrentX(x);
-    setCurrentY(y);
-  };
-
-  // Handle mouse up (finish drawing)
-  const handleMouseUp = () => {
-    if (!drawing) return;
-    
-    setDrawing(false);
-    
-    const width = Math.abs(currentX - startX);
-    const height = Math.abs(currentY - startY);
-    
-    console.log(`Finished drawing, size: ${width}x${height}`);
-    
-    // Only show form if the rectangle has a minimum size
-    if (width > 10 && height > 10) {
-      setShowForm(true);
+    if (clickedRegion) {
+      // Select the region and deselect others
+      setRegions(regions.map(r => ({
+        ...r,
+        isSelected: r.id === clickedRegion.id,
+        isDragging: r.id === clickedRegion.id
+      })));
+      setSelectedRegionId(clickedRegion.id);
+      setRegionName(clickedRegion.name);
     } else {
-      console.log('Rectangle too small, ignoring');
+      // Clicked outside any region, deselect all
+      setRegions(regions.map(r => ({ ...r, isSelected: false, isDragging: false })));
+      setSelectedRegionId(null);
+      setShowForm(false);
     }
   };
 
-  // Calculate rectangle dimensions
-  const getRectStyle = () => {
-    if (!drawing && !showForm) return { display: 'none' };
+  // Handle mouse move (update rectangle or drag)
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!containerRef.current) return;
     
-    const left = Math.min(startX, currentX);
-    const top = Math.min(startY, currentY);
-    const width = Math.abs(currentX - startX);
-    const height = Math.abs(currentY - startY);
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     
-    return {
-      left: `${left}px`,
-      top: `${top}px`,
-      width: `${width}px`,
-      height: `${height}px`,
-      borderColor: '#3b82f6',
-      backgroundColor: '#3b82f633',
-    };
+    // If we're drawing, update current point
+    if (isCreating && startPoint) {
+      setCurrentPoint({ x, y });
+      return;
+    }
+    
+    // If we're dragging a region
+    const draggingRegion = regions.find(r => r.isDragging);
+    if (draggingRegion) {
+      // Calculate movement
+      const deltaX = x - (draggingRegion.x + draggingRegion.width / 2);
+      const deltaY = y - (draggingRegion.y + draggingRegion.height / 2);
+      
+      // Update region position
+      setRegions(regions.map(r => {
+        if (r.id === draggingRegion.id) {
+          return {
+            ...r,
+            x: Math.max(0, Math.min(r.x + deltaX, imageSize.width - r.width)),
+            y: Math.max(0, Math.min(r.y + deltaY, imageSize.height - r.height))
+          };
+        }
+        return r;
+      }));
+    }
+    
+    // If we're resizing a region
+    const resizingRegion = regions.find(r => r.isResizing);
+    if (resizingRegion) {
+      setRegions(regions.map(r => {
+        if (r.id === resizingRegion.id) {
+          const newWidth = Math.max(20, x - r.x);
+          const newHeight = Math.max(20, y - r.y);
+          return {
+            ...r,
+            width: newWidth,
+            height: newHeight
+          };
+        }
+        return r;
+      }));
+    }
   };
 
-  // Handle form submission
-  const handleAddRegion = (e: React.FormEvent) => {
+  // Handle mouse up (finish dragging or resizing)
+  const handleMouseUp = () => {
+    // End any dragging or resizing
+    setRegions(regions.map(r => ({
+      ...r,
+      isDragging: false,
+      isResizing: false
+    })));
+  };
+
+  // Create region from manual dimensions
+  const handleCreateManualRegion = () => {
+    // Validate dimensions are within image bounds
+    const { x, y, width, height } = manualDimensions;
+    
+    if (x < 0 || y < 0 || width <= 0 || height <= 0 || 
+        x + width > imageSize.width || y + height > imageSize.height) {
+      setError('Region dimensions must be within image bounds');
+      return;
+    }
+    
+    const newRegion: ActiveRegion = {
+      id: `region-${Date.now()}`,
+      name: '',
+      x, y, width, height,
+      isSelected: true,
+      isResizing: false,
+      isDragging: false
+    };
+    
+    setRegions(prev => prev.map(r => ({ ...r, isSelected: false })).concat(newRegion));
+    setSelectedRegionId(newRegion.id);
+    setRegionName('');
+    setShowForm(true);
+  };
+
+  // Handle form submission to name a region
+  const handleNameRegion = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!regionName.trim()) {
@@ -110,140 +264,391 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       return;
     }
     
-    const left = Math.min(startX, currentX);
-    const top = Math.min(startY, currentY);
-    const width = Math.abs(currentX - startX);
-    const height = Math.abs(currentY - startY);
+    setRegions(regions.map(r => {
+      if (r.id === selectedRegionId) {
+        return { ...r, name: regionName };
+      }
+      return r;
+    }));
     
-    const newRegion = {
-      name: regionName,
-      x: left,
-      y: top,
-      width,
-      height,
-    };
-    
-    const updatedRegions = [...regions, newRegion];
-    setRegions(updatedRegions);
-    setRegionName('');
     setShowForm(false);
     setError(null);
     
-    console.log('Added new region:', newRegion);
-    console.log('Updated regions:', updatedRegions);
+    console.log(`Named region ${selectedRegionId} as "${regionName}"`);
   };
 
-  const handleRemoveRegion = (index: number) => {
-    const updatedRegions = [...regions];
-    const removedRegion = updatedRegions[index];
-    updatedRegions.splice(index, 1);
-    setRegions(updatedRegions);
-    console.log('Removed region:', removedRegion);
+  // Remove a region
+  const handleRemoveRegion = (id: string) => {
+    setRegions(regions.filter(r => r.id !== id));
+    if (selectedRegionId === id) {
+      setSelectedRegionId(null);
+      setShowForm(false);
+    }
   };
 
+  // Copy a region
+  const handleCopyRegion = (id: string) => {
+    const regionToCopy = regions.find(r => r.id === id);
+    if (!regionToCopy) return;
+    
+    const newRegion: ActiveRegion = {
+      ...regionToCopy,
+      id: `region-${Date.now()}`,
+      name: `${regionToCopy.name} (Copy)`,
+      x: regionToCopy.x + 20,
+      y: regionToCopy.y + 20,
+      isSelected: true
+    };
+    
+    setRegions(prev => 
+      prev.map(r => ({ ...r, isSelected: false })).concat(newRegion)
+    );
+    setSelectedRegionId(newRegion.id);
+  };
+
+  // Toggle resize mode for a region
+  const handleToggleResize = (id: string) => {
+    setRegions(regions.map(r => {
+      if (r.id === id) {
+        return { ...r, isResizing: !r.isResizing, isDragging: false };
+      }
+      return { ...r, isResizing: false };
+    }));
+  };
+
+  // Toggle drag mode for a region
+  const handleToggleDrag = (id: string) => {
+    setRegions(regions.map(r => {
+      if (r.id === id) {
+        return { ...r, isDragging: !r.isDragging, isResizing: false };
+      }
+      return { ...r, isDragging: false };
+    }));
+  };
+
+  // Complete the mapping process
   const handleComplete = () => {
-    console.log('Completing region mapping with:', regions);
-    onComplete(regions);
+    // Check if all regions have names
+    const unnamedRegions = regions.filter(r => !r.name.trim());
+    if (unnamedRegions.length > 0) {
+      setError(`Please name all regions (${unnamedRegions.length} unnamed)`);
+      return;
+    }
+    
+    const formattedRegions = regions.map(({ name, x, y, width, height }) => ({
+      name, x, y, width, height
+    }));
+    
+    console.log('Completing region mapping with:', formattedRegions);
+    onComplete(formattedRegions);
+  };
+
+  // Calculate styles for the currently drawing rectangle
+  const getDrawingRectStyle = () => {
+    if (!isCreating || !startPoint || !currentPoint) return { display: 'none' };
+    
+    const left = Math.min(startPoint.x, currentPoint.x);
+    const top = Math.min(startPoint.y, currentPoint.y);
+    const width = Math.abs(currentPoint.x - startPoint.x);
+    const height = Math.abs(currentPoint.y - startPoint.y);
+    
+    return {
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${width}px`,
+      height: `${height}px`,
+    };
   };
 
   return (
     <div className="space-y-4 border rounded-md p-4 bg-muted/50">
-      <h3 className="font-medium">Regionen definieren</h3>
-      
-      {error && (
-        <div className="p-2 bg-red-100 text-red-700 rounded-md text-sm">
-          {error}
-        </div>
-      )}
-      
-      <div 
-        ref={containerRef} 
-        className="relative overflow-hidden border rounded-md cursor-crosshair"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={() => drawing && setDrawing(false)}
-      >
-        <img 
-          ref={imageRef}
-          src={imageSrc}
-          alt="Image to define regions on"
-          className="max-w-full h-auto"
-          onError={() => {
-            console.error('Failed to load image:', imageSrc);
-            setError('Failed to load image. Please try again with a different image.');
-          }}
-        />
-        
-        {/* Drawing rectangle */}
-        <div 
-          className="absolute border-2 border-primary pointer-events-none" 
-          style={getRectStyle()}
-        />
-        
-        {/* Existing regions */}
-        {regions.map((region, i) => (
-          <div 
-            key={i}
-            className="absolute border-2 border-primary bg-primary/20 flex items-center justify-center text-xs font-medium"
-            style={{
-              left: `${region.x}px`,
-              top: `${region.y}px`,
-              width: `${region.width}px`,
-              height: `${region.height}px`,
+      <div className="flex justify-between items-center">
+        <h3 className="font-medium">Regionen definieren</h3>
+        <div className="flex space-x-2">
+          <Button 
+            type="button" 
+            size="sm"
+            variant={isCreating ? "secondary" : "outline"}
+            onClick={() => {
+              setIsCreating(!isCreating);
+              setStartPoint(null);
+              setCurrentPoint(null);
             }}
           >
-            <span className="bg-background/80 px-1 py-0.5 rounded">{region.name}</span>
-          </div>
-        ))}
+            <Square className="h-4 w-4 mr-1" />
+            {isCreating ? "Beenden" : "Region zeichnen"}
+          </Button>
+        </div>
       </div>
       
-      {showForm && (
-        <form onSubmit={handleAddRegion} className="space-y-3">
-          <div className="space-y-2">
-            <Label htmlFor="region-name">Region Name</Label>
-            <Input
-              id="region-name"
-              value={regionName}
-              onChange={(e) => setRegionName(e.target.value)}
-              placeholder="Enter name for this region"
-              required
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          {error && (
+            <div className="p-2 mb-2 bg-red-100 text-red-700 rounded-md text-sm">
+              {error}
+            </div>
+          )}
+          
+          <div 
+            ref={containerRef} 
+            className="relative overflow-hidden border rounded-md"
+            style={{ cursor: isCreating ? 'crosshair' : 'default' }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+            <img 
+              ref={imageRef}
+              src={imageSrc}
+              alt="Image to define regions on"
+              className="max-w-full h-auto"
+              onLoad={handleImageLoad}
+              onError={() => {
+                console.error('Failed to load image:', imageSrc);
+                setError('Failed to load image. Please try again with a different image.');
+              }}
             />
+            
+            {/* Currently drawing rectangle */}
+            {isCreating && startPoint && (
+              <div 
+                className="absolute border-2 border-primary bg-primary/20 pointer-events-none"
+                style={getDrawingRectStyle()}
+              >
+                {currentPoint && (
+                  <div className="absolute bottom-0 right-0 bg-background/90 text-xs px-1 py-0.5 rounded">
+                    {Math.abs(currentPoint.x - startPoint.x)}×{Math.abs(currentPoint.y - startPoint.y)}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Existing regions */}
+            {regions.map((region) => (
+              <div 
+                key={region.id}
+                className={`absolute border-2 ${region.isSelected ? 'border-yellow-500' : 'border-primary'} 
+                            ${region.isSelected ? 'bg-yellow-500/20' : 'bg-primary/20'} flex items-center justify-center`}
+                style={{
+                  left: `${region.x}px`,
+                  top: `${region.y}px`,
+                  width: `${region.width}px`,
+                  height: `${region.height}px`,
+                }}
+              >
+                <span className={`bg-background/90 px-1 py-0.5 rounded text-xs ${region.name ? '' : 'text-muted-foreground'}`}>
+                  {region.name || 'Unnamed'}
+                </span>
+                
+                {region.isSelected && (
+                  <div className="absolute -top-7 left-0 right-0 flex justify-center space-x-1">
+                    <button 
+                      className="bg-background border rounded-md p-1 hover:bg-muted"
+                      onClick={() => handleToggleDrag(region.id)}
+                      title="Move region"
+                    >
+                      <Move className="h-3 w-3" />
+                    </button>
+                    <button 
+                      className="bg-background border rounded-md p-1 hover:bg-muted"
+                      onClick={() => handleToggleResize(region.id)}
+                      title="Resize region"
+                    >
+                      <Square className="h-3 w-3" />
+                    </button>
+                    <button 
+                      className="bg-background border rounded-md p-1 hover:bg-muted"
+                      onClick={() => handleCopyRegion(region.id)}
+                      title="Copy region"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </button>
+                    <button 
+                      className="bg-background border rounded-md p-1 hover:bg-muted text-red-500 hover:text-red-700"
+                      onClick={() => handleRemoveRegion(region.id)}
+                      title="Delete region"
+                    >
+                      <Trash className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+                
+                {/* Size indicator */}
+                <div className="absolute bottom-0 right-0 bg-background/90 text-xs px-1 py-0.5 rounded">
+                  {Math.round(region.width)}×{Math.round(region.height)}
+                </div>
+                
+                {/* Resize handle */}
+                {region.isSelected && (
+                  <div 
+                    className="absolute bottom-0 right-0 w-4 h-4 bg-yellow-500 border border-background rounded-sm cursor-se-resize"
+                    style={{ transform: 'translate(50%, 50%)' }}
+                  />
+                )}
+              </div>
+            ))}
           </div>
           
-          <div className="flex space-x-2">
-            <Button type="submit" size="sm">Add Region</Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+          {/* Image and drawing information */}
+          <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+            <div>
+              Image dimensions: {imageSize.width}×{imageSize.height}
+            </div>
+            {isCreating && startPoint && currentPoint && (
+              <div>
+                Drawing: {Math.abs(currentPoint.x - startPoint.x)}×{Math.abs(currentPoint.y - startPoint.y)} at 
+                ({Math.min(startPoint.x, currentPoint.x)}, {Math.min(startPoint.y, currentPoint.y)})
+              </div>
+            )}
           </div>
-        </form>
-      )}
-      
-      {regions.length > 0 && (
-        <div className="space-y-3">
-          <h4 className="font-medium">Defined Regions ({regions.length})</h4>
-          <ul className="space-y-2">
-            {regions.map((region, i) => (
-              <li key={i} className="flex justify-between items-center p-2 bg-background rounded-md">
-                <span>{region.name}</span>
-                <Button 
-                  type="button" 
-                  size="sm" 
-                  variant="ghost" 
-                  onClick={() => handleRemoveRegion(i)} 
-                  className="h-7 w-7 p-0"
-                >
-                  ×
-                </Button>
-              </li>
-            ))}
-          </ul>
         </div>
-      )}
-      
-      <div className="flex justify-end space-x-2">
-        <Button type="button" onClick={handleComplete}>
-          Complete
-        </Button>
+        
+        <div className="space-y-4">
+          {/* Manual region creation */}
+          <div className="p-3 border rounded-md space-y-3">
+            <h4 className="font-medium text-sm">Region erstellen</h4>
+            
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="region-x" className="text-xs">X-Position</Label>
+                <Input
+                  id="region-x"
+                  type="number"
+                  min="0"
+                  max={imageSize.width}
+                  value={manualDimensions.x}
+                  onChange={(e) => setManualDimensions({...manualDimensions, x: parseInt(e.target.value) || 0})}
+                  className="h-8"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="region-y" className="text-xs">Y-Position</Label>
+                <Input
+                  id="region-y"
+                  type="number"
+                  min="0"
+                  max={imageSize.height}
+                  value={manualDimensions.y}
+                  onChange={(e) => setManualDimensions({...manualDimensions, y: parseInt(e.target.value) || 0})}
+                  className="h-8"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="region-width" className="text-xs">Breite</Label>
+                <Input
+                  id="region-width"
+                  type="number"
+                  min="20"
+                  max={imageSize.width}
+                  value={manualDimensions.width}
+                  onChange={(e) => setManualDimensions({...manualDimensions, width: parseInt(e.target.value) || 100})}
+                  className="h-8"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="region-height" className="text-xs">Höhe</Label>
+                <Input
+                  id="region-height"
+                  type="number"
+                  min="20"
+                  max={imageSize.height}
+                  value={manualDimensions.height}
+                  onChange={(e) => setManualDimensions({...manualDimensions, height: parseInt(e.target.value) || 100})}
+                  className="h-8"
+                />
+              </div>
+            </div>
+            
+            <Button 
+              type="button" 
+              size="sm" 
+              className="w-full"
+              onClick={handleCreateManualRegion}
+            >
+              Region erstellen
+            </Button>
+          </div>
+          
+          {/* Region naming form */}
+          {showForm && selectedRegionId && (
+            <form onSubmit={handleNameRegion} className="p-3 border rounded-md space-y-3">
+              <h4 className="font-medium text-sm">Region benennen</h4>
+              <div className="space-y-2">
+                <Label htmlFor="region-name" className="text-xs">Name der Region</Label>
+                <Input
+                  id="region-name"
+                  value={regionName}
+                  onChange={(e) => setRegionName(e.target.value)}
+                  placeholder="Namen eingeben"
+                  required
+                  className="h-8"
+                />
+              </div>
+              
+              <div className="flex space-x-2">
+                <Button type="submit" size="sm" className="flex-1">Speichern</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => {
+                  setShowForm(false);
+                  // If the region is new and has no name, remove it
+                  const region = regions.find(r => r.id === selectedRegionId);
+                  if (region && !region.name) {
+                    handleRemoveRegion(selectedRegionId);
+                  }
+                }} className="flex-1">Abbrechen</Button>
+              </div>
+            </form>
+          )}
+          
+          {/* Regions list */}
+          {regions.length > 0 && (
+            <div className="p-3 border rounded-md space-y-3">
+              <h4 className="font-medium text-sm">Definierte Regionen ({regions.length})</h4>
+              <div className="max-h-60 overflow-y-auto">
+                <ul className="space-y-2">
+                  {regions.map((region) => (
+                    <li 
+                      key={region.id} 
+                      className={`flex justify-between items-center p-2 rounded-md cursor-pointer
+                                ${region.isSelected ? 'bg-yellow-500/10 border border-yellow-500' : 'bg-background hover:bg-muted'}`}
+                      onClick={() => {
+                        setRegions(regions.map(r => ({...r, isSelected: r.id === region.id})));
+                        setSelectedRegionId(region.id);
+                        setRegionName(region.name);
+                        if (!region.name) {
+                          setShowForm(true);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <div 
+                          className="w-3 h-3 rounded-sm bg-primary"
+                          style={{backgroundColor: region.isSelected ? 'rgb(234 179 8)' : ''}}
+                        />
+                        <span className={`text-sm ${!region.name && 'text-muted-foreground italic'}`}>
+                          {region.name || 'Unnamed'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {Math.round(region.width)}×{Math.round(region.height)}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+          
+          {/* Finish button */}
+          <Button 
+            type="button" 
+            onClick={handleComplete}
+            className="w-full"
+            disabled={regions.length === 0 || regions.some(r => !r.name.trim())}
+          >
+            Regionen übernehmen
+          </Button>
+        </div>
       </div>
     </div>
   );

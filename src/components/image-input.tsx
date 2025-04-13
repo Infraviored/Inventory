@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
+import { AlertCircle } from 'lucide-react';
 
 interface ImageInputProps {
   onImageChange: (file: File | null, croppedImage?: string) => void;
@@ -14,22 +15,39 @@ interface ImageInputProps {
 export function ImageInput({ onImageChange, label = 'Bild', initialPreview = null }: ImageInputProps) {
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(initialPreview);
-  const [showCropper, setShowCropper] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       setImage(file);
+      setImageError(null);
       
       const reader = new FileReader();
       reader.onload = () => {
-        setPreview(reader.result as string);
+        const result = reader.result as string;
+        setPreview(result);
+        
+        // Create a temporary image to check if it loads properly
+        const img = document.createElement('img');
+        img.onload = () => {
+          // Successfully loaded
+          onImageChange(file, result);
+        };
+        img.onerror = () => {
+          setImageError('Bild konnte nicht geladen werden. Bitte versuchen Sie ein anderes Format.');
+          setPreview(null);
+          onImageChange(null);
+        };
+        img.src = result;
+      };
+      reader.onerror = () => {
+        setImageError('Fehler beim Lesen der Datei.');
+        setPreview(null);
+        onImageChange(null);
       };
       reader.readAsDataURL(file);
-      
-      // Pass the file to parent component
-      onImageChange(file);
     }
   };
 
@@ -42,7 +60,7 @@ export function ImageInput({ onImageChange, label = 'Bild', initialPreview = nul
   const handleRemoveImage = () => {
     setImage(null);
     setPreview(null);
-    setShowCropper(false);
+    setImageError(null);
     onImageChange(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -84,6 +102,13 @@ export function ImageInput({ onImageChange, label = 'Bild', initialPreview = nul
           </Button>
         </div>
         
+        {imageError && (
+          <div className="flex items-center p-3 mt-2 text-sm border border-red-200 rounded-md bg-red-50 text-red-800">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            {imageError}
+          </div>
+        )}
+        
         {preview && (
           <div className="mt-2 space-y-2">
             <div className="relative aspect-video w-full overflow-hidden rounded-md border">
@@ -104,6 +129,11 @@ export function ImageInput({ onImageChange, label = 'Bild', initialPreview = nul
               >
                 Entfernen
               </Button>
+            </div>
+            
+            <div className="p-3 border border-blue-200 rounded-md bg-blue-50 text-blue-800 text-sm">
+              <p className="font-medium">Bild erfolgreich hochgeladen!</p>
+              <p>Sie können jetzt Regionen auf diesem Bild definieren, indem Sie auf "Regionen auf dem Bild definieren" klicken.</p>
             </div>
           </div>
         )}
