@@ -24,8 +24,8 @@
 - [x] Add language toggle functionality
 
 ## Testing and Finalization
-- [ ] Test all implemented features
-- [ ] Verify database functionality
-- [ ] Verify region mapper with localizations
-- [ ] Verify language switching
-- [ ] Create branch and push changes to GitHub
+- [x] Test all implemented features
+- [x] Verify database functionality
+- [x] Verify region mapper with localizations
+- [x] Verify language switching
+- [x] Create branch and push changes to GitHub
