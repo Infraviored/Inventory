@@ -26,8 +26,12 @@ export async function GET(request: NextRequest) {
     if (parentId) {
       locations = await storage.getLocationsByParentId(parseInt(parentId));
     } else if (isRoot === 'true') {
-      locations = await storage.getRootLocations();
+      // Use the correct method name from the storage provider
+      locations = await storage.getAllLocations();
+      // Filter for root locations (parentId is null)
+      locations = locations.filter(loc => loc.parentId === null);
     } else {
+      // Use the correct method name from the storage provider
       locations = await storage.getAllLocations();
     }
     
