@@ -487,6 +487,27 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     };
   };
 
+  // Handle complete button click - send regions back to parent component
+  const handleComplete = () => {
+    // Check if all regions have names
+    if (regions.some(r => !r.name.trim())) {
+      setError(t('regions.allRegionsNeedNames'));
+      return;
+    }
+    
+    // Format regions for the parent component
+    const formattedRegions = regions.map(r => ({
+      name: r.name,
+      x: r.x,
+      y: r.y,
+      width: r.width,
+      height: r.height
+    }));
+    
+    // Call the onComplete callback with the formatted regions
+    onComplete(formattedRegions);
+  };
+
   return (
     <div className="space-y-4 border rounded-md p-4 bg-muted/50">
       <div className="flex justify-between items-center">
@@ -503,23 +524,17 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
             }}
           >
             <Square className="h-4 w-4 mr-1" />
-            {isCreating ? t('common.cancel') : t('regions.addNew')}
+            {isCreating ? t('regions.drawing') : t('regions.draw')}
           </Button>
         </div>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          {error && (
-            <div className="p-2 mb-2 bg-red-100 text-red-700 rounded-md text-sm">
-              {error}
-            </div>
-          )}
-          
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Image container */}
+        <div className="md:col-span-2 relative border rounded-md overflow-hidden bg-background">
           <div 
-            ref={containerRef} 
-            className="relative overflow-hidden border rounded-md"
-            style={{ cursor: isCreating ? 'crosshair' : 'default' }}
+            ref={containerRef}
+            className="relative"
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -527,36 +542,27 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
           >
             <img 
               ref={imageRef}
-              src={imageSrc}
-              alt="Image to define regions on"
+              src={imageSrc} 
+              alt={t('regions.locationImage')}
               className="max-w-full h-auto"
               onLoad={handleImageLoad}
-              onError={() => {
-                console.error('Failed to load image:', imageSrc);
-                setError(t('common.error') + ': ' + t('locations.image'));
-              }}
             />
             
-            {/* Currently drawing rectangle */}
-            {isCreating && startPoint && (
-              <div 
-                className="absolute border-2 border-primary bg-primary/20 pointer-events-none"
-                style={getDrawingRectStyle()}
-              >
-                {currentPoint && (
-                  <div className="absolute bottom-0 right-0 bg-background/90 text-xs px-1 py-0.5 rounded">
-                    {Math.abs(currentPoint.x - startPoint.x)}×{Math.abs(currentPoint.y - startPoint.y)}
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Drawing overlay */}
+            <div 
+              className="absolute border-2 border-yellow-500 bg-yellow-500/30 pointer-events-none"
+              style={getDrawingRectStyle()}
+            />
             
             {/* Existing regions */}
             {regions.map((region) => (
               <div 
                 key={region.id}
-                className={`absolute border-2 ${region.isSelected ? 'border-yellow-500' : 'border-primary'} 
-                            ${region.isSelected ? 'bg-yellow-500/20' : 'bg-primary/20'} flex items-center justify-center`}
+                className={`absolute border-2 ${
+                  region.isSelected 
+                    ? 'border-yellow-500 bg-yellow-500/30' 
+                    : 'border-primary bg-primary/30'
+                }`}
                 style={{
                   left: `${region.x}px`,
                   top: `${region.y}px`,
@@ -564,138 +570,158 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                   height: `${region.height}px`,
                 }}
               >
-                <span className={`bg-background/90 px-1 py-0.5 rounded text-xs ${region.name ? '' : 'text-muted-foreground'}`}>
+                {/* Region label */}
+                <div className={`absolute top-0 left-0 px-1 py-0.5 text-xs ${
+                  region.isSelected 
+                    ? 'bg-yellow-500 text-yellow-950' 
+                    : 'bg-primary text-primary-foreground'
+                }`}>
                   {region.name || t('regions.name')}
-                </span>
+                </div>
                 
+                {/* Resize handle (only for selected regions) */}
                 {region.isSelected && (
-                  <div className="absolute -top-7 left-0 right-0 flex justify-center space-x-1">
+                  <div className="absolute bottom-0 right-0 w-4 h-4 bg-yellow-500 border-2 border-white rounded-sm cursor-se-resize" />
+                )}
+                
+                {/* Region actions */}
+                {region.isSelected && (
+                  <div className="absolute top-0 right-0 flex space-x-1 p-1">
                     <button 
-                      className="bg-background border rounded-md p-1 hover:bg-muted"
-                      onClick={() => handleCopyRegion(region.id)}
+                      type="button"
+                      className="w-5 h-5 flex items-center justify-center bg-white rounded-full text-gray-700 hover:bg-gray-200"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCopyRegion(region.id);
+                      }}
                       title={t('common.copy')}
                     >
                       <Copy className="h-3 w-3" />
                     </button>
                     <button 
-                      className="bg-background border rounded-md p-1 hover:bg-muted text-red-500 hover:text-red-700"
-                      onClick={() => handleRemoveRegion(region.id)}
+                      type="button"
+                      className="w-5 h-5 flex items-center justify-center bg-white rounded-full text-red-600 hover:bg-red-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveRegion(region.id);
+                      }}
                       title={t('common.delete')}
                     >
                       <Trash className="h-3 w-3" />
                     </button>
                   </div>
                 )}
-                
-                {/* Size indicator */}
-                <div className="absolute bottom-0 right-0 bg-background/90 text-xs px-1 py-0.5 rounded">
-                  {Math.round(region.width)}×{Math.round(region.height)}
-                </div>
-                
-                {/* Resize handle - only for resizing */}
-                {region.isSelected && (
-                  <div 
-                    className="absolute bottom-0 right-0 w-4 h-4 bg-yellow-500 border border-background rounded-sm cursor-se-resize"
-                    style={{ transform: 'translate(50%, 50%)' }}
-                  />
-                )}
               </div>
             ))}
           </div>
           
-          {/* Image and drawing information */}
-          <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-            <div>
-              {t('locations.image')} {t('regions.dimensions')}: {imageSize.width}×{imageSize.height}
-            </div>
-            {isCreating && startPoint && currentPoint && (
-              <div>
-                {t('regions.dimensions')}: {Math.abs(currentPoint.x - startPoint.x)}×{Math.abs(currentPoint.y - startPoint.y)} at 
-                ({Math.min(startPoint.x, currentPoint.x)}, {Math.min(startPoint.y, currentPoint.y)})
+          {/* Instructions */}
+          {isCreating && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="bg-black/70 text-white px-4 py-2 rounded-md text-sm">
+                {t('regions.drawInstructions')}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
         
+        {/* Controls */}
         <div className="space-y-4">
-          {/* Manual region creation */}
-          <div className="p-3 border rounded-md space-y-3">
-            <h4 className="font-medium text-sm">{t('regions.manualAdd')}</h4>
-            
+          {/* Manual dimensions */}
+          <div className="space-y-3 p-3 border rounded-md">
+            <h4 className="font-medium text-sm">{t('regions.manualDimensions')}</h4>
             <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="region-x" className="text-xs">X-{t('regions.position')}</Label>
-                <Input
-                  id="region-x"
+              <div>
+                <Label htmlFor="x" className="text-xs">{t('regions.x')}</Label>
+                <Input 
+                  id="x"
                   type="number"
                   min="0"
                   max={imageSize.width}
                   value={manualDimensions.x}
-                  onChange={(e) => setManualDimensions({...manualDimensions, x: parseInt(e.target.value) || 0})}
+                  onChange={(e) => setManualDimensions({
+                    ...manualDimensions,
+                    x: parseInt(e.target.value) || 0
+                  })}
                   className="h-8"
                 />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="region-y" className="text-xs">Y-{t('regions.position')}</Label>
-                <Input
-                  id="region-y"
+              <div>
+                <Label htmlFor="y" className="text-xs">{t('regions.y')}</Label>
+                <Input 
+                  id="y"
                   type="number"
                   min="0"
                   max={imageSize.height}
                   value={manualDimensions.y}
-                  onChange={(e) => setManualDimensions({...manualDimensions, y: parseInt(e.target.value) || 0})}
+                  onChange={(e) => setManualDimensions({
+                    ...manualDimensions,
+                    y: parseInt(e.target.value) || 0
+                  })}
                   className="h-8"
                 />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="region-width" className="text-xs">{t('regions.width')}</Label>
-                <Input
-                  id="region-width"
+              <div>
+                <Label htmlFor="width" className="text-xs">{t('regions.width')}</Label>
+                <Input 
+                  id="width"
                   type="number"
-                  min="20"
+                  min="10"
                   max={imageSize.width}
                   value={manualDimensions.width}
-                  onChange={(e) => setManualDimensions({...manualDimensions, width: parseInt(e.target.value) || 100})}
+                  onChange={(e) => setManualDimensions({
+                    ...manualDimensions,
+                    width: parseInt(e.target.value) || 10
+                  })}
                   className="h-8"
                 />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="region-height" className="text-xs">{t('regions.height')}</Label>
-                <Input
-                  id="region-height"
+              <div>
+                <Label htmlFor="height" className="text-xs">{t('regions.height')}</Label>
+                <Input 
+                  id="height"
                   type="number"
-                  min="20"
+                  min="10"
                   max={imageSize.height}
                   value={manualDimensions.height}
-                  onChange={(e) => setManualDimensions({...manualDimensions, height: parseInt(e.target.value) || 100})}
+                  onChange={(e) => setManualDimensions({
+                    ...manualDimensions,
+                    height: parseInt(e.target.value) || 10
+                  })}
                   className="h-8"
                 />
               </div>
             </div>
-            
             <Button 
               type="button" 
               size="sm" 
-              className="w-full"
               onClick={handleCreateManualRegion}
+              className="w-full"
             >
-              {t('regions.addNew')}
+              {t('regions.createRegion')}
             </Button>
           </div>
           
-          {/* Region naming form */}
+          {/* Error message */}
+          {error && (
+            <div className="p-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+              {error}
+            </div>
+          )}
+          
+          {/* Region name form */}
           {showForm && selectedRegionId && (
             <form onSubmit={handleNameRegion} className="p-3 border rounded-md space-y-3">
-              <h4 className="font-medium text-sm">{t('regions.name')}</h4>
+              <h4 className="font-medium text-sm">{t('regions.nameRegion')}</h4>
               <div className="space-y-2">
-                <Label htmlFor="region-name" className="text-xs">{t('regions.name')}</Label>
-                <Input
-                  id="region-name"
+                <Label htmlFor="regionName" className="text-xs">{t('regions.name')}</Label>
+                <Input 
+                  id="regionName"
                   value={regionName}
                   onChange={(e) => setRegionName(e.target.value)}
-                  placeholder={t('regions.name')}
-                  required
+                  placeholder={t('regions.namePlaceholder')}
                   className="h-8"
+                  autoFocus
                 />
               </div>
               
@@ -802,12 +828,21 @@ export default function RegionMapperOriginal({ locationId, imagePath }: RegionMa
 
   return (
     <div>
-      <div className="text-center p-4">
-        {loading && <div>{t('common.loading')}</div>}
-        {error && <div className="text-red-500">{error}</div>}
-        {!loading && !error && regions.length === 0 && <div>{t('regions.noRegions')}</div>}
-      </div>
-      <img src={imagePath} alt="Location" className="max-w-full h-auto border rounded-md" />
+      <h2>{t('regions.title')}</h2>
+      {loading ? (
+        <p>{t('common.loading')}</p>
+      ) : error ? (
+        <p>{error}</p>
+      ) : (
+        <div>
+          <p>{t('regions.count')}: {regions.length}</p>
+          <ul>
+            {regions.map(region => (
+              <li key={region.id}>{region.name}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
