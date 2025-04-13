@@ -5,8 +5,9 @@ import { getLocationRegions, addLocationRegion, Region } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Copy, Move, Square, Trash, Plus } from 'lucide-react';
+import { Copy, Move, Square, Trash, Plus, AlertCircle, Info } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
+import { Tooltip } from '@/components/ui/tooltip';
 
 // This is the component used by location-form.tsx
 interface RegionMapperFormProps {
@@ -45,6 +46,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
   const [showForm, setShowForm] = useState(false);
   const [regionName, setRegionName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const [manualDimensions, setManualDimensions] = useState({
     x: 10,
@@ -53,6 +55,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     height: 100
   });
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const [isMobile, setIsMobile] = useState(false);
 
   // Drawing state
   const [startPoint, setStartPoint] = useState<{x: number, y: number} | null>(null);
@@ -62,6 +65,20 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
+
+  // Check if device is mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
 
   // Load image dimensions on mount
   useEffect(() => {
@@ -80,6 +97,9 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
         width: imageRef.current.naturalWidth,
         height: imageRef.current.naturalHeight
       });
+      
+      // Reset any previous errors
+      setError(null);
     }
   };
 
@@ -96,6 +116,17 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     }));
     onComplete(formattedRegions);
   }, [regions, onComplete]);
+
+  // Clear success message after 3 seconds
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        setSuccess(null);
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
 
   // Handle mouse down (start drawing or select region)
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -147,8 +178,10 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
           setShowForm(true);
           
           console.log(`Created region: ${width}x${height} at (${left},${top})`);
+          setSuccess('Region created! Please name it.');
         } else {
           console.log('Region too small, ignoring');
+          setError('Region too small. Please create a larger region (at least 10x10 pixels).');
         }
         
         // Reset drawing state
@@ -181,8 +214,98 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
         x: clickedRegion.x + clickedRegion.width + 10,
         y: clickedRegion.y
       });
+      
+      // Show form if region is unnamed
+      if (!clickedRegion.name) {
+        setShowForm(true);
+      }
     } else {
       // Clicked outside any region, deselect all
+      setRegions(regions.map(r => ({ ...r, isSelected: false, isDragging: false })));
+      setSelectedRegionId(null);
+      setShowForm(false);
+    }
+  };
+
+  // Handle touch start for mobile devices
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!containerRef.current || e.touches.length !== 1) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.touches[0].clientX - rect.left;
+    const y = e.touches[0].clientY - rect.top;
+    
+    // Similar logic to handleMouseDown
+    if (isCreating) {
+      if (!startPoint) {
+        setStartPoint({ x, y });
+        setCurrentPoint({ x, y });
+      } else {
+        const width = Math.abs(x - startPoint.x);
+        const height = Math.abs(y - startPoint.y);
+        
+        if (width > 10 && height > 10) {
+          const left = Math.min(startPoint.x, x);
+          const top = Math.min(startPoint.y, y);
+
+          const newRegion: ActiveRegion = {
+            id: `region-${Date.now()}`,
+            name: '',
+            x: left,
+            y: top,
+            width,
+            height,
+            isSelected: true,
+            isResizing: false,
+            isDragging: false
+          };
+          
+          setRegions(prev => prev.map(r => ({ ...r, isSelected: false })).concat(newRegion));
+          setSelectedRegionId(newRegion.id);
+          setRegionName('');
+          
+          setMenuPosition({
+            x: left + width + 10,
+            y: top
+          });
+          setShowForm(true);
+          setSuccess('Region created! Please name it.');
+        } else {
+          setError('Region too small. Please create a larger region (at least 10x10 pixels).');
+        }
+        
+        setStartPoint(null);
+        setCurrentPoint(null);
+      }
+      return;
+    }
+    
+    // Check if we touched a region
+    const touchedRegion = regions.find(region => 
+      x >= region.x && 
+      x <= (region.x + region.width) && 
+      y >= region.y && 
+      y <= (region.y + region.height)
+    );
+    
+    if (touchedRegion) {
+      setRegions(regions.map(r => ({
+        ...r,
+        isSelected: r.id === touchedRegion.id,
+        isDragging: r.id === touchedRegion.id
+      })));
+      setSelectedRegionId(touchedRegion.id);
+      setRegionName(touchedRegion.name);
+      
+      setMenuPosition({
+        x: touchedRegion.x + touchedRegion.width + 10,
+        y: touchedRegion.y
+      });
+      
+      if (!touchedRegion.name) {
+        setShowForm(true);
+      }
+    } else {
       setRegions(regions.map(r => ({ ...r, isSelected: false, isDragging: false })));
       setSelectedRegionId(null);
       setShowForm(false);
@@ -261,9 +384,85 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     }
   };
 
+  // Handle touch move for mobile devices
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!containerRef.current || e.touches.length !== 1) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.touches[0].clientX - rect.left;
+    const y = e.touches[0].clientY - rect.top;
+    
+    // Similar logic to handleMouseMove
+    if (isCreating && startPoint) {
+      setCurrentPoint({ x, y });
+      return;
+    }
+    
+    const draggingRegion = regions.find(r => r.isDragging);
+    if (draggingRegion) {
+      const deltaX = x - (draggingRegion.x + draggingRegion.width / 2);
+      const deltaY = y - (draggingRegion.y + draggingRegion.height / 2);
+      
+      setRegions(regions.map(r => {
+        if (r.id === draggingRegion.id) {
+          const newX = Math.max(0, Math.min(r.x + deltaX, imageSize.width - r.width));
+          const newY = Math.max(0, Math.min(r.y + deltaY, imageSize.height - r.height));
+          
+          if (r.id === selectedRegionId && showForm) {
+            setMenuPosition({
+              x: newX + r.width + 10,
+              y: newY
+            });
+          }
+          
+          return {
+            ...r,
+            x: newX,
+            y: newY
+          };
+        }
+        return r;
+      }));
+    }
+    
+    const resizingRegion = regions.find(r => r.isResizing);
+    if (resizingRegion) {
+      setRegions(regions.map(r => {
+        if (r.id === resizingRegion.id) {
+          const newWidth = Math.max(20, x - r.x);
+          const newHeight = Math.max(20, y - r.y);
+          
+          if (r.id === selectedRegionId && showForm) {
+            setMenuPosition({
+              x: r.x + newWidth + 10,
+              y: r.y
+            });
+          }
+          
+          return {
+            ...r,
+            width: newWidth,
+            height: newHeight
+          };
+        }
+        return r;
+      }));
+    }
+  };
+
   // Handle mouse up (finish dragging or resizing)
   const handleMouseUp = () => {
     // End any dragging or resizing
+    setRegions(regions.map(r => ({
+      ...r,
+      isDragging: false,
+      isResizing: false
+    })));
+  };
+
+  // Handle touch end for mobile devices
+  const handleTouchEnd = () => {
+    // Similar logic to handleMouseUp
     setRegions(regions.map(r => ({
       ...r,
       isDragging: false,
@@ -276,9 +475,13 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     // Validate dimensions are within image bounds
     const { x, y, width, height } = manualDimensions;
     
-    if (x < 0 || y < 0 || width <= 0 || height <= 0 || 
-        x + width > imageSize.width || y + height > imageSize.height) {
-      setError('Region dimensions must be within image bounds');
+    if (x < 0 || y < 0 || width <= 0 || height <= 0) {
+      setError('Region dimensions must be positive values');
+      return;
+    }
+    
+    if (x + width > imageSize.width || y + height > imageSize.height) {
+      setError(`Region dimensions must be within image bounds (${imageSize.width}x${imageSize.height})`);
       return;
     }
     
@@ -301,6 +504,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       y: y
     });
     setShowForm(true);
+    setSuccess('Region created! Please name it.');
   };
 
   // Handle form submission to name a region
@@ -312,15 +516,26 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       return;
     }
     
+    // Check for duplicate names
+    const isDuplicate = regions.some(r => 
+      r.id !== selectedRegionId && r.name.toLowerCase() === regionName.trim().toLowerCase()
+    );
+    
+    if (isDuplicate) {
+      setError('A region with this name already exists. Please choose a different name.');
+      return;
+    }
+    
     setRegions(regions.map(r => {
       if (r.id === selectedRegionId) {
-        return { ...r, name: regionName };
+        return { ...r, name: regionName.trim() };
       }
       return r;
     }));
     
     setShowForm(false);
     setError(null);
+    setSuccess('Region named successfully!');
     
     console.log(`Named region ${selectedRegionId} as "${regionName}"`);
   };
@@ -332,6 +547,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       setSelectedRegionId(null);
       setShowForm(false);
     }
+    setSuccess('Region removed successfully!');
   };
 
   // Copy a region
@@ -348,6 +564,15 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       isSelected: true
     };
     
+    // Ensure the copied region is within bounds
+    if (newRegion.x + newRegion.width > imageSize.width) {
+      newRegion.x = Math.max(0, imageSize.width - newRegion.width);
+    }
+    
+    if (newRegion.y + newRegion.height > imageSize.height) {
+      newRegion.y = Math.max(0, imageSize.height - newRegion.height);
+    }
+    
     setRegions(prev => 
       prev.map(r => ({ ...r, isSelected: false })).concat(newRegion)
     );
@@ -358,6 +583,8 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       x: newRegion.x + newRegion.width + 10,
       y: newRegion.y
     });
+    
+    setSuccess('Region copied successfully!');
   };
 
   // Toggle resize mode for a region
@@ -436,6 +663,17 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       top = Math.max(0, containerRect.height - formHeight);
     }
     
+    // For mobile devices, position the form at the bottom of the container
+    if (isMobile) {
+      return {
+        left: '0px',
+        top: 'auto',
+        bottom: '0px',
+        width: '100%',
+        position: 'absolute' as 'absolute'
+      };
+    }
+    
     return {
       left: `${left}px`,
       top: `${top}px`,
@@ -455,13 +693,29 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
               setIsCreating(!isCreating);
               setStartPoint(null);
               setCurrentPoint(null);
+              setError(null);
             }}
+            className="flex items-center"
           >
             <Plus className="h-4 w-4 mr-1" />
             {isCreating ? "Beenden" : "Region hinzufügen"}
           </Button>
         </div>
       </div>
+      
+      {error && (
+        <div className="p-2 mb-2 bg-red-100 text-red-700 rounded-md text-sm flex items-center">
+          <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+      
+      {success && (
+        <div className="p-2 mb-2 bg-green-100 text-green-700 rounded-md text-sm flex items-center">
+          <Info className="h-4 w-4 mr-2 flex-shrink-0" />
+          <span>{success}</span>
+        </div>
+      )}
       
       <div className="relative">
         <div 
@@ -472,6 +726,9 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           <img 
             ref={imageRef}
@@ -522,6 +779,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                     className="bg-background border rounded-md p-1 hover:bg-muted"
                     onClick={() => handleToggleDrag(region.id)}
                     title="Move region"
+                    aria-label="Move region"
                   >
                     <Move className="h-3 w-3" />
                   </button>
@@ -529,6 +787,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                     className="bg-background border rounded-md p-1 hover:bg-muted"
                     onClick={() => handleToggleResize(region.id)}
                     title="Resize region"
+                    aria-label="Resize region"
                   >
                     <Square className="h-3 w-3" />
                   </button>
@@ -536,6 +795,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                     className="bg-background border rounded-md p-1 hover:bg-muted"
                     onClick={() => handleCopyRegion(region.id)}
                     title="Copy region"
+                    aria-label="Copy region"
                   >
                     <Copy className="h-3 w-3" />
                   </button>
@@ -543,6 +803,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                     className="bg-background border rounded-md p-1 hover:bg-muted text-red-500 hover:text-red-700"
                     onClick={() => handleRemoveRegion(region.id)}
                     title="Delete region"
+                    aria-label="Delete region"
                   >
                     <Trash className="h-3 w-3" />
                   </button>
@@ -570,7 +831,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
           {showForm && selectedRegionId && (
             <div 
               ref={formRef}
-              className="absolute z-10 bg-background border rounded-md shadow-md p-3 w-60"
+              className={`absolute z-10 bg-background border rounded-md shadow-md p-3 ${isMobile ? 'w-full' : 'w-60'}`}
               style={getFormPosition()}
             >
               <form onSubmit={handleNameRegion} className="space-y-3">
@@ -597,6 +858,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                   <Button type="submit" size="sm" className="flex-1">Speichern</Button>
                   <Button type="button" size="sm" variant="outline" onClick={() => {
                     setShowForm(false);
+                    setError(null);
                     // If the region is new and has no name, remove it
                     const region = regions.find(r => r.id === selectedRegionId);
                     if (region && !region.name) {
@@ -607,6 +869,75 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
               </form>
             </div>
           )}
+        </div>
+        
+        {/* Manual region creation - shown below the image */}
+        <div className="mt-4 p-3 border rounded-md space-y-3">
+          <h4 className="font-medium text-sm">Region manuell erstellen</h4>
+          
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="region-x" className="text-xs">X-Position</Label>
+              <Input
+                id="region-x"
+                type="number"
+                min="0"
+                max={imageSize.width}
+                value={manualDimensions.x}
+                onChange={(e) => setManualDimensions({...manualDimensions, x: parseInt(e.target.value) || 0})}
+                className="h-8"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="region-y" className="text-xs">Y-Position</Label>
+              <Input
+                id="region-y"
+                type="number"
+                min="0"
+                max={imageSize.height}
+                value={manualDimensions.y}
+                onChange={(e) => setManualDimensions({...manualDimensions, y: parseInt(e.target.value) || 0})}
+                className="h-8"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="region-width" className="text-xs">Breite</Label>
+              <Input
+                id="region-width"
+                type="number"
+                min="20"
+                max={imageSize.width}
+                value={manualDimensions.width}
+                onChange={(e) => setManualDimensions({...manualDimensions, width: parseInt(e.target.value) || 100})}
+                className="h-8"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="region-height" className="text-xs">Höhe</Label>
+              <Input
+                id="region-height"
+                type="number"
+                min="20"
+                max={imageSize.height}
+                value={manualDimensions.height}
+                onChange={(e) => setManualDimensions({...manualDimensions, height: parseInt(e.target.value) || 100})}
+                className="h-8"
+              />
+            </div>
+          </div>
+          
+          <div className="text-xs text-muted-foreground mb-2">
+            Bildgröße: {imageSize.width}×{imageSize.height} Pixel
+          </div>
+          
+          <Button 
+            type="button" 
+            size="sm" 
+            className="w-full"
+            onClick={handleCreateManualRegion}
+          >
+            Region erstellen
+          </Button>
         </div>
         
         {/* Region list - shown below the image */}
