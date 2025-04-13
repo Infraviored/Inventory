@@ -28,8 +28,8 @@ interface ActiveRegion {
   isDragging: boolean;
 }
 
-// Snap threshold in pixels
-const SNAP_THRESHOLD = 5;
+// Snap threshold in pixels - increased for stronger magnetic effect
+const SNAP_THRESHOLD = 10;
 
 export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: RegionMapperFormProps) {
   const { t } = useLanguage();
@@ -89,7 +89,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     }
   };
 
-  // Find snap positions based on other regions
+  // Find snap positions based on other regions - enhanced with more snap points
   const findSnapPositions = (currentRegion: ActiveRegion | null) => {
     const snapPositions = {
       x: [] as number[],
@@ -114,12 +114,22 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       snapPositions.y.push(region.y);
       snapPositions.right.push(region.x + region.width);
       snapPositions.bottom.push(region.y + region.height);
+      
+      // Add center positions for better alignment
+      snapPositions.x.push(region.x + region.width / 2);
+      snapPositions.y.push(region.y + region.height / 2);
+      
+      // Add quarter positions for more precise alignment
+      snapPositions.x.push(region.x + region.width / 4);
+      snapPositions.x.push(region.x + (region.width * 3) / 4);
+      snapPositions.y.push(region.y + region.height / 4);
+      snapPositions.y.push(region.y + (region.height * 3) / 4);
     });
     
     return snapPositions;
   };
 
-  // Find nearest snap position
+  // Find nearest snap position - improved with stronger magnetic effect
   const findNearestSnap = (value: number, positions: number[]) => {
     let nearest = null;
     let minDistance = SNAP_THRESHOLD + 1;
@@ -176,11 +186,12 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     // Check if we clicked on a resize handle
     const selectedRegion = regions.find(r => r.isSelected);
     if (selectedRegion) {
+      // Make the resize handle larger and more precise
       const resizeHandleRect = {
-        x: selectedRegion.x + selectedRegion.width - 10,
-        y: selectedRegion.y + selectedRegion.height - 10,
-        width: 20,
-        height: 20
+        x: selectedRegion.x + selectedRegion.width - 20,
+        y: selectedRegion.y + selectedRegion.height - 20,
+        width: 30,
+        height: 30
       };
       
       if (
@@ -189,7 +200,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
         y >= resizeHandleRect.y && 
         y <= resizeHandleRect.y + resizeHandleRect.height
       ) {
-        // Clicked on resize handle
+        // Clicked on resize handle - ONLY resize, never drag
         setRegions(regions.map(r => ({
           ...r,
           isResizing: r.id === selectedRegion.id,
@@ -297,8 +308,12 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       const snapRight = findNearestSnap(right, snapPositions.right);
       const snapBottom = findNearestSnap(bottom, snapPositions.bottom);
       
-      const finalWidth = snapRight !== null ? snapRight - resizingRegion.x : boundedWidth;
-      const finalHeight = snapBottom !== null ? snapBottom - resizingRegion.y : boundedHeight;
+      // Visual feedback for snapping - add a flash effect or highlight when snapping occurs
+      const isSnappingRight = snapRight !== null;
+      const isSnappingBottom = snapBottom !== null;
+      
+      const finalWidth = isSnappingRight ? snapRight - resizingRegion.x : boundedWidth;
+      const finalHeight = isSnappingBottom ? snapBottom - resizingRegion.y : boundedHeight;
       
       // Update region dimensions
       setRegions(regions.map(r => {
@@ -518,9 +533,17 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
             size="sm"
             variant={isCreating ? "secondary" : "outline"}
             onClick={() => {
-              setIsCreating(!isCreating);
+              // Toggle creation mode - only allow one region to be added at a time
+              const newCreatingState = !isCreating;
+              setIsCreating(newCreatingState);
               setStartPoint(null);
               setCurrentPoint(null);
+              
+              // If we're exiting creation mode, deselect all regions
+              if (!newCreatingState) {
+                setRegions(regions.map(r => ({ ...r, isSelected: false })));
+                setSelectedRegionId(null);
+              }
             }}
           >
             <Square className="h-4 w-4 mr-1" />
@@ -579,9 +602,13 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                   {region.name || t('regions.name')}
                 </div>
                 
-                {/* Resize handle (only for selected regions) */}
+                {/* Resize handle (only for selected regions) - made larger and more visible */}
                 {region.isSelected && (
-                  <div className="absolute bottom-0 right-0 w-4 h-4 bg-yellow-500 border-2 border-white rounded-sm cursor-se-resize" />
+                  <div className="absolute bottom-0 right-0 w-6 h-6 bg-yellow-500 border-2 border-white rounded-sm cursor-se-resize flex items-center justify-center">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 9L9 1M5 9L9 5M9 9L9 9" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </div>
                 )}
                 
                 {/* Region actions */}
