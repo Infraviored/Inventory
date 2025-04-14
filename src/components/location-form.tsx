@@ -148,9 +148,19 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
     }
   };
 
+  // Use a ref to prevent unnecessary state updates
+  const prevRegionsRef = useRef<string>('');
+  
   const handleRegionsComplete = (definedRegions: Array<{name: string, x: number, y: number, width: number, height: number}>) => {
-    console.log('Regions defined:', definedRegions);
-    setRegions(definedRegions);
+    // Convert to string for comparison
+    const regionsString = JSON.stringify(definedRegions);
+    
+    // Only update state if regions have actually changed
+    if (regionsString !== prevRegionsRef.current) {
+      console.log('Regions defined:', definedRegions);
+      prevRegionsRef.current = regionsString;
+      setRegions(definedRegions);
+    }
   };
 
   return (

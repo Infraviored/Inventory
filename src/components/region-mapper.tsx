@@ -189,11 +189,23 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [], autoSt
   };
 
   // Update parent component with regions whenever they change
+  // But use a ref to track previous regions to prevent unnecessary updates
+  const prevRegionsRef = useRef<string>('');
+  
   useEffect(() => {
-    const formattedRegions = regions.map(({ name, x, y, width, height }) => ({
-      name, x, y, width, height
-    }));
-    onComplete(formattedRegions);
+    // Convert regions to string for comparison
+    const regionsString = JSON.stringify(
+      regions.map(({ name, x, y, width, height }) => ({ name, x, y, width, height }))
+    );
+    
+    // Only call onComplete if regions have actually changed
+    if (regionsString !== prevRegionsRef.current) {
+      prevRegionsRef.current = regionsString;
+      const formattedRegions = regions.map(({ name, x, y, width, height }) => ({
+        name, x, y, width, height
+      }));
+      onComplete(formattedRegions);
+    }
   }, [regions, onComplete]);
 
   // Clear success message after 3 seconds
@@ -532,8 +544,11 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [], autoSt
           isDragging: false
         };
         
-        // Add new region to list
-        setRegions(regions.map(r => ({ ...r, isSelected: false })).concat(newRegion));
+        console.log('Region drawing finished:', newRegion);
+        
+        // Add new region to list - create a new array to ensure state update
+        const updatedRegions = [...regions.map(r => ({ ...r, isSelected: false })), newRegion];
+        setRegions(updatedRegions);
         setSelectedRegionId(newRegion.id);
         
         // Position the form menu next to the region
@@ -547,6 +562,8 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [], autoSt
         
         // Exit creation mode if not in duplicate mode
         setIsCreating(false);
+      } else {
+        console.log('Region too small, not creating');
       }
       
       // Reset drawing state
@@ -574,16 +591,22 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [], autoSt
   // Handle region naming
   const handleNameRegion = (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     
-    if (!selectedRegionId) return;
+    if (!selectedRegionId) {
+      console.error('No region selected for naming');
+      return;
+    }
     
     if (!regionName.trim()) {
       setError(t('regions.allRegionsNeedNames'));
       return;
     }
     
-    // Update region name
-    setRegions(regions.map(r => {
+    console.log('Saving region name:', regionName, 'for region ID:', selectedRegionId);
+    
+    // Update region name - create a new array to ensure state update
+    const updatedRegions = regions.map(r => {
       if (r.id === selectedRegionId) {
         return {
           ...r,
@@ -591,12 +614,16 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [], autoSt
         };
       }
       return r;
-    }));
+    });
+    
+    setRegions(updatedRegions);
     
     // Hide form
     setShowForm(false);
     setError(null);
     setSuccess(t('common.success'));
+    
+    console.log('Region named successfully:', regionName);
   };
 
   // Handle region removal
@@ -691,8 +718,11 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [], autoSt
       isDragging: false
     };
     
-    // Add new region to list
-    setRegions(regions.map(r => ({ ...r, isSelected: false })).concat(newRegion));
+    console.log('Manual region created:', newRegion);
+    
+    // Add new region to list - create a new array to ensure state update
+    const updatedRegions = [...regions.map(r => ({ ...r, isSelected: false })), newRegion];
+    setRegions(updatedRegions);
     setSelectedRegionId(newRegion.id);
     
     // Position the form menu next to the region
