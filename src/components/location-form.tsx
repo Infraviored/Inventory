@@ -45,8 +45,21 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
         formData.append('parentId', parentId.toString());
       }
       
+      // Ensure image is included in the form data
       if (image) {
+        console.log('Adding image to form data:', image.name);
         formData.append('image', image);
+      } else if (imagePreview) {
+        // If we have an image preview but no File object, convert the data URL to a File
+        console.log('Converting image preview to file');
+        try {
+          const response = await fetch(imagePreview);
+          const blob = await response.blob();
+          const file = new File([blob], 'image.jpg', { type: 'image/jpeg' });
+          formData.append('image', file);
+        } catch (error) {
+          console.error('Error converting image preview to file:', error);
+        }
       }
       
       // Add regions data if available
@@ -198,29 +211,34 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                     />
                   ) : (
                     <div className="relative border rounded-md overflow-hidden">
-                      <img 
-                        src={imagePreview} 
-                        alt={t('locations.image')} 
-                        className="max-w-full h-auto"
-                      />
-                      
-                      {/* Region indicators when not in edit mode */}
-                      {regions.map((region, index) => (
-                        <div 
-                          key={index}
-                          className="absolute border-2 border-primary bg-primary/30"
-                          style={{
-                            left: `${region.x}px`,
-                            top: `${region.y}px`,
-                            width: `${region.width}px`,
-                            height: `${region.height}px`,
-                          }}
-                        >
-                          <div className="absolute top-0 left-0 px-1 py-0.5 text-xs bg-primary text-primary-foreground">
-                            {region.name}
-                          </div>
-                        </div>
-                      ))}
+                      {/* Don't show the image preview here since ImageInput already shows it */}
+                      {regions.length > 0 && (
+                        <>
+                          <img 
+                            src={imagePreview} 
+                            alt={t('locations.image')} 
+                            className="max-w-full h-auto"
+                          />
+                          
+                          {/* Region indicators when not in edit mode */}
+                          {regions.map((region, index) => (
+                            <div 
+                              key={index}
+                              className="absolute border-2 border-primary bg-primary/30"
+                              style={{
+                                left: `${region.x}px`,
+                                top: `${region.y}px`,
+                                width: `${region.width}px`,
+                                height: `${region.height}px`,
+                              }}
+                            >
+                              <div className="absolute top-0 left-0 px-1 py-0.5 text-xs bg-primary text-primary-foreground">
+                                {region.name}
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
                     </div>
                   )}
                   

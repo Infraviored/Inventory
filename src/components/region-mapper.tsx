@@ -1142,6 +1142,15 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [], autoSt
                     required
                     className="h-8"
                     autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      // Prevent Enter key from submitting the form and closing the region mapper
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleNameRegion(e);
+                      }
+                    }}
                   />
                 </div>
                 
