@@ -121,6 +121,18 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     }
   }, [success]);
 
+  // Update regionName when selectedRegionId changes
+  useEffect(() => {
+    if (selectedRegionId) {
+      const selectedRegion = regions.find(r => r.id === selectedRegionId);
+      if (selectedRegion) {
+        setRegionName(selectedRegion.name);
+      }
+    } else {
+      setRegionName('');
+    }
+  }, [selectedRegionId, regions]);
+
   // Handle mouse down (start drawing or select region)
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!containerRef.current) return;
@@ -204,7 +216,6 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
         isResizing: false
       })));
       setSelectedRegionId(clickedRegion.id);
-      setRegionName(clickedRegion.name);
       
       // Position the form menu next to the region
       setMenuPosition({
@@ -297,7 +308,6 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
         isResizing: false
       })));
       setSelectedRegionId(touchedRegion.id);
-      setRegionName(touchedRegion.name);
       
       setMenuPosition({
         x: touchedRegion.x + touchedRegion.width + 10,
@@ -512,6 +522,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
   // Handle form submission to name a region
   const handleNameRegion = (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     
     if (!regionName.trim()) {
       setError('Please enter a region name');
@@ -540,6 +551,23 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     setSuccess('Region named successfully!');
     
     console.log(`Named region ${selectedRegionId} as "${regionName}"`);
+  };
+
+  // Open the naming form for a region
+  const handleOpenNameForm = (id: string) => {
+    const region = regions.find(r => r.id === id);
+    if (!region) return;
+    
+    setSelectedRegionId(id);
+    setRegionName(region.name);
+    
+    // Position the form menu next to the region
+    setMenuPosition({
+      x: region.x + region.width + 10,
+      y: region.y
+    });
+    
+    setShowForm(true);
   };
 
   // Remove a region
@@ -757,6 +785,27 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                 width: `${region.width}px`,
                 height: `${region.height}px`,
               }}
+              onClick={(e) => {
+                e.stopPropagation();
+                // Select this region
+                setRegions(regions.map(r => ({
+                  ...r,
+                  isSelected: r.id === region.id,
+                  isDragging: false,
+                  isResizing: false
+                })));
+                setSelectedRegionId(region.id);
+                
+                // Position the form menu next to the region
+                setMenuPosition({
+                  x: region.x + region.width + 10,
+                  y: region.y
+                });
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                handleOpenNameForm(region.id);
+              }}
             >
               <span className={`bg-background/90 px-1 py-0.5 rounded text-xs ${region.name ? '' : 'text-muted-foreground'}`}>
                 {region.name || 'Unnamed'}
@@ -866,7 +915,8 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                     type="button" 
                     size="sm" 
                     variant="outline" 
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setShowForm(false);
                       setError(null);
                       // If the region is new and has no name, remove it
@@ -899,18 +949,14 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                     onClick={() => {
                       setRegions(regions.map(r => ({...r, isSelected: r.id === region.id})));
                       setSelectedRegionId(region.id);
-                      setRegionName(region.name);
                       
                       // Position the form menu next to the region
                       setMenuPosition({
                         x: region.x + region.width + 10,
                         y: region.y
                       });
-                      
-                      if (!region.name) {
-                        setShowForm(true);
-                      }
                     }}
+                    onDoubleClick={() => handleOpenNameForm(region.id)}
                   >
                     <div className="flex items-center space-x-2">
                       <div 
@@ -921,8 +967,19 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                         {region.name || 'Unnamed'}
                       </span>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {Math.round(region.width)}×{Math.round(region.height)}
+                    <div className="flex items-center space-x-2">
+                      <div className="text-xs text-muted-foreground">
+                        {Math.round(region.width)}×{Math.round(region.height)}
+                      </div>
+                      <button
+                        className="text-xs text-blue-500 hover:text-blue-700"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenNameForm(region.id);
+                        }}
+                      >
+                        Umbenennen
+                      </button>
                     </div>
                   </li>
                 ))}
