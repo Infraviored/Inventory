@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { ImageInput } from './image-input';
 import { RegionMapper } from './region-mapper';
+import { useLanguage } from '@/lib/language';
 
 interface LocationFormProps {
   parentId?: number | null;
@@ -15,6 +16,7 @@ interface LocationFormProps {
 }
 
 export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState<File | null>(null);
@@ -116,7 +118,7 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
   const handleDefineRegions = () => {
     if (imagePreview) {
       console.log('Opening RegionMapper with image:', imagePreview);
-      setShowRegionMapper(true);
+      setShowRegionMapper(!showRegionMapper);
     } else {
       console.error('Cannot define regions: No image available');
     }
@@ -130,101 +132,126 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Neuen Ort hinzufügen</h2>
+      <h2 className="text-2xl font-bold">{t('locations.addNew')}</h2>
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="name">Name *</Label>
+          <Label htmlFor="name">{t('locations.name')} *</Label>
           <Input
             id="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="z.B. Wohnzimmer, Schrank 1"
+            placeholder={t('locations.name')}
             required
           />
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="locationType">Typ (optional)</Label>
+          <Label htmlFor="locationType">{t('locations.type')} ({t('common.optional')})</Label>
           <select
             id="locationType"
             value={locationType}
             onChange={(e) => setLocationType(e.target.value)}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <option value="">Bitte wählen...</option>
-            <option value="room">Raum</option>
-            <option value="cabinet">Schrank</option>
-            <option value="drawer">Schublade</option>
-            <option value="shelf">Regal</option>
-            <option value="box">Box</option>
-            <option value="other">Sonstiges</option>
+            <option value="">{t('locations.types.selectType')}</option>
+            <option value="room">{t('locations.types.room')}</option>
+            <option value="cabinet">{t('locations.types.cabinet')}</option>
+            <option value="drawer">{t('locations.types.drawer')}</option>
+            <option value="shelf">{t('locations.types.shelf')}</option>
+            <option value="box">{t('locations.types.box')}</option>
+            <option value="other">{t('locations.types.other')}</option>
           </select>
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="description">Beschreibung</Label>
+          <Label htmlFor="description">{t('locations.description')}</Label>
           <Textarea
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Optionale Beschreibung"
+            placeholder={t('locations.description')}
             rows={3}
           />
         </div>
         
-        <ImageInput 
-          onImageChange={handleImageChange}
-          label="Bild (optional)"
-          initialPreview={imagePreview}
-        />
-        
-        {imagePreview && !showRegionMapper && (
-          <div className="mt-4 p-4 border-2 border-primary border-dashed rounded-md bg-primary/5">
-            <div className="flex flex-col items-center space-y-3">
-              <h3 className="font-medium text-center">Region Mapping verfügbar!</h3>
-              <p className="text-sm text-center">Sie können jetzt Regionen in Ihrem Bild definieren, um später Inventar-Positionen genauer zu verfolgen.</p>
-              <Button 
-                type="button" 
-                variant="default" 
-                onClick={handleDefineRegions}
-                className="w-full"
-              >
-                Regionen auf dem Bild definieren
-              </Button>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="image">{`${t('locations.image')} (${t('common.optional')})`}</Label>
+            <div className="relative">
+              <ImageInput 
+                onImageChange={handleImageChange}
+                initialPreview={imagePreview}
+                hideLabel={true}
+              />
+              
+              {imagePreview && (
+                <div className="mt-4 relative">
+                  <div className="relative border rounded-md overflow-hidden">
+                    <img 
+                      src={imagePreview} 
+                      alt={t('locations.image')} 
+                      className="max-w-full h-auto"
+                    />
+                    
+                    {/* In-place region mapper overlay */}
+                    {showRegionMapper && (
+                      <div className="absolute inset-0 bg-black/50 z-10">
+                        <div className="absolute inset-0">
+                          <RegionMapper
+                            imageSrc={imagePreview}
+                            onComplete={handleRegionsComplete}
+                            initialRegions={regions}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Region indicators when not in edit mode */}
+                    {!showRegionMapper && regions.map((region, index) => (
+                      <div 
+                        key={index}
+                        className="absolute border-2 border-primary bg-primary/30"
+                        style={{
+                          left: `${region.x}px`,
+                          top: `${region.y}px`,
+                          width: `${region.width}px`,
+                          height: `${region.height}px`,
+                        }}
+                      >
+                        <div className="absolute top-0 left-0 px-1 py-0.5 text-xs bg-primary text-primary-foreground">
+                          {region.name}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Region controls */}
+                  <div className="mt-2 flex justify-between items-center">
+                    <div>
+                      {regions.length > 0 && (
+                        <div className="text-sm text-muted-foreground">
+                          {t('regions.definedRegions')}: {regions.length}
+                        </div>
+                      )}
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant={showRegionMapper ? "secondary" : "outline"} 
+                      size="sm"
+                      onClick={handleDefineRegions}
+                    >
+                      {showRegionMapper ? t('common.done') : (regions.length > 0 ? t('common.edit') : t('regions.addNew'))}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        )}
-        
-        {showRegionMapper && imagePreview && (
-          <RegionMapper
-            imageSrc={imagePreview}
-            onComplete={handleRegionsComplete}
-            initialRegions={regions}
-          />
-        )}
-        
-        {regions.length > 0 && !showRegionMapper && (
-          <div className="p-4 border rounded-md bg-muted">
-            <h3 className="font-medium mb-2">Definierte Regionen ({regions.length})</h3>
-            <ul className="list-disc pl-5 space-y-1">
-              {regions.map((region, index) => (
-                <li key={index}>{region.name}</li>
-              ))}
-            </ul>
-            <Button 
-              type="button" 
-              variant="link" 
-              onClick={handleDefineRegions}
-              className="mt-2 p-0 h-auto"
-            >
-              Regionen bearbeiten
-            </Button>
-          </div>
-        )}
+        </div>
         
         <Button type="submit" disabled={isSubmitting} className="w-full">
-          {isSubmitting ? 'Wird gespeichert...' : 'Speichern'}
+          {isSubmitting ? t('common.loading') : t('common.save')}
         </Button>
       </form>
     </div>
