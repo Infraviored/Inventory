@@ -87,22 +87,34 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
       // If we have regions, save them
       if (regions.length > 0 && data.id) {
         console.log(`Saving ${regions.length} regions for location ID ${data.id}`);
-        const regionsPromises = regions.map(region => 
-          fetch(`/api/locations/${data.id}/regions`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(region),
-          })
-        );
         
-        const regionsResults = await Promise.all(regionsPromises);
+        // Save regions sequentially instead of using Promise.all
+        let failedCount = 0;
+        for (const region of regions) {
+          try {
+            const response = await fetch(`/api/locations/${data.id}/regions`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(region),
+            });
+            
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error(`Failed to save region: ${errorText}`);
+              failedCount++;
+            } else {
+              console.log(`Region "${region.name}" saved successfully`);
+            }
+          } catch (error) {
+            console.error('Error saving region:', error);
+            failedCount++;
+          }
+        }
         
-        // Check if any region creation failed
-        const failedRegions = regionsResults.filter(res => !res.ok);
-        if (failedRegions.length > 0) {
-          console.error(`${failedRegions.length} regions failed to save`);
+        if (failedCount > 0) {
+          console.error(`${failedCount} regions failed to save`);
         } else {
           console.log('All regions saved successfully');
         }

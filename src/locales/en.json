@@ -38,7 +38,8 @@
     "descending": "Descending",
     "all": "All",
     "saving": "Saving...",
-    "lastUpdated": "Last updated"
+    "lastUpdated": "Last updated",
+    "done": "Done"
   },
   "locations": {
     "title": "Locations",
@@ -93,7 +94,10 @@
     "outOfBounds": "Region dimensions are out of bounds",
     "allRegionsNeedNames": "All regions need names before saving",
     "count": "Region count",
-    "locationImage": "Location image"
+    "locationImage": "Location image",
+    "unnamed": "Unnamed region",
+    "rename": "Rename region",
+    "enterName": "Enter region name"
   },
   "inventory": {
     "title": "Inventory",

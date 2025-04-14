@@ -38,7 +38,8 @@
     "descending": "Absteigend",
     "all": "Alle",
     "saving": "Wird gespeichert...",
-    "lastUpdated": "Zuletzt aktualisiert"
+    "lastUpdated": "Zuletzt aktualisiert",
+    "done": "Fertig"
   },
   "locations": {
     "title": "Lagerorte",
@@ -93,7 +94,10 @@
     "outOfBounds": "Regionabmessungen sind außerhalb der Grenzen",
     "allRegionsNeedNames": "Alle Regionen benötigen Namen vor dem Speichern",
     "count": "Anzahl der Regionen",
-    "locationImage": "Lagerortbild"
+    "locationImage": "Lagerortbild",
+    "unnamed": "Unbenannte Region",
+    "rename": "Region umbenennen",
+    "enterName": "Regionsnamen eingeben"
   },
   "inventory": {
     "title": "Inventar",
