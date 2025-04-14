@@ -177,53 +177,51 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
           <div className="space-y-2">
             <Label htmlFor="image">{`${t('locations.image')} (${t('common.optional')})`}</Label>
             <div className="relative">
-              <ImageInput 
-                onImageChange={handleImageChange}
-                initialPreview={imagePreview}
-                hideLabel={true}
-              />
+              {/* Show ImageInput only when not in region mapper mode */}
+              {!showRegionMapper && (
+                <ImageInput 
+                  onImageChange={handleImageChange}
+                  initialPreview={imagePreview}
+                  hideLabel={true}
+                />
+              )}
               
               {imagePreview && (
                 <div className="mt-4 relative">
-                  <div className="relative border rounded-md overflow-hidden">
-                    {/* Only show the image if we're not showing the region mapper */}
-                    {!showRegionMapper && (
+                  {/* Show either the region mapper or the image with region indicators */}
+                  {showRegionMapper ? (
+                    <RegionMapper
+                      imageSrc={imagePreview}
+                      onComplete={handleRegionsComplete}
+                      initialRegions={regions}
+                    />
+                  ) : (
+                    <div className="relative border rounded-md overflow-hidden">
                       <img 
                         src={imagePreview} 
                         alt={t('locations.image')} 
                         className="max-w-full h-auto"
                       />
-                    )}
-                    
-                    {/* In-place region mapper overlay */}
-                    {showRegionMapper && (
-                      <div className="absolute inset-0 z-10">
-                        <RegionMapper
-                          imageSrc={imagePreview}
-                          onComplete={handleRegionsComplete}
-                          initialRegions={regions}
-                        />
-                      </div>
-                    )}
-                    
-                    {/* Region indicators when not in edit mode */}
-                    {!showRegionMapper && regions.map((region, index) => (
-                      <div 
-                        key={index}
-                        className="absolute border-2 border-primary bg-primary/30"
-                        style={{
-                          left: `${region.x}px`,
-                          top: `${region.y}px`,
-                          width: `${region.width}px`,
-                          height: `${region.height}px`,
-                        }}
-                      >
-                        <div className="absolute top-0 left-0 px-1 py-0.5 text-xs bg-primary text-primary-foreground">
-                          {region.name}
+                      
+                      {/* Region indicators when not in edit mode */}
+                      {regions.map((region, index) => (
+                        <div 
+                          key={index}
+                          className="absolute border-2 border-primary bg-primary/30"
+                          style={{
+                            left: `${region.x}px`,
+                            top: `${region.y}px`,
+                            width: `${region.width}px`,
+                            height: `${region.height}px`,
+                          }}
+                        >
+                          <div className="absolute top-0 left-0 px-1 py-0.5 text-xs bg-primary text-primary-foreground">
+                            {region.name}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                   
                   {/* Region controls */}
                   <div className="mt-2 flex justify-between items-center">

@@ -14,6 +14,7 @@ interface RegionMapperFormProps {
   imageSrc: string;
   onComplete: (regions: Array<{name: string, x: number, y: number, width: number, height: number}>) => void;
   initialRegions?: Array<{name: string, x: number, y: number, width: number, height: number}>;
+  autoStartDrawing?: boolean;
 }
 
 interface ActiveRegion {
@@ -31,7 +32,7 @@ interface ActiveRegion {
 // Snap threshold in pixels - increased for stronger magnetic effect
 const SNAP_THRESHOLD = 10;
 
-export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: RegionMapperFormProps) {
+export function RegionMapper({ imageSrc, onComplete, initialRegions = [], autoStartDrawing = true }: RegionMapperFormProps) {
   const { t } = useLanguage();
   
   // Region state
@@ -46,7 +47,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
   );
   
   // UI state
-  const [isCreating, setIsCreating] = useState(false);
+  const [isCreating, setIsCreating] = useState(autoStartDrawing);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [regionName, setRegionName] = useState('');
