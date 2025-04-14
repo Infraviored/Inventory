@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Copy, Move, Square, Trash, Plus, AlertCircle, Info } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
-import { Tooltip } from '@/components/ui/tooltip';
 
 // This is the component used by location-form.tsx
 interface RegionMapperFormProps {
@@ -103,12 +102,6 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     }
   };
 
-  // Logging for debugging
-  useEffect(() => {
-    console.log('RegionMapper initialized with image:', imageSrc);
-    console.log('Initial regions:', initialRegions);
-  }, [imageSrc, initialRegions]);
-
   // Update parent component with regions whenever they change
   useEffect(() => {
     const formattedRegions = regions.map(({ name, x, y, width, height }) => ({
@@ -177,6 +170,9 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
           });
           setShowForm(true);
           
+          // Exit creation mode after adding a region
+          setIsCreating(false);
+          
           console.log(`Created region: ${width}x${height} at (${left},${top})`);
           setSuccess('Region created! Please name it.');
         } else {
@@ -204,7 +200,8 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       setRegions(regions.map(r => ({
         ...r,
         isSelected: r.id === clickedRegion.id,
-        isDragging: r.id === clickedRegion.id
+        isDragging: false,
+        isResizing: false
       })));
       setSelectedRegionId(clickedRegion.id);
       setRegionName(clickedRegion.name);
@@ -221,7 +218,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       }
     } else {
       // Clicked outside any region, deselect all
-      setRegions(regions.map(r => ({ ...r, isSelected: false, isDragging: false })));
+      setRegions(regions.map(r => ({ ...r, isSelected: false, isDragging: false, isResizing: false })));
       setSelectedRegionId(null);
       setShowForm(false);
     }
@@ -269,6 +266,10 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
             y: top
           });
           setShowForm(true);
+          
+          // Exit creation mode after adding a region
+          setIsCreating(false);
+          
           setSuccess('Region created! Please name it.');
         } else {
           setError('Region too small. Please create a larger region (at least 10x10 pixels).');
@@ -292,7 +293,8 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       setRegions(regions.map(r => ({
         ...r,
         isSelected: r.id === touchedRegion.id,
-        isDragging: r.id === touchedRegion.id
+        isDragging: false,
+        isResizing: false
       })));
       setSelectedRegionId(touchedRegion.id);
       setRegionName(touchedRegion.name);
@@ -306,7 +308,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
         setShowForm(true);
       }
     } else {
-      setRegions(regions.map(r => ({ ...r, isSelected: false, isDragging: false })));
+      setRegions(regions.map(r => ({ ...r, isSelected: false, isDragging: false, isResizing: false })));
       setSelectedRegionId(null);
       setShowForm(false);
     }
@@ -607,19 +609,6 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     }));
   };
 
-  // Add a new region button handler
-  const handleAddRegion = (e: React.MouseEvent) => {
-    if (!containerRef.current) return;
-    
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    setIsCreating(true);
-    setStartPoint({ x, y });
-    setCurrentPoint({ x, y });
-  };
-
   // Calculate styles for the currently drawing rectangle
   const getDrawingRectStyle = () => {
     if (!isCreating || !startPoint || !currentPoint) return { display: 'none' };
@@ -777,7 +766,10 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                 <div className="absolute -top-7 left-0 right-0 flex justify-center space-x-1">
                   <button 
                     className="bg-background border rounded-md p-1 hover:bg-muted"
-                    onClick={() => handleToggleDrag(region.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleDrag(region.id);
+                    }}
                     title="Move region"
                     aria-label="Move region"
                   >
@@ -785,7 +777,10 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                   </button>
                   <button 
                     className="bg-background border rounded-md p-1 hover:bg-muted"
-                    onClick={() => handleToggleResize(region.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleResize(region.id);
+                    }}
                     title="Resize region"
                     aria-label="Resize region"
                   >
@@ -793,7 +788,10 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                   </button>
                   <button 
                     className="bg-background border rounded-md p-1 hover:bg-muted"
-                    onClick={() => handleCopyRegion(region.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopyRegion(region.id);
+                    }}
                     title="Copy region"
                     aria-label="Copy region"
                   >
@@ -801,7 +799,10 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                   </button>
                   <button 
                     className="bg-background border rounded-md p-1 hover:bg-muted text-red-500 hover:text-red-700"
-                    onClick={() => handleRemoveRegion(region.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveRegion(region.id);
+                    }}
                     title="Delete region"
                     aria-label="Delete region"
                   >
@@ -822,6 +823,10 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                   style={{
                     transform: 'translate(50%, 50%)'
                   }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleResize(region.id);
+                  }}
                 />
               )}
             </div>
@@ -833,6 +838,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
               ref={formRef}
               className={`absolute z-10 bg-background border rounded-md shadow-md p-3 ${isMobile ? 'w-full' : 'w-60'}`}
               style={getFormPosition()}
+              onClick={(e) => e.stopPropagation()}
             >
               <form onSubmit={handleNameRegion} className="space-y-3">
                 <h4 className="font-medium text-sm">Region benennen</h4>
@@ -856,88 +862,27 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                 
                 <div className="flex space-x-2">
                   <Button type="submit" size="sm" className="flex-1">Speichern</Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => {
-                    setShowForm(false);
-                    setError(null);
-                    // If the region is new and has no name, remove it
-                    const region = regions.find(r => r.id === selectedRegionId);
-                    if (region && !region.name) {
-                      handleRemoveRegion(selectedRegionId);
-                    }
-                  }} className="flex-1">Abbrechen</Button>
+                  <Button 
+                    type="button" 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => {
+                      setShowForm(false);
+                      setError(null);
+                      // If the region is new and has no name, remove it
+                      const region = regions.find(r => r.id === selectedRegionId);
+                      if (region && !region.name) {
+                        handleRemoveRegion(selectedRegionId);
+                      }
+                    }} 
+                    className="flex-1"
+                  >
+                    Abbrechen
+                  </Button>
                 </div>
               </form>
             </div>
           )}
-        </div>
-        
-        {/* Manual region creation - shown below the image */}
-        <div className="mt-4 p-3 border rounded-md space-y-3">
-          <h4 className="font-medium text-sm">Region manuell erstellen</h4>
-          
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label htmlFor="region-x" className="text-xs">X-Position</Label>
-              <Input
-                id="region-x"
-                type="number"
-                min="0"
-                max={imageSize.width}
-                value={manualDimensions.x}
-                onChange={(e) => setManualDimensions({...manualDimensions, x: parseInt(e.target.value) || 0})}
-                className="h-8"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="region-y" className="text-xs">Y-Position</Label>
-              <Input
-                id="region-y"
-                type="number"
-                min="0"
-                max={imageSize.height}
-                value={manualDimensions.y}
-                onChange={(e) => setManualDimensions({...manualDimensions, y: parseInt(e.target.value) || 0})}
-                className="h-8"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="region-width" className="text-xs">Breite</Label>
-              <Input
-                id="region-width"
-                type="number"
-                min="20"
-                max={imageSize.width}
-                value={manualDimensions.width}
-                onChange={(e) => setManualDimensions({...manualDimensions, width: parseInt(e.target.value) || 100})}
-                className="h-8"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="region-height" className="text-xs">Höhe</Label>
-              <Input
-                id="region-height"
-                type="number"
-                min="20"
-                max={imageSize.height}
-                value={manualDimensions.height}
-                onChange={(e) => setManualDimensions({...manualDimensions, height: parseInt(e.target.value) || 100})}
-                className="h-8"
-              />
-            </div>
-          </div>
-          
-          <div className="text-xs text-muted-foreground mb-2">
-            Bildgröße: {imageSize.width}×{imageSize.height} Pixel
-          </div>
-          
-          <Button 
-            type="button" 
-            size="sm" 
-            className="w-full"
-            onClick={handleCreateManualRegion}
-          >
-            Region erstellen
-          </Button>
         </div>
         
         {/* Region list - shown below the image */}
