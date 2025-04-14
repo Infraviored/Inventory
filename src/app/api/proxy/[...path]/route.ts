@@ -10,7 +10,9 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const queryString = searchParams.toString();
     
-    const backendUrl = `https://5000-iwaqc4g1bjvhn91xj1poq-3a4debb8.manus.computer/api/${path}${queryString ? `?${queryString}` : ''}`;
+    // Get backend URL from environment variable or use default for local development
+    const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+    const backendUrl = `${backendBaseUrl}/api/${path}${queryString ? `?${queryString}` : ''}`;
     console.log(`Proxying GET request to: ${backendUrl}`);
     
     const response = await fetch(backendUrl, {
@@ -38,7 +40,9 @@ export async function POST(
 ) {
   try {
     const path = params.path.join('/');
-    const backendUrl = `https://5000-iwaqc4g1bjvhn91xj1poq-3a4debb8.manus.computer/api/${path}`;
+    // Get backend URL from environment variable or use default for local development
+    const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+    const backendUrl = `${backendBaseUrl}/api/${path}`;
     console.log(`Proxying POST request to: ${backendUrl}`);
     
     const body = await request.json();
@@ -69,7 +73,9 @@ export async function PUT(
 ) {
   try {
     const path = params.path.join('/');
-    const backendUrl = `https://5000-iwaqc4g1bjvhn91xj1poq-3a4debb8.manus.computer/api/${path}`;
+    // Get backend URL from environment variable or use default for local development
+    const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+    const backendUrl = `${backendBaseUrl}/api/${path}`;
     console.log(`Proxying PUT request to: ${backendUrl}`);
     
     const body = await request.json();
@@ -100,7 +106,9 @@ export async function DELETE(
 ) {
   try {
     const path = params.path.join('/');
-    const backendUrl = `https://5000-iwaqc4g1bjvhn91xj1poq-3a4debb8.manus.computer/api/${path}`;
+    // Get backend URL from environment variable or use default for local development
+    const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+    const backendUrl = `${backendBaseUrl}/api/${path}`;
     console.log(`Proxying DELETE request to: ${backendUrl}`);
     
     const response = await fetch(backendUrl, {
