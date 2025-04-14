@@ -124,6 +124,14 @@ export async function deleteLocation(id: number): Promise<void> {
     console.error('API request failed:', errorMessage);
     throw new Error(errorMessage);
   }
+  
+  // Try to parse JSON response, but don't fail if there's no JSON
+  try {
+    await response.json();
+  } catch (error) {
+    // It's okay if there's no JSON response for DELETE
+    console.log('Delete successful, no JSON response');
+  }
 }
 
 export async function getLocationBreadcrumbs(id: number): Promise<{id: number, name: string}[]> {

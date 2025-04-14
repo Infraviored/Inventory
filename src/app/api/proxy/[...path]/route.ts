@@ -121,14 +121,24 @@ export async function DELETE(
       headers: {
         'Content-Type': 'application/json',
       },
+      cache: 'no-store', // Disable caching to ensure fresh data
     });
     
     if (!response.ok) {
+      console.error(`Backend API error: Status ${response.status}`);
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
       throw new Error(`Backend API error: ${response.status}`);
     }
     
-    const data = await response.json();
-    return NextResponse.json(data);
+    // Try to parse JSON response, but don't fail if there's no content
+    try {
+      const data = await response.json();
+      return NextResponse.json(data);
+    } catch (error) {
+      // If no JSON content, return a success message
+      return NextResponse.json({ success: true });
+    }
   } catch (error) {
     console.error(`Proxy error: ${error}`);
     return NextResponse.json({ error: 'Failed to delete data from backend' }, { status: 500 });

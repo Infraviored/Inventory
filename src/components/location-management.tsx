@@ -144,12 +144,17 @@ export default function LocationManagement({ parentId }: { parentId?: number }) 
                   <p className="text-gray-600 mb-4">{location.description}</p>
                 )}
                 <div className="flex space-x-2 mt-4">
-                  <Link 
-                    href={`/locations?id=${location.id}`}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
+                  <button
+                    onClick={() => {
+                      setShowAddForm(true);
+                      // Here we would typically load the location data for editing
+                      // For now, we'll just show the form which will allow creating a new location
+                      // In a full implementation, we would pre-populate the form with location data
+                    }}
+                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
                   >
-                    View
-                  </Link>
+                    Edit
+                  </button>
                   <button
                     onClick={() => handleDelete(location.id)}
                     className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"

@@ -188,12 +188,13 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
               
               {imagePreview && (
                 <div className="mt-4 relative">
-                  {/* Show either the region mapper or the image with region indicators */}
+                  {/* Only show the image once - either in region mapper or with region indicators */}
                   {showRegionMapper ? (
                     <RegionMapper
                       imageSrc={imagePreview}
                       onComplete={handleRegionsComplete}
                       initialRegions={regions}
+                      autoStartDrawing={true}
                     />
                   ) : (
                     <div className="relative border rounded-md overflow-hidden">

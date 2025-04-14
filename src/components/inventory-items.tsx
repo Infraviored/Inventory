@@ -112,6 +112,12 @@ export default function InventoryItems({ locationId, regionId }: { locationId?: 
                     View
                   </button>
                   <button
+                    onClick={() => router.push(`/items/${item.id}`)}
+                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
+                  >
+                    Edit
+                  </button>
+                  <button
                     onClick={() => handleDelete(item.id)}
                     className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
                   >
