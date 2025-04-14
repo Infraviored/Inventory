@@ -336,18 +336,17 @@ const browserStorage = {
 
 // Detect environment and determine storage mode
 export function detectEnvironment(): StorageConfig {
-  // Always use browser storage for deployed environments
-  // This is a simplification to ensure it works in the temporary deployment
-  
-  // Initialize browser storage immediately to ensure it's ready
+  // Use API mode when Flask backend is available
+  // Initialize browser storage as fallback
   if (typeof window !== 'undefined') {
     browserStorage.initializeStorage();
-    console.log('Browser storage initialized');
+    console.log('Browser storage initialized as fallback');
   }
   
+  // Use the Flask API backend that's running on port 5000
   return {
-    mode: 'browser',
-    apiBaseUrl: '/api'
+    mode: 'api',
+    apiBaseUrl: 'http://5000-iwaqc4g1bjvhn91xj1poq-3a4debb8.manus.computer'
   };
 }
 
