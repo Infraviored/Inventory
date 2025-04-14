@@ -30,6 +30,7 @@ The application follows a client-server architecture with clear separation of co
 
 ### Backend (Server-side)
 - **API Server**: Python Flask RESTful API
+- **Database**: SQLite for data persistence
 - **Cross-Origin Support**: Flask-CORS middleware for frontend access
 - **File Handling**: Werkzeug utilities for secure file uploads
 - **Error Handling**: Comprehensive try-catch blocks with detailed error responses
@@ -37,6 +38,7 @@ The application follows a client-server architecture with clear separation of co
 
 ### Communication Pattern
 - **API Communication**: HTTP REST API with JSON payloads
+- **API Proxy**: Next.js API routes proxy requests to Flask backend
 - **Data Validation**: Server-side validation of all incoming requests
 - **Error Handling**: Structured error responses with descriptive messages
 - **File Transfers**: Multi-part form data for image uploads
@@ -48,20 +50,20 @@ The application follows a client-server architecture with clear separation of co
 /
 ├── .next/                # Next.js build output
 ├── api/                  # Python Flask backend
-├── backup_local_storage/ # Alternative browser storage implementation
 ├── data/                 # Database storage directory
 ├── node_modules/         # Frontend dependencies
 ├── public/               # Static files and uploaded images
 ├── src/                  # Frontend source code
+├── .env.local            # Environment variables for API configuration
 ├── .gitignore            # Git ignore file
+├── launch.sh             # Script to launch both frontend and backend
+├── launch_instructions.md # Documentation for using the launch script
 ├── next-env.d.ts         # Next.js TypeScript declarations
 ├── next.config.js        # Next.js configuration
 ├── package-lock.json     # NPM dependency lock file
 ├── package.json          # Frontend package configuration
 ├── postcss.config.js     # PostCSS configuration for Tailwind
 ├── README.md             # This documentation file
-├── reset-and-start.sh    # Script to reset database and restart app
-├── start.sh              # Script to start development environment
 ├── tailwind-output.css   # Generated Tailwind styles
 ├── tailwind.config.js    # Tailwind CSS configuration
 └── tsconfig.json         # TypeScript configuration
@@ -86,6 +88,8 @@ api/
 ```
 src/
 ├── app/                  # Next.js app router pages
+│   ├── api/              # API routes including proxy to backend
+│   └── ...               # Page components
 ├── components/           # React components
 │   ├── ui/               # Base UI components
 │   ├── image-input.tsx   # Image upload component
@@ -103,16 +107,10 @@ src/
 │   └── theme-toggle.tsx  # Light/dark mode toggle
 ├── hooks/                # Custom React hooks
 ├── lib/                  # Utility functions and API clients
+│   ├── api.ts            # API client for backend communication
+│   ├── storage-provider.ts # Storage abstraction layer
+│   └── ...               # Other utility functions
 └── locales/              # Internationalization files
-```
-
-### Alternative Storage (`/backup_local_storage`)
-```
-backup_local_storage/
-├── api/                  # API implementation using browser storage
-├── json-db_local.js      # JSON file-based storage implementation (8.4KB)
-├── kv-db_local.js        # Key-value based storage implementation (10KB)
-└── memory-db_local.js    # In-memory storage implementation (8.5KB)
 ```
 
 ## Data Management
@@ -149,26 +147,6 @@ The database consists of the following tables:
    - Stores normalized tags extracted from item names and descriptions
    - Enables efficient fuzzy searching capabilities
 
-### Alternative Storage Options
-The system provides alternative storage implementations in the `backup_local_storage` directory:
-
-1. **JSON File Storage** (`json-db_local.js`)
-   - Stores data in JSON files on the filesystem
-   - Provides persistence without a database server
-   - Suitable for simple deployments
-
-2. **Key-Value Storage** (`kv-db_local.js`)
-   - Uses browser's localStorage/IndexedDB for persistence
-   - Enables fully client-side operation without a backend
-   - Data remains in the user's browser
-
-3. **In-Memory Storage** (`memory-db_local.js`)
-   - Temporary runtime storage with no persistence
-   - Useful for testing and development
-   - Resets when the application restarts
-
-These alternative implementations allow the application to run without a database server, providing flexibility for different deployment scenarios.
-
 ## Key Components
 
 ### Region Mapper (24KB)
@@ -179,6 +157,7 @@ The `region-mapper.tsx` component is a sophisticated visual interface that allow
 - Name, resize, move, and delete regions
 - Visualize region dimensions and positions
 - Select existing regions for editing
+- Automatically start drawing mode when "Add New Region" is clicked
 
 This component enables precise spatial organization of inventory items within locations, making it easier to locate items in the real world.
 
@@ -197,23 +176,55 @@ The `inventory-item-form.tsx` component offers:
 - Location and region assignment
 - Validation and error handling
 
+### API Proxy
+The application includes a Next.js API proxy that:
+- Routes frontend requests to the Flask backend
+- Handles CORS issues automatically
+- Uses environment variables for flexible configuration
+- Provides consistent error handling
+- Simplifies deployment across different environments
+
 ## Deployment Options
 
-The application is designed for flexible deployment options:
+The application is designed for flexible deployment:
 
 ### Development Environment
-- **Start Script**: `start.sh` for local development
-  - Automatically initializes database if needed
+- **Launch Script**: `launch.sh` for local development
+  - Automatically configures environment variables
   - Starts Flask backend on port 5000
   - Starts Next.js frontend on port 3000
   - Provides clean shutdown of both services
+  - Detects Manus environment and configures API proxy accordingly
 
-### Reset and Fresh Start
-- **Reset Script**: `reset-and-start.sh`
-  - Stops any running instances
-  - Deletes the existing database
-  - Initializes a fresh database instance
-  - Starts both backend and frontend servers
+### Manus Computer Deployment
+1. **Clone and Setup**
+   ```bash
+   git clone https://github.com/Infraviored/Inventory.git
+   cd Inventory
+   git checkout manus
+   npm install
+   ```
+
+2. **Launch Services**
+   ```bash
+   chmod +x launch.sh
+   ./launch.sh
+   ```
+
+3. **Expose Ports**
+   Expose both the frontend and backend ports:
+   - Frontend: Port 3000
+   - Backend: Port 5000
+
+4. **Update Environment Configuration**
+   If you encounter API connectivity issues:
+   
+   1. Get your Manus computer ID (from the exposed URL)
+   2. Update the `.env.local` file:
+      ```
+      NEXT_PUBLIC_API_BASE_URL=https://5000-[your-manus-id].manus.computer
+      ```
+   3. Restart the frontend service
 
 ### Production Deployment Options
 
@@ -231,23 +242,35 @@ The application is designed for flexible deployment options:
 
 3. **Serverless Options**
    - Frontend: Deploy to Vercel or Netlify
-   - Backend: API routes within Next.js or separate serverless functions
+   - Backend: Deploy Flask API to a serverless platform
    - Database: Migrate to a managed database service
-   - Best for scalable public deployments
-
-4. **Offline/Browser-Only Mode**
-   - Use the implementations in the `backup_local_storage` directory
-   - Replace backend API calls with browser storage
-   - All data stays on the client device
-   - Suitable for privacy-focused users or offline scenarios
+   - Configure API proxy to point to deployed backend
 
 ### Deployment Considerations
 - **Data Persistence**: Ensure database file and uploads directory are properly persisted
 - **Network Configuration**: Configure CORS settings for production domains
 - **Security**: Implement appropriate access controls and authentication in production
+- **API Proxy**: Update environment variables to point to the correct backend URL
 - **Scaling**: Consider database migration for high-traffic scenarios
 
 ## Recent Changes and Updates
+
+### API Proxy Implementation
+- Added Next.js API proxy to handle communication with Flask backend
+- Implemented environment-based configuration for backend URL
+- Fixed connectivity issues between frontend and backend
+- Eliminated CORS issues and simplified deployment
+
+### Region Mapper Improvements
+- Fixed image duplication issue in the location form
+- Implemented direct region drawing when "Add New Region" is clicked
+- Added autoStartDrawing prop to automatically enter drawing mode
+- Enhanced user experience with immediate drawing capabilities
+
+### React 19 Compatibility
+- Fixed React 19 warnings related to element.ref usage
+- Updated component structure to avoid nested button issues
+- Ensured proper component hierarchy in theme-toggle.tsx
 
 ### Backend Optimizations
 The Flask backend (`api/app.py`) has been significantly streamlined and optimized:
@@ -277,8 +300,9 @@ Major improvements to the frontend components:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/inventory.git
-   cd inventory
+   git clone https://github.com/Infraviored/Inventory.git
+   cd Inventory
+   git checkout manus
    ```
 
 2. **Install dependencies**
@@ -288,15 +312,14 @@ Major improvements to the frontend components:
    
    # Backend dependencies
    cd api
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
+   pip install flask flask-cors
    cd ..
    ```
 
 3. **Start the development servers**
    ```bash
-   ./start.sh
+   chmod +x launch.sh
+   ./launch.sh
    ```
 
 4. **Access the application**
