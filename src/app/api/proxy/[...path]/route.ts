@@ -131,12 +131,21 @@ export async function DELETE(
       throw new Error(`Backend API error: ${response.status}`);
     }
     
-    // Try to parse JSON response, but don't fail if there's no content
-    try {
-      const data = await response.json();
-      return NextResponse.json(data);
-    } catch (error) {
-      // If no JSON content, return a success message
+    // For DELETE requests, we don't always expect JSON content
+    // Check if there's content before trying to parse it
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        const data = await response.json();
+        return NextResponse.json(data);
+      } catch (error) {
+        // If JSON parsing fails despite content-type, still return success
+        console.log('Delete successful, but JSON parsing failed');
+        return NextResponse.json({ success: true });
+      }
+    } else {
+      // No JSON content expected, return success
+      console.log('Delete successful, no JSON content');
       return NextResponse.json({ success: true });
     }
   } catch (error) {

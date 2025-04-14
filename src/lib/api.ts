@@ -114,8 +114,9 @@ export async function updateLocation(id: number, formData: FormData): Promise<Lo
 }
 
 export async function deleteLocation(id: number): Promise<void> {
-  const response = await fetch(`/api/locations/${id}`, {
+  const response = await fetch(`/api/proxy/locations/${id}`, {
     method: 'DELETE',
+    cache: 'no-store',
   });
   
   if (!response.ok) {
@@ -125,13 +126,8 @@ export async function deleteLocation(id: number): Promise<void> {
     throw new Error(errorMessage);
   }
   
-  // Try to parse JSON response, but don't fail if there's no JSON
-  try {
-    await response.json();
-  } catch (error) {
-    // It's okay if there's no JSON response for DELETE
-    console.log('Delete successful, no JSON response');
-  }
+  // Success - no need to process response for DELETE operations
+  console.log('Delete operation successful');
 }
 
 export async function getLocationBreadcrumbs(id: number): Promise<{id: number, name: string}[]> {
