@@ -338,6 +338,13 @@ const browserStorage = {
 export function detectEnvironment(): StorageConfig {
   // Always use browser storage for deployed environments
   // This is a simplification to ensure it works in the temporary deployment
+  
+  // Initialize browser storage immediately to ensure it's ready
+  if (typeof window !== 'undefined') {
+    browserStorage.initializeStorage();
+    console.log('Browser storage initialized');
+  }
+  
   return {
     mode: 'browser',
     apiBaseUrl: '/api'
