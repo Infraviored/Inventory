@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Copy, Move, Square, Trash, Plus, AlertCircle, Info } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
+import { useLanguage } from '@/lib/language';
 
 // This is the component used by location-form.tsx
 interface RegionMapperFormProps {
@@ -27,7 +28,12 @@ interface ActiveRegion {
   isDragging: boolean;
 }
 
+// Snap threshold in pixels - increased for stronger magnetic effect
+const SNAP_THRESHOLD = 10;
+
 export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: RegionMapperFormProps) {
+  const { t } = useLanguage();
+  
   // Region state
   const [regions, setRegions] = useState<ActiveRegion[]>(
     initialRegions.map((r, i) => ({
@@ -55,6 +61,8 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
   });
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [isMobile, setIsMobile] = useState(false);
+  const [dragStartPos, setDragStartPos] = useState<{x: number, y: number} | null>(null);
+  const [resizeStartDims, setResizeStartDims] = useState<{width: number, height: number} | null>(null);
 
   // Drawing state
   const [startPoint, setStartPoint] = useState<{x: number, y: number} | null>(null);
@@ -102,6 +110,83 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     }
   };
 
+  // Find snap positions based on other regions - enhanced with more snap points
+  const findSnapPositions = (currentRegion: ActiveRegion | null) => {
+    const snapPositions = {
+      x: [] as number[],
+      y: [] as number[],
+      right: [] as number[],
+      bottom: [] as number[]
+    };
+    
+    // Add image boundaries
+    snapPositions.x.push(0);
+    snapPositions.y.push(0);
+    snapPositions.right.push(imageSize.width);
+    snapPositions.bottom.push(imageSize.height);
+    
+    // Add positions from other regions
+    regions.forEach(region => {
+      // Skip the current region
+      if (currentRegion && region.id === currentRegion.id) return;
+      
+      // Add left, right, top, bottom positions
+      snapPositions.x.push(region.x);
+      snapPositions.y.push(region.y);
+      snapPositions.right.push(region.x + region.width);
+      snapPositions.bottom.push(region.y + region.height);
+      
+      // Add center positions for better alignment
+      snapPositions.x.push(region.x + region.width / 2);
+      snapPositions.y.push(region.y + region.height / 2);
+      
+      // Add quarter positions for more precise alignment
+      snapPositions.x.push(region.x + region.width / 4);
+      snapPositions.x.push(region.x + (region.width * 3) / 4);
+      snapPositions.y.push(region.y + region.height / 4);
+      snapPositions.y.push(region.y + (region.height * 3) / 4);
+    });
+    
+    return snapPositions;
+  };
+
+  // Find nearest snap position - improved with stronger magnetic effect
+  const findNearestSnap = (value: number, positions: number[]) => {
+    let nearest = null;
+    let minDistance = SNAP_THRESHOLD + 1;
+    
+    for (const pos of positions) {
+      const distance = Math.abs(value - pos);
+      if (distance < SNAP_THRESHOLD && distance < minDistance) {
+        nearest = pos;
+        minDistance = distance;
+      }
+    }
+    
+    return nearest;
+  };
+
+  // Apply snapping to coordinates
+  const applySnapping = (x: number, y: number, width: number, height: number, currentRegion: ActiveRegion | null) => {
+    const snapPositions = findSnapPositions(currentRegion);
+    
+    // Check for snapping on left edge
+    const snapX = findNearestSnap(x, snapPositions.x);
+    // Check for snapping on right edge
+    const snapRight = findNearestSnap(x + width, snapPositions.right);
+    // Check for snapping on top edge
+    const snapY = findNearestSnap(y, snapPositions.y);
+    // Check for snapping on bottom edge
+    const snapBottom = findNearestSnap(y + height, snapPositions.bottom);
+    
+    return {
+      x: snapX !== null ? snapX : (snapRight !== null ? snapRight - width : x),
+      y: snapY !== null ? snapY : (snapBottom !== null ? snapBottom - height : y),
+      width,
+      height
+    };
+  };
+
   // Update parent component with regions whenever they change
   useEffect(() => {
     const formattedRegions = regions.map(({ name, x, y, width, height }) => ({
@@ -142,64 +227,47 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // If we're in creation mode, set start point
+    // If we're in creation mode, start drawing
     if (isCreating) {
-      if (!startPoint) {
-        // First click - start drawing
-        setStartPoint({ x, y });
-        setCurrentPoint({ x, y });
-        console.log(`Started drawing at (${x}, ${y})`);
-      } else {
-        // Second click - finish drawing
-        const width = Math.abs(x - startPoint.x);
-        const height = Math.abs(y - startPoint.y);
-        
-        if (width > 10 && height > 10) {
-          const left = Math.min(startPoint.x, x);
-          const top = Math.min(startPoint.y, y);
-
-          // Create the new region temporarily
-          const newRegion: ActiveRegion = {
-            id: `region-${Date.now()}`,
-            name: '',
-            x: left,
-            y: top,
-            width,
-            height,
-            isSelected: true,
-            isResizing: false,
-            isDragging: false
-          };
-          
-          setRegions(prev => prev.map(r => ({ ...r, isSelected: false })).concat(newRegion));
-          setSelectedRegionId(newRegion.id);
-          setRegionName('');
-          
-          // Position the form menu next to the region
-          setMenuPosition({
-            x: left + width + 10,
-            y: top
-          });
-          setShowForm(true);
-          
-          // Exit creation mode after adding a region
-          setIsCreating(false);
-          
-          console.log(`Created region: ${width}x${height} at (${left},${top})`);
-          setSuccess('Region created! Please name it.');
-        } else {
-          console.log('Region too small, ignoring');
-          setError('Region too small. Please create a larger region (at least 10x10 pixels).');
-        }
-        
-        // Reset drawing state
-        setStartPoint(null);
-        setCurrentPoint(null);
-      }
+      setStartPoint({ x, y });
+      setCurrentPoint({ x, y });
+      console.log(`Started drawing at (${x}, ${y})`);
       return;
     }
     
-    // If we're not creating, check if we clicked on a region
+    // Check if we clicked on a resize handle
+    const selectedRegion = regions.find(r => r.isSelected);
+    if (selectedRegion) {
+      // Make the resize handle larger and more precise
+      const resizeHandleRect = {
+        x: selectedRegion.x + selectedRegion.width - 20,
+        y: selectedRegion.y + selectedRegion.height - 20,
+        width: 30,
+        height: 30
+      };
+      
+      if (
+        x >= resizeHandleRect.x && 
+        x <= resizeHandleRect.x + resizeHandleRect.width && 
+        y >= resizeHandleRect.y && 
+        y <= resizeHandleRect.y + resizeHandleRect.height
+      ) {
+        // Clicked on resize handle - ONLY resize, never drag
+        setRegions(regions.map(r => ({
+          ...r,
+          isResizing: r.id === selectedRegion.id,
+          isDragging: false
+        })));
+        setResizeStartDims({
+          width: selectedRegion.width,
+          height: selectedRegion.height
+        });
+        setDragStartPos({ x, y });
+        return;
+      }
+    }
+    
+    // Check if we clicked on a region
     const clickedRegion = regions.find(region => 
       x >= region.x && 
       x <= (region.x + region.width) && 
@@ -208,14 +276,16 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     );
     
     if (clickedRegion) {
-      // Select the region and deselect others
+      // Select the region and prepare for dragging
       setRegions(regions.map(r => ({
         ...r,
         isSelected: r.id === clickedRegion.id,
-        isDragging: false,
+        isDragging: r.id === clickedRegion.id,
         isResizing: false
       })));
       setSelectedRegionId(clickedRegion.id);
+      setRegionName(clickedRegion.name);
+      setDragStartPos({ x, y });
       
       // Position the form menu next to the region
       setMenuPosition({
@@ -245,50 +315,8 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     
     // Similar logic to handleMouseDown
     if (isCreating) {
-      if (!startPoint) {
-        setStartPoint({ x, y });
-        setCurrentPoint({ x, y });
-      } else {
-        const width = Math.abs(x - startPoint.x);
-        const height = Math.abs(y - startPoint.y);
-        
-        if (width > 10 && height > 10) {
-          const left = Math.min(startPoint.x, x);
-          const top = Math.min(startPoint.y, y);
-
-          const newRegion: ActiveRegion = {
-            id: `region-${Date.now()}`,
-            name: '',
-            x: left,
-            y: top,
-            width,
-            height,
-            isSelected: true,
-            isResizing: false,
-            isDragging: false
-          };
-          
-          setRegions(prev => prev.map(r => ({ ...r, isSelected: false })).concat(newRegion));
-          setSelectedRegionId(newRegion.id);
-          setRegionName('');
-          
-          setMenuPosition({
-            x: left + width + 10,
-            y: top
-          });
-          setShowForm(true);
-          
-          // Exit creation mode after adding a region
-          setIsCreating(false);
-          
-          setSuccess('Region created! Please name it.');
-        } else {
-          setError('Region too small. Please create a larger region (at least 10x10 pixels).');
-        }
-        
-        setStartPoint(null);
-        setCurrentPoint(null);
-      }
+      setStartPoint({ x, y });
+      setCurrentPoint({ x, y });
       return;
     }
     
@@ -304,11 +332,14 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       setRegions(regions.map(r => ({
         ...r,
         isSelected: r.id === touchedRegion.id,
-        isDragging: false,
+        isDragging: r.id === touchedRegion.id,
         isResizing: false
       })));
       setSelectedRegionId(touchedRegion.id);
+      setRegionName(touchedRegion.name);
+      setDragStartPos({ x, y });
       
+      // Position the form menu next to the region
       setMenuPosition({
         x: touchedRegion.x + touchedRegion.width + 10,
         y: touchedRegion.y
@@ -324,7 +355,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     }
   };
 
-  // Handle mouse move (update rectangle or drag)
+  // Handle mouse move (update rectangle or drag/resize)
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!containerRef.current) return;
     
@@ -332,7 +363,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    // If we're drawing, update current point
+    // If we're drawing a new region
     if (isCreating && startPoint) {
       setCurrentPoint({ x, y });
       return;
@@ -340,55 +371,86 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     
     // If we're dragging a region
     const draggingRegion = regions.find(r => r.isDragging);
-    if (draggingRegion) {
+    if (draggingRegion && dragStartPos) {
       // Calculate movement
-      const deltaX = x - (draggingRegion.x + draggingRegion.width / 2);
-      const deltaY = y - (draggingRegion.y + draggingRegion.height / 2);
+      const deltaX = x - dragStartPos.x;
+      const deltaY = y - dragStartPos.y;
+      
+      // Calculate new position
+      let newX = Math.max(0, Math.min(draggingRegion.x + deltaX, imageSize.width - draggingRegion.width));
+      let newY = Math.max(0, Math.min(draggingRegion.y + deltaY, imageSize.height - draggingRegion.height));
+      
+      // Apply snapping
+      const snapped = applySnapping(newX, newY, draggingRegion.width, draggingRegion.height, draggingRegion);
       
       // Update region position
       setRegions(regions.map(r => {
         if (r.id === draggingRegion.id) {
-          const newX = Math.max(0, Math.min(r.x + deltaX, imageSize.width - r.width));
-          const newY = Math.max(0, Math.min(r.y + deltaY, imageSize.height - r.height));
-          
           // Update menu position if this is the selected region
           if (r.id === selectedRegionId && showForm) {
             setMenuPosition({
-              x: newX + r.width + 10,
-              y: newY
+              x: snapped.x + r.width + 10,
+              y: snapped.y
             });
           }
           
           return {
             ...r,
-            x: newX,
-            y: newY
+            x: snapped.x,
+            y: snapped.y
           };
         }
         return r;
       }));
+      
+      // Update drag start position
+      setDragStartPos({ x, y });
     }
     
     // If we're resizing a region
     const resizingRegion = regions.find(r => r.isResizing);
-    if (resizingRegion) {
+    if (resizingRegion && dragStartPos && resizeStartDims) {
+      // Calculate new dimensions
+      const deltaX = x - dragStartPos.x;
+      const deltaY = y - dragStartPos.y;
+      
+      const newWidth = Math.max(20, resizeStartDims.width + deltaX);
+      const newHeight = Math.max(20, resizeStartDims.height + deltaY);
+      
+      // Ensure region stays within image bounds
+      const boundedWidth = Math.min(newWidth, imageSize.width - resizingRegion.x);
+      const boundedHeight = Math.min(newHeight, imageSize.height - resizingRegion.y);
+      
+      // Apply snapping for the right and bottom edges
+      const right = resizingRegion.x + boundedWidth;
+      const bottom = resizingRegion.y + boundedHeight;
+      
+      const snapPositions = findSnapPositions(resizingRegion);
+      const snapRight = findNearestSnap(right, snapPositions.right);
+      const snapBottom = findNearestSnap(bottom, snapPositions.bottom);
+      
+      // Visual feedback for snapping - add a flash effect or highlight when snapping occurs
+      const isSnappingRight = snapRight !== null;
+      const isSnappingBottom = snapBottom !== null;
+      
+      const finalWidth = isSnappingRight ? snapRight - resizingRegion.x : boundedWidth;
+      const finalHeight = isSnappingBottom ? snapBottom - resizingRegion.y : boundedHeight;
+      
+      // Update region dimensions
       setRegions(regions.map(r => {
         if (r.id === resizingRegion.id) {
-          const newWidth = Math.max(20, x - r.x);
-          const newHeight = Math.max(20, y - r.y);
-          
           // Update menu position if this is the selected region
           if (r.id === selectedRegionId && showForm) {
             setMenuPosition({
-              x: r.x + newWidth + 10,
+              x: r.x + finalWidth + 10,
               y: r.y
             });
           }
           
           return {
             ...r,
-            width: newWidth,
-            height: newHeight
+            width: finalWidth,
+            height: finalHeight
           };
         }
         return r;
@@ -410,51 +472,84 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
       return;
     }
     
+    // If we're dragging a region
     const draggingRegion = regions.find(r => r.isDragging);
-    if (draggingRegion) {
-      const deltaX = x - (draggingRegion.x + draggingRegion.width / 2);
-      const deltaY = y - (draggingRegion.y + draggingRegion.height / 2);
+    if (draggingRegion && dragStartPos) {
+      // Calculate movement
+      const deltaX = x - dragStartPos.x;
+      const deltaY = y - dragStartPos.y;
       
+      // Calculate new position
+      let newX = Math.max(0, Math.min(draggingRegion.x + deltaX, imageSize.width - draggingRegion.width));
+      let newY = Math.max(0, Math.min(draggingRegion.y + deltaY, imageSize.height - draggingRegion.height));
+      
+      // Apply snapping
+      const snapped = applySnapping(newX, newY, draggingRegion.width, draggingRegion.height, draggingRegion);
+      
+      // Update region position
       setRegions(regions.map(r => {
         if (r.id === draggingRegion.id) {
-          const newX = Math.max(0, Math.min(r.x + deltaX, imageSize.width - r.width));
-          const newY = Math.max(0, Math.min(r.y + deltaY, imageSize.height - r.height));
-          
+          // Update menu position if this is the selected region
           if (r.id === selectedRegionId && showForm) {
             setMenuPosition({
-              x: newX + r.width + 10,
-              y: newY
+              x: snapped.x + r.width + 10,
+              y: snapped.y
             });
           }
           
           return {
             ...r,
-            x: newX,
-            y: newY
+            x: snapped.x,
+            y: snapped.y
           };
         }
         return r;
       }));
+      
+      // Update drag start position
+      setDragStartPos({ x, y });
     }
     
+    // If we're resizing a region
     const resizingRegion = regions.find(r => r.isResizing);
-    if (resizingRegion) {
+    if (resizingRegion && dragStartPos && resizeStartDims) {
+      // Calculate new dimensions
+      const deltaX = x - dragStartPos.x;
+      const deltaY = y - dragStartPos.y;
+      
+      const newWidth = Math.max(20, resizeStartDims.width + deltaX);
+      const newHeight = Math.max(20, resizeStartDims.height + deltaY);
+      
+      // Ensure region stays within image bounds
+      const boundedWidth = Math.min(newWidth, imageSize.width - resizingRegion.x);
+      const boundedHeight = Math.min(newHeight, imageSize.height - resizingRegion.y);
+      
+      // Apply snapping for the right and bottom edges
+      const right = resizingRegion.x + boundedWidth;
+      const bottom = resizingRegion.y + boundedHeight;
+      
+      const snapPositions = findSnapPositions(resizingRegion);
+      const snapRight = findNearestSnap(right, snapPositions.right);
+      const snapBottom = findNearestSnap(bottom, snapPositions.bottom);
+      
+      const finalWidth = snapRight !== null ? snapRight - resizingRegion.x : boundedWidth;
+      const finalHeight = snapBottom !== null ? snapBottom - resizingRegion.y : boundedHeight;
+      
+      // Update region dimensions
       setRegions(regions.map(r => {
         if (r.id === resizingRegion.id) {
-          const newWidth = Math.max(20, x - r.x);
-          const newHeight = Math.max(20, y - r.y);
-          
+          // Update menu position if this is the selected region
           if (r.id === selectedRegionId && showForm) {
             setMenuPosition({
-              x: r.x + newWidth + 10,
+              x: r.x + finalWidth + 10,
               y: r.y
             });
           }
           
           return {
             ...r,
-            width: newWidth,
-            height: newHeight
+            width: finalWidth,
+            height: finalHeight
           };
         }
         return r;
@@ -464,22 +559,131 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
 
   // Handle mouse up (finish dragging or resizing)
   const handleMouseUp = () => {
+    // If we're creating a region and have both start and end points
+    if (isCreating && startPoint && currentPoint) {
+      const width = Math.abs(currentPoint.x - startPoint.x);
+      const height = Math.abs(currentPoint.y - startPoint.y);
+      
+      if (width > 10 && height > 10) {
+        const left = Math.min(startPoint.x, currentPoint.x);
+        const top = Math.min(startPoint.y, currentPoint.y);
+
+        // Apply snapping
+        const snapped = applySnapping(left, top, width, height, null);
+
+        // Create the new region
+        const newRegion: ActiveRegion = {
+          id: `region-${Date.now()}`,
+          name: '',
+          x: snapped.x,
+          y: snapped.y,
+          width: snapped.width,
+          height: snapped.height,
+          isSelected: true,
+          isResizing: false,
+          isDragging: false
+        };
+        
+        setRegions(prev => prev.map(r => ({ ...r, isSelected: false })).concat(newRegion));
+        setSelectedRegionId(newRegion.id);
+        setRegionName('');
+        
+        // Position the form menu next to the region
+        setMenuPosition({
+          x: snapped.x + snapped.width + 10,
+          y: snapped.y
+        });
+        setShowForm(true);
+        
+        // Exit creation mode after adding a region
+        setIsCreating(false);
+        
+        console.log(`Created region: ${width}x${height} at (${left},${top})`);
+        setSuccess('Region created! Please name it.');
+      } else {
+        console.log('Region too small, ignoring');
+        setError('Region too small. Please create a larger region (at least 10x10 pixels).');
+      }
+      
+      // Reset drawing state
+      setStartPoint(null);
+      setCurrentPoint(null);
+      return;
+    }
+    
     // End any dragging or resizing
     setRegions(regions.map(r => ({
       ...r,
       isDragging: false,
       isResizing: false
     })));
+    
+    // Reset drag/resize tracking
+    setDragStartPos(null);
+    setResizeStartDims(null);
   };
 
   // Handle touch end for mobile devices
   const handleTouchEnd = () => {
     // Similar logic to handleMouseUp
+    if (isCreating && startPoint && currentPoint) {
+      const width = Math.abs(currentPoint.x - startPoint.x);
+      const height = Math.abs(currentPoint.y - startPoint.y);
+      
+      if (width > 10 && height > 10) {
+        const left = Math.min(startPoint.x, currentPoint.x);
+        const top = Math.min(startPoint.y, currentPoint.y);
+
+        // Apply snapping
+        const snapped = applySnapping(left, top, width, height, null);
+
+        // Create the new region
+        const newRegion: ActiveRegion = {
+          id: `region-${Date.now()}`,
+          name: '',
+          x: snapped.x,
+          y: snapped.y,
+          width: snapped.width,
+          height: snapped.height,
+          isSelected: true,
+          isResizing: false,
+          isDragging: false
+        };
+        
+        setRegions(prev => prev.map(r => ({ ...r, isSelected: false })).concat(newRegion));
+        setSelectedRegionId(newRegion.id);
+        setRegionName('');
+        
+        // Position the form menu next to the region
+        setMenuPosition({
+          x: snapped.x + snapped.width + 10,
+          y: snapped.y
+        });
+        setShowForm(true);
+        
+        // Exit creation mode after adding a region
+        setIsCreating(false);
+        
+        setSuccess('Region created! Please name it.');
+      } else {
+        setError('Region too small. Please create a larger region (at least 10x10 pixels).');
+      }
+      
+      // Reset drawing state
+      setStartPoint(null);
+      setCurrentPoint(null);
+      return;
+    }
+    
     setRegions(regions.map(r => ({
       ...r,
       isDragging: false,
       isResizing: false
     })));
+    
+    // Reset drag/resize tracking
+    setDragStartPos(null);
+    setResizeStartDims(null);
   };
 
   // Create region from manual dimensions
@@ -487,20 +691,22 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     // Validate dimensions are within image bounds
     const { x, y, width, height } = manualDimensions;
     
-    if (x < 0 || y < 0 || width <= 0 || height <= 0) {
-      setError('Region dimensions must be positive values');
+    if (x < 0 || y < 0 || width <= 0 || height <= 0 || 
+        x + width > imageSize.width || y + height > imageSize.height) {
+      setError(t('common.error') + ': ' + t('regions.outOfBounds'));
       return;
     }
     
-    if (x + width > imageSize.width || y + height > imageSize.height) {
-      setError(`Region dimensions must be within image bounds (${imageSize.width}x${imageSize.height})`);
-      return;
-    }
+    // Apply snapping
+    const snapped = applySnapping(x, y, width, height, null);
     
     const newRegion: ActiveRegion = {
       id: `region-${Date.now()}`,
       name: '',
-      x, y, width, height,
+      x: snapped.x,
+      y: snapped.y,
+      width: snapped.width,
+      height: snapped.height,
       isSelected: true,
       isResizing: false,
       isDragging: false
@@ -525,7 +731,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     e.stopPropagation();
     
     if (!regionName.trim()) {
-      setError('Please enter a region name');
+      setError(t('regions.name') + ' ' + t('common.required'));
       return;
     }
     
@@ -585,23 +791,29 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     const regionToCopy = regions.find(r => r.id === id);
     if (!regionToCopy) return;
     
+    // Default offset for the copy
+    let offsetX = 20;
+    let offsetY = 20;
+    
+    // Try to align with the original region if possible
+    const snapPositions = findSnapPositions(null);
+    
+    // Create the new region
     const newRegion: ActiveRegion = {
       ...regionToCopy,
       id: `region-${Date.now()}`,
-      name: `${regionToCopy.name} (Copy)`,
-      x: regionToCopy.x + 20,
-      y: regionToCopy.y + 20,
-      isSelected: true
+      name: `${regionToCopy.name} (${t('common.copy')})`,
+      x: Math.min(regionToCopy.x + offsetX, imageSize.width - regionToCopy.width),
+      y: Math.min(regionToCopy.y + offsetY, imageSize.height - regionToCopy.height),
+      isSelected: true,
+      isResizing: false,
+      isDragging: false
     };
     
-    // Ensure the copied region is within bounds
-    if (newRegion.x + newRegion.width > imageSize.width) {
-      newRegion.x = Math.max(0, imageSize.width - newRegion.width);
-    }
-    
-    if (newRegion.y + newRegion.height > imageSize.height) {
-      newRegion.y = Math.max(0, imageSize.height - newRegion.height);
-    }
+    // Apply snapping to the copied region
+    const snapped = applySnapping(newRegion.x, newRegion.y, newRegion.width, newRegion.height, null);
+    newRegion.x = snapped.x;
+    newRegion.y = snapped.y;
     
     setRegions(prev => 
       prev.map(r => ({ ...r, isSelected: false })).concat(newRegion)
@@ -697,17 +909,40 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
     };
   };
 
+  // Handle complete button click - send regions back to parent component
+  const handleComplete = () => {
+    // Check if all regions have names
+    if (regions.some(r => !r.name.trim())) {
+      setError(t('regions.allRegionsNeedNames'));
+      return;
+    }
+    
+    // Format regions for the parent component
+    const formattedRegions = regions.map(r => ({
+      name: r.name,
+      x: r.x,
+      y: r.y,
+      width: r.width,
+      height: r.height
+    }));
+    
+    // Call the onComplete callback with the formatted regions
+    onComplete(formattedRegions);
+  };
+
   return (
     <div className="space-y-4 border rounded-md p-4 bg-muted/50">
       <div className="flex justify-between items-center">
-        <h3 className="font-medium">Regionen definieren</h3>
+        <h3 className="font-medium">{t('regions.title')}</h3>
         <div className="flex space-x-2">
           <Button 
             type="button" 
             size="sm"
             variant={isCreating ? "secondary" : "outline"}
             onClick={() => {
-              setIsCreating(!isCreating);
+              // Toggle creation mode - only allow one region to be added at a time
+              const newCreatingState = !isCreating;
+              setIsCreating(newCreatingState);
               setStartPoint(null);
               setCurrentPoint(null);
               setError(null);
@@ -715,7 +950,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
             className="flex items-center"
           >
             <Plus className="h-4 w-4 mr-1" />
-            {isCreating ? "Beenden" : "Region hinzufügen"}
+            {isCreating ? t('common.cancel') : t('regions.addNew')}
           </Button>
         </div>
       </div>
@@ -808,7 +1043,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
               }}
             >
               <span className={`bg-background/90 px-1 py-0.5 rounded text-xs ${region.name ? '' : 'text-muted-foreground'}`}>
-                {region.name || 'Unnamed'}
+                {region.name || t('regions.unnamed')}
               </span>
               
               {region.isSelected && (
@@ -819,8 +1054,8 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                       e.stopPropagation();
                       handleToggleDrag(region.id);
                     }}
-                    title="Move region"
-                    aria-label="Move region"
+                    title={t('regions.move')}
+                    aria-label={t('regions.move')}
                   >
                     <Move className="h-3 w-3" />
                   </button>
@@ -830,8 +1065,8 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                       e.stopPropagation();
                       handleToggleResize(region.id);
                     }}
-                    title="Resize region"
-                    aria-label="Resize region"
+                    title={t('regions.resize')}
+                    aria-label={t('regions.resize')}
                   >
                     <Square className="h-3 w-3" />
                   </button>
@@ -841,8 +1076,8 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                       e.stopPropagation();
                       handleCopyRegion(region.id);
                     }}
-                    title="Copy region"
-                    aria-label="Copy region"
+                    title={t('common.copy')}
+                    aria-label={t('common.copy')}
                   >
                     <Copy className="h-3 w-3" />
                   </button>
@@ -852,8 +1087,8 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                       e.stopPropagation();
                       handleRemoveRegion(region.id);
                     }}
-                    title="Delete region"
-                    aria-label="Delete region"
+                    title={t('common.delete')}
+                    aria-label={t('common.delete')}
                   >
                     <Trash className="h-3 w-3" />
                   </button>
@@ -890,19 +1125,19 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
               onClick={(e) => e.stopPropagation()}
             >
               <form onSubmit={handleNameRegion} className="space-y-3">
-                <h4 className="font-medium text-sm">Region benennen</h4>
+                <h4 className="font-medium text-sm">{t('regions.nameRegion')}</h4>
                 {error && (
                   <div className="p-2 bg-red-100 text-red-700 rounded-md text-xs">
                     {error}
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="region-name" className="text-xs">Name der Region</Label>
+                  <Label htmlFor="region-name" className="text-xs">{t('regions.name')}</Label>
                   <Input
                     id="region-name"
                     value={regionName}
                     onChange={(e) => setRegionName(e.target.value)}
-                    placeholder="Namen eingeben"
+                    placeholder={t('regions.enterName')}
                     required
                     className="h-8"
                     autoFocus
@@ -910,7 +1145,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                 </div>
                 
                 <div className="flex space-x-2">
-                  <Button type="submit" size="sm" className="flex-1">Speichern</Button>
+                  <Button type="submit" size="sm" className="flex-1">{t('common.save')}</Button>
                   <Button 
                     type="button" 
                     size="sm" 
@@ -927,7 +1162,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                     }} 
                     className="flex-1"
                   >
-                    Abbrechen
+                    {t('common.cancel')}
                   </Button>
                 </div>
               </form>
@@ -938,7 +1173,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
         {/* Region list - shown below the image */}
         {regions.length > 0 && (
           <div className="mt-4 p-3 border rounded-md space-y-3">
-            <h4 className="font-medium text-sm">Definierte Regionen ({regions.length})</h4>
+            <h4 className="font-medium text-sm">{t('regions.definedRegions')} ({regions.length})</h4>
             <div className="max-h-40 overflow-y-auto">
               <ul className="space-y-2">
                 {regions.map((region) => (
@@ -964,7 +1199,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                         style={{backgroundColor: region.isSelected ? 'rgb(234 179 8)' : ''}}
                       />
                       <span className={`text-sm ${!region.name && 'text-muted-foreground italic'}`}>
-                        {region.name || 'Unnamed'}
+                        {region.name || t('regions.unnamed')}
                       </span>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -978,7 +1213,7 @@ export function RegionMapper({ imageSrc, onComplete, initialRegions = [] }: Regi
                           handleOpenNameForm(region.id);
                         }}
                       >
-                        Umbenennen
+                        {t('regions.rename')}
                       </button>
                     </div>
                   </li>
@@ -1003,6 +1238,7 @@ export default function RegionMapperOriginal({ locationId, imagePath }: RegionMa
   const [regions, setRegions] = useState<Region[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useLanguage();
 
   // Placeholder implementation to prevent errors
   useEffect(() => {
@@ -1027,11 +1263,11 @@ export default function RegionMapperOriginal({ locationId, imagePath }: RegionMa
   return (
     <div>
       <div className="text-center p-4">
-        {loading && <div>Loading regions...</div>}
+        {loading && <div>{t('common.loading')}</div>}
         {error && <div className="text-red-500">{error}</div>}
-        {!loading && !error && regions.length === 0 && <div>No regions defined yet</div>}
+        {!loading && !error && regions.length === 0 && <div>{t('regions.noRegions')}</div>}
       </div>
-      <img src={imagePath} alt="Location" className="max-w-full h-auto border rounded-md" />
+      <img src={imagePath} alt={t('locations.image')} className="max-w-full h-auto border rounded-md" />
     </div>
   );
 }

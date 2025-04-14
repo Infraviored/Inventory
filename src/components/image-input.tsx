@@ -10,9 +10,10 @@ interface ImageInputProps {
   onImageChange: (file: File | null, croppedImage?: string) => void;
   label?: string;
   initialPreview?: string | null;
+  hideLabel?: boolean;
 }
 
-export function ImageInput({ onImageChange, label = 'Bild', initialPreview = null }: ImageInputProps) {
+export function ImageInput({ onImageChange, label = 'Bild', initialPreview = null, hideLabel = false }: ImageInputProps) {
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(initialPreview);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -69,7 +70,7 @@ export function ImageInput({ onImageChange, label = 'Bild', initialPreview = nul
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="image">{label}</Label>
+      {!hideLabel && <Label htmlFor="image">{label}</Label>}
       
       <div className="flex flex-col space-y-2">
         <input
@@ -129,6 +130,11 @@ export function ImageInput({ onImageChange, label = 'Bild', initialPreview = nul
               >
                 Entfernen
               </Button>
+            </div>
+            
+            <div className="p-3 border border-blue-200 rounded-md bg-blue-50 text-blue-800 text-sm">
+              <p className="font-medium">Bild erfolgreich hochgeladen!</p>
+              <p>Sie können jetzt Regionen auf diesem Bild definieren.</p>
             </div>
           </div>
         )}

@@ -1,8 +1,10 @@
-// Update API routes to use the Flask backend API
+// Updated API route to use the storage provider instead of Flask backend
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile } from 'fs/promises';
 import path from 'path';
 import { generateUniqueFilename } from '@/lib/utils';
+import { StorageProvider } from '@/lib/storage-provider';
+
 // Ensure uploads directory exists
 import { mkdir } from 'fs/promises';
 import fs from 'fs';
@@ -11,8 +13,8 @@ if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
-// API Base URL
-const API_BASE_URL = 'http://localhost:5000/api';
+// Initialize storage provider
+const storage = new StorageProvider();
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,29 +22,22 @@ export async function GET(request: NextRequest) {
     const parentId = searchParams.get('parentId');
     const isRoot = searchParams.get('root');
     
-    // Build the query string
-    const params = new URLSearchParams();
+    let locations;
     if (parentId) {
-      params.append('parentId', parentId);
-    }
-    if (isRoot === 'true') {
-      params.append('root', 'true');
-    }
-
-    // Call Flask backend
-    const url = `${API_BASE_URL}/locations${params.toString() ? `?${params.toString()}` : ''}`;
-    console.log('Calling Flask API:', url);
-    
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Flask API error: ${response.status}`);
+      locations = await storage.getLocationsByParentId(parseInt(parentId));
+    } else if (isRoot === 'true') {
+      // Use the correct method name from the storage provider
+      locations = await storage.getAllLocations();
+      // Filter for root locations (parentId is null)
+      locations = locations.filter(loc => loc.parentId === null);
+    } else {
+      // Use the correct method name from the storage provider
+      locations = await storage.getAllLocations();
     }
     
-    const locations = await response.json();
     return NextResponse.json(locations);
   } catch (error) {
-    console.error('Error fetching locations from Flask API:', error);
+    console.error('Error fetching locations:', error);
     return NextResponse.json(
       { error: 'Failed to fetch locations' },
       { status: 500 }
@@ -53,30 +48,52 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    // Create a new FormData to send to Flask
-    const flaskFormData = new FormData();
     
-    // Copy all fields from the request formData
-    for (const [key, value] of formData.entries()) {
-      flaskFormData.append(key, value);
+    // Extract location data
+    const name = formData.get('name') as string;
+    const description = formData.get('description') as string || null;
+    const parentId = formData.get('parentId') ? parseInt(formData.get('parentId') as string) : null;
+    const locationType = formData.get('locationType') as string || null;
+    
+    // Handle image upload if present
+    let imagePath = null;
+    const image = formData.get('image') as File;
+    if (image && image.size > 0) {
+      const filename = generateUniqueFilename(image.name);
+      const filePath = path.join(UPLOADS_DIR, filename);
+      const buffer = Buffer.from(await image.arrayBuffer());
+      await writeFile(filePath, buffer);
+      imagePath = `/uploads/${filename}`;
     }
-
-    // Call Flask backend
-    console.log('Posting new location to Flask API');
-    const response = await fetch(`${API_BASE_URL}/locations`, {
-      method: 'POST',
-      body: flaskFormData,
+    
+    // Create location in storage
+    const newLocation = await storage.createLocation({
+      name,
+      description,
+      parentId,
+      imagePath,
+      locationType
     });
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Flask API error: ${response.status} - ${errorText}`);
+    // Handle regions if provided
+    const regionsJson = formData.get('regions') as string;
+    if (regionsJson) {
+      const regions = JSON.parse(regionsJson);
+      for (const region of regions) {
+        await storage.createRegion(newLocation.id, {
+          name: region.name,
+          x: region.x,
+          y: region.y,
+          width: region.width,
+          height: region.height,
+          color: region.color || null
+        });
+      }
     }
     
-    const newLocation = await response.json();
     return NextResponse.json(newLocation, { status: 201 });
   } catch (error: any) {
-    console.error('Error creating location via Flask API:', error);
+    console.error('Error creating location:', error);
     return NextResponse.json(
       { error: `Failed to create location: ${error.message || 'Unknown error'}` },
       { status: 500 }
