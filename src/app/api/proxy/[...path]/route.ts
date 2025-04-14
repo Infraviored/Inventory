@@ -20,9 +20,14 @@ export async function GET(
       headers: {
         'Content-Type': 'application/json',
       },
+      cache: 'no-store', // Disable caching to ensure fresh data
+      next: { revalidate: 0 }, // Disable Next.js cache
     });
     
     if (!response.ok) {
+      console.error(`Backend API error: Status ${response.status}`);
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
       throw new Error(`Backend API error: ${response.status}`);
     }
     

@@ -344,10 +344,13 @@ export function detectEnvironment(): StorageConfig {
   }
   
   // Use the Flask API backend that's running on port 5000
-  // Use the exposed port URL for the backend API with no trailing slash
+  // Get the API base URL from the environment variable
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+  console.log('Using API base URL:', apiBaseUrl);
+  
   return {
     mode: 'api',
-    apiBaseUrl: 'https://5000-iwaqc4g1bjvhn91xj1poq-3a4debb8.manus.computer'
+    apiBaseUrl: apiBaseUrl
   };
 }
 
