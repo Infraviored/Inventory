@@ -40,7 +40,9 @@
    - Stop any existing services
    - Start the Flask backend on port 5000
    - Configure the API proxy environment variables
-   - Start the Next.js frontend on port 3000
+   - Start the Next.js frontend on port 3000 with Turbopack for faster development
+   
+   > **Note:** During development (especially in the Manus environment), we use Turbopack for faster refresh times and improved developer experience. This is configured in the package.json file with the `--turbopack` flag in the dev script.
 
 5. **Manual Startup (Alternative)**
    If you prefer to start services manually:
