@@ -360,18 +360,46 @@ export class StorageProvider {
 
   // Locations API
   async getAllLocations() {
+    if (this.config.mode === 'api') {
+      const response = await fetch(`${this.config.apiBaseUrl}/api/locations`);
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      return response.json();
+    }
     return browserStorage.getLocations();
   }
 
   async getRootLocations() {
+    if (this.config.mode === 'api') {
+      const response = await fetch(`${this.config.apiBaseUrl}/api/locations?root=true`);
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      return response.json();
+    }
     return browserStorage.getRootLocations();
   }
 
   async getLocationsByParentId(parentId: number) {
+    if (this.config.mode === 'api') {
+      const response = await fetch(`${this.config.apiBaseUrl}/api/locations?parentId=${parentId}`);
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      return response.json();
+    }
     return browserStorage.getChildLocations(parentId);
   }
 
   async getLocationById(id: number) {
+    if (this.config.mode === 'api') {
+      const response = await fetch(`${this.config.apiBaseUrl}/api/locations/${id}`);
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      return response.json();
+    }
     return browserStorage.getLocationById(id);
   }
 
@@ -382,6 +410,25 @@ export class StorageProvider {
     imagePath: string | null;
     locationType?: string | null;
   }) {
+    if (this.config.mode === 'api') {
+      const formData = new FormData();
+      formData.append('name', location.name);
+      if (location.description) formData.append('description', location.description);
+      if (location.parentId !== null) formData.append('parentId', location.parentId.toString());
+      if (location.imagePath) formData.append('imagePath', location.imagePath);
+      if (location.locationType) formData.append('locationType', location.locationType);
+      
+      const response = await fetch(`${this.config.apiBaseUrl}/api/locations`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      return response.json();
+    }
     const newLocation = await browserStorage.addLocation(
       location.name,
       location.parentId,
