@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { ImageInput } from './image-input';
-import { RegionMapper } from './region-mapper';
+import { RegionMapper } from './region-mapper/index';
 import { useLanguage } from '@/lib/language';
 
 interface LocationFormProps {
