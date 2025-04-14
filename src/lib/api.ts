@@ -1,6 +1,7 @@
 // API client for the Python Flask backend
 // All requests go through Next.js API routes which then proxy to the Flask backend
 // This keeps URLs relative and simplifies deployment
+// Updated to use the proxy API route
 
 // Types
 export interface Location {
