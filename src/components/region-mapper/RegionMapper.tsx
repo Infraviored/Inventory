@@ -479,7 +479,7 @@ export function RegionMapper({
       {/* Image container with fixed dimensions */}
       <div 
         ref={containerRef}
-        className="relative border rounded-md overflow-hidden"
+        className="relative border border-border rounded-md overflow-hidden dark:border-border"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -494,7 +494,7 @@ export function RegionMapper({
         <img 
           ref={imageRef}
           src={imageSrc} 
-          alt={t('regions.locationImage')}
+          alt={t('regions.locationImage') || "Location image"}
           className="max-w-full h-auto"
           onLoad={handleImageLoad}
           draggable={false}
@@ -504,7 +504,7 @@ export function RegionMapper({
         {/* Drawing overlay */}
         {isCreating && startPoint && currentPoint && (
           <div 
-            className="absolute border-2 border-primary bg-primary/30 z-10"
+            className="absolute border-2 border-primary bg-primary/30 z-10 dark:bg-primary/20"
             style={{
               left: `${Math.min(startPoint.x, currentPoint.x)}px`,
               top: `${Math.min(startPoint.y, currentPoint.y)}px`,
@@ -567,18 +567,18 @@ export function RegionMapper({
             size="sm"
             onClick={handleToggleDrawing}
           >
-            {isCreating ? t('common.done') : t('regions.addNew')}
+            {isCreating ? t('common.done') || "Done" : t('regions.addNew') || "Add Region"}
           </Button>
         </div>
         
         {error && (
-          <div className="text-sm text-red-500 flex items-center">
+          <div className="text-sm text-destructive flex items-center dark:text-red-400">
             <span className="mr-1">⚠️</span> {error}
           </div>
         )}
         
         {success && (
-          <div className="text-sm text-green-500 flex items-center">
+          <div className="text-sm text-emerald-600 flex items-center dark:text-emerald-400">
             <span className="mr-1">✓</span> {success}
           </div>
         )}

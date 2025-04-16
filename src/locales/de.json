@@ -97,7 +97,15 @@
     "locationImage": "Lagerortbild",
     "unnamed": "Unbenannte Region",
     "rename": "Region umbenennen",
-    "enterName": "Regionsnamen eingeben"
+    "enterName": "Regionsnamen eingeben",
+    "closeEditor": "Regions-Editor schließen",
+    "editRegions": "Regionen bearbeiten",
+    "defineAreas": "Bereiche definieren",
+    "defineAreasDescription": "Markieren Sie wichtige Bereiche auf Ihrem Bild, um Gegenstände leichter zu finden.",
+    "startDefining": "Beginnen Sie mit der Definition von Regionen",
+    "regionSingular": "Region",
+    "regionPlural": "Regionen",
+    "noImage": "Bilddaten nicht verfügbar. Bitte versuchen Sie es erneut hochzuladen."
   },
   "inventory": {
     "title": "Inventar",

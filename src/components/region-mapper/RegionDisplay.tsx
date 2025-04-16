@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ActiveRegion } from './types';
+import { useLanguage } from '@/lib/language';
 
 interface RegionDisplayProps {
   region: ActiveRegion;
@@ -12,10 +13,17 @@ interface RegionDisplayProps {
 }
 
 export function RegionDisplay({ region, isSelected, onToggleResize, onDuplicate, onRemove }: RegionDisplayProps) {
+  const { t } = useLanguage();
+  
+  // Selected regions use yellow, unselected use the primary color
+  const borderColor = isSelected ? 'border-yellow-500 dark:border-yellow-400' : 'border-primary dark:border-primary';
+  const bgColor = isSelected ? 'bg-yellow-500/30 dark:bg-yellow-400/20' : 'bg-primary/30 dark:bg-primary/20';
+  const labelBg = isSelected ? 'bg-yellow-500 dark:bg-yellow-400' : 'bg-primary dark:bg-primary';
+
   return (
     <div 
       key={region.id}
-      className={`absolute border-2 ${isSelected ? 'border-yellow-500' : 'border-primary'} ${isSelected ? 'bg-yellow-500/30' : 'bg-primary/30'} z-10`}
+      className={`absolute border-2 ${borderColor} ${bgColor} z-10`}
       style={{
         left: `${region.x}px`,
         top: `${region.y}px`,
@@ -25,12 +33,12 @@ export function RegionDisplay({ region, isSelected, onToggleResize, onDuplicate,
       }}
     >
       {/* Region name label */}
-      <div className={`absolute top-0 left-0 px-1 py-0.5 text-xs ${isSelected ? 'bg-yellow-500' : 'bg-primary'} text-primary-foreground`}>
-        {region.name || 'Unnamed'}
+      <div className={`absolute top-0 left-0 px-1 py-0.5 text-xs ${labelBg} text-primary-foreground`}>
+        {region.name || t('regions.unnamed') || 'Unnamed'}
       </div>
       
       {/* Region dimensions label */}
-      <div className="absolute bottom-0 right-0 px-1 py-0.5 text-xs bg-background/80 text-foreground">
+      <div className="absolute bottom-0 right-0 px-1 py-0.5 text-xs bg-background/80 dark:bg-background/90 text-foreground">
         {Math.round(region.width)}×{Math.round(region.height)}
       </div>
       
@@ -40,8 +48,8 @@ export function RegionDisplay({ region, isSelected, onToggleResize, onDuplicate,
           {/* Duplicate button */}
           {onDuplicate && (
             <div 
-              className="w-6 h-6 mr-1 bg-yellow-500 border border-background rounded-sm cursor-pointer flex items-center justify-center"
-              title="Duplicate region"
+              className="w-6 h-6 mr-1 bg-yellow-500 dark:bg-yellow-400 border border-background dark:border-background rounded-sm cursor-pointer flex items-center justify-center"
+              title={t('common.copy') || "Duplicate region"}
               onClick={(e) => {
                 e.stopPropagation();
                 onDuplicate(region.id);
@@ -57,8 +65,8 @@ export function RegionDisplay({ region, isSelected, onToggleResize, onDuplicate,
           {/* Delete button */}
           {onRemove && (
             <div 
-              className="w-6 h-6 bg-red-500 border border-background rounded-sm cursor-pointer flex items-center justify-center"
-              title="Delete region"
+              className="w-6 h-6 bg-destructive dark:bg-red-500 border border-background dark:border-background rounded-sm cursor-pointer flex items-center justify-center"
+              title={t('common.delete') || "Delete region"}
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove(region.id);
@@ -77,7 +85,7 @@ export function RegionDisplay({ region, isSelected, onToggleResize, onDuplicate,
       {/* Resize handle (bottom right) */}
       {isSelected && (
         <div 
-          className="absolute bottom-0 right-0 w-6 h-6 bg-yellow-500 border border-background rounded-sm cursor-se-resize z-20"
+          className="absolute bottom-0 right-0 w-6 h-6 bg-yellow-500 dark:bg-yellow-400 border border-background dark:border-background rounded-sm cursor-se-resize z-20"
           style={{
             transform: 'translate(30%, 30%)'
           }}

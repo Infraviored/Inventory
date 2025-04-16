@@ -97,7 +97,15 @@
     "locationImage": "Location image",
     "unnamed": "Unnamed region",
     "rename": "Rename region",
-    "enterName": "Enter region name"
+    "enterName": "Enter region name",
+    "closeEditor": "Close Region Editor",
+    "editRegions": "Edit Regions",
+    "defineAreas": "Define Areas",
+    "defineAreasDescription": "Mark important areas on your image to make items easier to find.",
+    "startDefining": "Start Defining Regions",
+    "regionSingular": "region",
+    "regionPlural": "regions",
+    "noImage": "Image data not available. Please try uploading again."
   },
   "inventory": {
     "title": "Inventory",

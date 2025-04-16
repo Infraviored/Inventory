@@ -35,7 +35,7 @@ export function RegionForm({
   
   const handleSave = () => {
     if (!regionName.trim()) {
-      setError(t('regions.allRegionsNeedNames'));
+      setError(t('regions.allRegionsNeedNames') || "All regions need names before saving");
       return;
     }
     
@@ -58,7 +58,7 @@ export function RegionForm({
   
   return (
     <div 
-      className={`bg-background border rounded-md shadow-md p-3 ${isMobile ? 'w-full' : 'w-60'}`}
+      className={`bg-background border border-border rounded-md shadow-md p-3 dark:border-border dark:shadow-lg dark:shadow-black/20 ${isMobile ? 'w-full' : 'w-60'}`}
       onClick={stopPropagation}
       onMouseDown={stopPropagation}
       onMouseUp={stopPropagation}
@@ -66,22 +66,22 @@ export function RegionForm({
       data-region-form="true"
     >
       <div className="space-y-3">
-        <h4 className="font-medium text-sm">{t('regions.nameRegion')}</h4>
+        <h4 className="font-medium text-sm text-foreground">{t('regions.nameRegion') || "Name Region"}</h4>
         
         {error && (
-          <div className="p-2 bg-red-100 text-red-700 rounded-md text-xs">
+          <div className="p-2 bg-destructive/10 text-destructive rounded-md text-xs dark:bg-red-900/30 dark:text-red-400">
             {error}
           </div>
         )}
         
         <div className="space-y-2">
-          <Label htmlFor="region-name" className="text-xs">{t('regions.name')}</Label>
+          <Label htmlFor="region-name" className="text-xs">{t('regions.name') || "Name"}</Label>
           <Input
             id="region-name"
             value={regionName}
             onChange={(e) => setRegionName(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={t('regions.enterName')}
+            placeholder={t('regions.namePlaceholder') || "Enter region name"}
             className="h-8"
             autoFocus
             onClick={stopPropagation}
@@ -99,7 +99,7 @@ export function RegionForm({
               handleSave();
             }}
           >
-            {t('common.save')}
+            {t('common.save') || "Save"}
           </Button>
           <Button 
             type="button" 
@@ -111,7 +111,7 @@ export function RegionForm({
             }}
             className="flex-1"
           >
-            {t('common.cancel')}
+            {t('common.cancel') || "Cancel"}
           </Button>
         </div>
       </div>
