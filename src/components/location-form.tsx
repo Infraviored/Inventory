@@ -35,12 +35,11 @@ function FixedSizeRegionMapper({
         width: auto !important;
         height: auto !important;
         max-width: 100% !important;
-        max-height: 1000px !important;
+        max-height: 100vh !important;
       }
       .region-mapper .relative.border.rounded-md.overflow-hidden,
       .region-mapper .relative.border.border-border.rounded-md.overflow-hidden.dark\\:border-border {
         width: 100% !important;
-        max-height: 1000px !important;
         height: auto !important;
         display: flex !important;
         align-items: center !important;
@@ -73,7 +72,7 @@ function FixedSizeRegionMapper({
   }, []);
 
   return (
-    <div className="relative region-mapper" style={{ maxWidth: '100%', height: '100%', overflow: 'hidden' }}>
+    <div className="relative region-mapper" style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
       <RegionMapper
         key="region-mapper"
         imageSrc={imageSrc}
@@ -372,7 +371,7 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
             <Label htmlFor="image">{`${t('common.fields.image')} (${t('common.optional')})`}</Label>
             
             {!imagePreview ? (
-              <div className="flex flex-col items-center justify-center h-[600px] border border-dashed border-border rounded-md bg-muted/50 dark:bg-muted/20 dark:border-border p-6 text-center">
+              <div className="flex flex-col items-center justify-center border border-dashed border-border rounded-md bg-muted/50 dark:bg-muted/20 dark:border-border p-6 text-center">
                 <div className="mb-4">
                   <div className="text-lg font-medium mb-2 text-foreground">{t('locations.uploadImage')}</div>
                   <p className="text-muted-foreground mb-4">{t('locations.imageInstructions')}</p>
@@ -384,14 +383,15 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                 />
               </div>
             ) : (
-              <div className="relative rounded overflow-hidden" style={{ maxWidth: '100%', height: '600px', border: '1px solid var(--border)' }}>
+              <div className="relative rounded overflow-visible" style={{ width: '100%', height: 'auto', border: '1px solid var(--border)' }}>
                 {/* Hide the image when RegionMapper is displayed */}
                 {!showRegionMapper ? (
                   <>
                     <img 
                       src={imagePreview} 
                       alt={t('locations.imagePreview')}
-                      className="object-contain w-full h-full bg-background dark:bg-muted"
+                      className="object-contain w-full bg-background dark:bg-muted"
+                      style={{ maxHeight: '80vh' }}
                     />
                     
                     {!regions.length && (
@@ -454,7 +454,7 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                     )}
                   </>
                 ) : (
-                  <div className="absolute inset-0 bg-background dark:bg-background z-10" style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+                  <div className="bg-background dark:bg-background" style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
                     <FixedSizeRegionMapper
                       imageSrc={imageData || imageUrlRef.current || placeholderImage}
                       initialRegions={regions}

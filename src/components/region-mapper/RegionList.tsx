@@ -22,7 +22,7 @@ export function RegionList({ regions, onSelectRegion, onRemoveRegion }: RegionLi
       <h4 className="font-medium text-sm text-foreground">
         {t('regions.definedRegions') || "Defined Regions"} ({regions.length})
       </h4>
-      <div className="max-h-40 overflow-y-auto">
+      <div className="max-h-[400px] overflow-y-auto">
         <ul className="space-y-2">
           {regions.map((region) => (
             <li 

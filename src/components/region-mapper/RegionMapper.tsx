@@ -170,10 +170,10 @@ export function RegionMapper({
     if (selectedRegion) {
       // Make the resize handle larger and more precise
       const resizeHandleRect = {
-        x: selectedRegion.x + selectedRegion.width - 20,
-        y: selectedRegion.y + selectedRegion.height - 20,
-        width: 30,
-        height: 30
+        x: selectedRegion.x + selectedRegion.width - 25,
+        y: selectedRegion.y + selectedRegion.height - 25,
+        width: 40,
+        height: 40
       };
       
       if (
@@ -269,9 +269,21 @@ export function RegionMapper({
         if (r.id === draggingRegion.id) {
           // Update menu position if this is the selected region
           if (r.id === selectedRegionId && showForm) {
+            const containerWidth = containerRef.current?.offsetWidth || 1000;
+            const containerHeight = containerRef.current?.offsetHeight || 800;
+            const formWidth = 270; // Approximate form width
+            
+            const formX = snapped.x + r.width + 10 < containerWidth - formWidth
+              ? snapped.x + r.width + 10
+              : Math.max(0, snapped.x - formWidth - 10);
+              
+            const formY = snapped.y + 180 < containerHeight
+              ? snapped.y
+              : Math.max(0, snapped.y - 100);
+            
             setMenuPosition({
-              x: snapped.x + r.width + 10,
-              y: snapped.y
+              x: formX,
+              y: formY
             });
           }
           
@@ -309,9 +321,21 @@ export function RegionMapper({
         if (r.id === resizingRegion.id) {
           // Update menu position if this is the selected region
           if (r.id === selectedRegionId && showForm) {
+            const containerWidth = containerRef.current?.offsetWidth || 1000;
+            const containerHeight = containerRef.current?.offsetHeight || 800;
+            const formWidth = 270; // Approximate form width
+            
+            const formX = r.x + boundedWidth + 10 < containerWidth - formWidth
+              ? r.x + boundedWidth + 10
+              : Math.max(0, r.x - formWidth - 10);
+              
+            const formY = r.y + 180 < containerHeight
+              ? r.y
+              : Math.max(0, r.y - 100);
+            
             setMenuPosition({
-              x: r.x + boundedWidth + 10,
-              y: r.y
+              x: formX,
+              y: formY
             });
           }
           
@@ -386,12 +410,18 @@ export function RegionMapper({
         // Position form near the new region
         // Calculate form position - try to keep it within the container
         const containerWidth = containerRef.current.offsetWidth;
-        const formX = x + width + 10 < containerWidth - 260 
+        const containerHeight = containerRef.current.offsetHeight;
+        const formWidth = 270; // Approximate form width
+        const formHeight = 180; // Approximate form height
+
+        const formX = x + width + 10 < containerWidth - formWidth 
           ? x + width + 10 
-          : Math.max(0, x - 270);
+          : Math.max(0, x - formWidth - 10);
           
-        const formY = Math.max(0, y);
-        
+        const formY = y + formHeight < containerHeight
+          ? y
+          : Math.max(0, y - formHeight + height);
+
         setMenuPosition({
           x: formX,
           y: formY
