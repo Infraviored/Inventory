@@ -26,17 +26,10 @@ export function RegionForm({
   const [regionName, setRegionName] = useState('');
   const [error, setError] = useState<string | null>(null);
   
-  // Debug log when component mounts
-  useEffect(() => {
-    console.log("RegionForm mounted with selectedRegion:", selectedRegion);
-  }, []);
-  
   // Initialize name when selectedRegion changes
   useEffect(() => {
     if (selectedRegion) {
-      console.log("RegionForm initializing with selectedRegion:", JSON.stringify(selectedRegion));
       setRegionName(selectedRegion.name || '');
-      console.log("Set initial region name to:", selectedRegion.name || '(empty)');
     }
   }, [selectedRegion]);
   
@@ -46,12 +39,6 @@ export function RegionForm({
       return;
     }
     
-    console.log("=== FORM SUBMIT ===");
-    console.log("Saving name:", regionName);
-    console.log("Selected region:", selectedRegion ? JSON.stringify(selectedRegion) : 'null');
-    console.log("Region ID:", selectedRegion?.id);
-    console.log("==================");
-    
     onNameRegion(regionName.trim());
   };
   
@@ -59,7 +46,6 @@ export function RegionForm({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      console.log("Enter key pressed, submitting form");
       handleSave();
     }
   };
@@ -68,7 +54,6 @@ export function RegionForm({
   const stopPropagation = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    console.log("Form event stopped from propagating");
   };
   
   return (
@@ -94,10 +79,7 @@ export function RegionForm({
           <Input
             id="region-name"
             value={regionName}
-            onChange={(e) => {
-              setRegionName(e.target.value);
-              console.log("Input changed to:", e.target.value);
-            }}
+            onChange={(e) => setRegionName(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('regions.enterName')}
             className="h-8"

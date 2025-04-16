@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { ActiveRegion } from './types';
 
 interface RegionDisplayProps {
@@ -12,11 +12,6 @@ interface RegionDisplayProps {
 }
 
 export function RegionDisplay({ region, isSelected, onToggleResize, onDuplicate, onRemove }: RegionDisplayProps) {
-  // Log when a region is rendered to help with debugging
-  useEffect(() => {
-    console.log('Rendering region:', region.id, { x: region.x, y: region.y, width: region.width, height: region.height, isSelected });
-  }, [region, isSelected]);
-
   return (
     <div 
       key={region.id}

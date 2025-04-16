@@ -125,7 +125,6 @@ export function RegionMapper({
     const isFormClick = !!target.closest('[data-region-form="true"]');
     
     if (isFormClick) {
-      console.log('Click detected on form element, ignoring container mousedown');
       formInteractionRef.current = true;
       return;
     }
@@ -141,7 +140,6 @@ export function RegionMapper({
     if (isCreating) {
       setStartPoint({ x, y });
       setCurrentPoint({ x, y });
-      console.log(`Started drawing at (${x}, ${y})`);
       return;
     }
     
@@ -312,7 +310,6 @@ export function RegionMapper({
     // If we were interacting with the form, reset the flag and don't process this event
     if (formInteractionRef.current) {
       formInteractionRef.current = false;
-      console.log('Ignoring mouseup due to form interaction');
       return;
     }
     
@@ -391,20 +388,11 @@ export function RegionMapper({
 
   // Handle region naming
   const handleNameRegion = (name: string) => {
-    if (!selectedRegionId) {
-      console.error('No region selected for naming');
-      return;
-    }
-    
-    console.log('Saving region name:', name, 'for region ID:', selectedRegionId);
-    
-    // Debug dump of regions before update
-    console.log('Regions before update:', JSON.stringify(regions));
+    if (!selectedRegionId) return;
     
     // Find the region to update directly
     const updatedRegions = regions.map(r => {
       if (r.id === selectedRegionId) {
-        console.log(`Updating region ${r.id} name from "${r.name}" to "${name}"`);
         return { ...r, name };
       }
       return r;
@@ -417,17 +405,12 @@ export function RegionMapper({
     const formattedRegions = updatedRegions.map(({ name, x, y, width, height }) => ({
       name, x, y, width, height
     }));
-    console.log('Calling onComplete with formatted regions:', JSON.stringify(formattedRegions));
     onComplete(formattedRegions);
     
     // Show success
     setShowForm(false);
     setError(null);
     setSuccess(t('common.success'));
-    
-    // Debug - dump state after update
-    console.log('Region named successfully');
-    console.log('Debug dump:', { regions: updatedRegions, selectedRegionId, showForm: false });
   };
 
   // Handle region removal
@@ -489,8 +472,6 @@ export function RegionMapper({
       x: newRegion.x + newRegion.width + 10,
       y: newRegion.y
     });
-    
-    console.log(`Duplicated region ${id} to new region ${newRegionId}`);
   };
 
   return (
@@ -558,7 +539,6 @@ export function RegionMapper({
               selectedRegion={regions.find(r => r.id === selectedRegionId) || null}
               onNameRegion={handleNameRegion}
               onCancel={() => {
-                console.log('Form cancelled, current region state:', regions.find(r => r.id === selectedRegionId));
                 setShowForm(false);
                 setError(null);
                 // If the region is new and has no name, remove it
@@ -585,60 +565,6 @@ export function RegionMapper({
           >
             {isCreating ? t('common.done') : t('regions.addNew')}
           </Button>
-
-          {/* Debug button to force redraw regions if they disappear */}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              console.log('Debug: Redrawing regions', regions);
-              // Force a re-render by creating a new array reference
-              setRegions([...regions]);
-            }}
-          >
-            Refresh View
-          </Button>
-          
-          {/* Quick name buttons for debugging */}
-          {selectedRegionId && (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const name = `Region ${Math.floor(Math.random() * 100)}`;
-                  console.log(`Quick naming region to "${name}"`);
-                  
-                  // Create a deep copy
-                  const newRegions = regions.map(r => 
-                    r.id === selectedRegionId ? {...r, name} : {...r}
-                  );
-                  
-                  setRegions(newRegions);
-                  setSuccess(`Named region: ${name}`);
-                  
-                  // Notify parent
-                  const formattedRegions = newRegions.map(
-                    ({ name, x, y, width, height }) => ({ name, x, y, width, height })
-                  );
-                  onComplete(formattedRegions);
-                }}
-              >
-                Quick Name
-              </Button>
-              
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleDuplicateRegion(selectedRegionId)}
-              >
-                Duplicate
-              </Button>
-            </>
-          )}
         </div>
         
         {error && (
@@ -676,134 +602,6 @@ export function RegionMapper({
         }}
         onRemoveRegion={handleRemoveRegion}
       />
-      
-      {/* Debug info - always visible during development */}
-      <div className="mt-4 p-2 border rounded bg-gray-50 text-xs">
-        <details open>
-          <summary className="font-bold cursor-pointer">Debug Info</summary>
-          <div className="mt-2 space-y-1">
-            <div>Selected Region ID: <span className="font-mono">{selectedRegionId || 'none'}</span></div>
-            <div>Show Form: {showForm ? 'yes' : 'no'}</div>
-            
-            {/* Debug button to print region state */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                console.log('Debug dump:', { regions, selectedRegionId, showForm });
-                
-                // If a region is selected, log its details
-                if (selectedRegionId) {
-                  const region = regions.find(r => r.id === selectedRegionId);
-                  console.log('Selected region details:', region);
-                }
-              }}
-            >
-              Debug State
-            </Button>
-            
-            {/* Emergency fix button */}
-            {selectedRegionId && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const testName = "FIXED NAME";
-                  console.log(`EMERGENCY FIX: Setting region ${selectedRegionId} name to "${testName}"`);
-                  
-                  // Direct update with a fixed name
-                  const updatedRegions = regions.map(r => 
-                    r.id === selectedRegionId ? {...r, name: testName} : r
-                  );
-                  
-                  setRegions(updatedRegions);
-                  
-                  // Notify parent
-                  const formattedRegions = updatedRegions.map(
-                    ({ name, x, y, width, height }) => ({ name, x, y, width, height })
-                  );
-                  onComplete(formattedRegions);
-                  
-                  setSuccess(`Emergency fix applied: ${testName}`);
-                }}
-              >
-                Emergency Fix Name
-              </Button>
-            )}
-            
-            {/* Direct region naming form (manual override) */}
-            {selectedRegionId && (
-              <div className="p-2 border border-blue-300 bg-blue-50 rounded mt-2">
-                <h4 className="font-bold">Manual Region Naming</h4>
-                <div className="flex items-center mt-1 gap-2">
-                  <input 
-                    type="text" 
-                    className="border p-1 w-full" 
-                    placeholder="Enter region name"
-                    defaultValue={regions.find(r => r.id === selectedRegionId)?.name || ''}
-                    id="manual-region-name"
-                  />
-                  <button
-                    className="px-2 py-1 bg-blue-500 text-white rounded"
-                    onClick={() => {
-                      const input = document.getElementById('manual-region-name') as HTMLInputElement;
-                      const name = input?.value || 'Unnamed Region';
-                      console.log('Manual override: Setting region name to:', name);
-                      
-                      // Create deep copy of regions
-                      const newRegions = JSON.parse(JSON.stringify(regions));
-                      
-                      // Update the name directly
-                      const regionIndex = newRegions.findIndex((r: any) => r.id === selectedRegionId);
-                      if (regionIndex !== -1) {
-                        newRegions[regionIndex].name = name;
-                        setRegions(newRegions);
-                        setShowForm(false);
-                        setSuccess(`Region named "${name}" successfully`);
-                        
-                        // Notify parent
-                        const formattedRegions = newRegions.map(
-                          ({ name, x, y, width, height }: any) => ({ name, x, y, width, height })
-                        );
-                        onComplete(formattedRegions);
-                      }
-                    }}
-                  >
-                    Save Name
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            <div>Regions ({regions.length}):</div>
-            <ul className="pl-4 space-y-1">
-              {regions.map(r => (
-                <li key={r.id} className={r.isSelected ? 'bg-yellow-100 p-1' : 'p-1'}>
-                  <strong>ID:</strong> <span className="font-mono">{r.id}</span><br />
-                  <strong>Name:</strong> "{r.name || '(unnamed)'}"<br />
-                  <strong>Selected:</strong> {r.isSelected ? '✓' : '✗'}<br />
-                  <strong>Position:</strong> ({Math.round(r.x)},{Math.round(r.y)}) {Math.round(r.width)}×{Math.round(r.height)}
-                </li>
-              ))}
-            </ul>
-            <div className="mt-2">
-              <button 
-                className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-xs"
-                onClick={() => {
-                  console.log('Debug dump:', { regions, selectedRegionId, showForm });
-                  // Force a complete re-render
-                  const newRegions = JSON.parse(JSON.stringify(regions));
-                  setRegions(newRegions);
-                }}
-              >
-                Dump Debug Info
-              </button>
-            </div>
-          </div>
-        </details>
-      </div>
     </div>
   );
 }
