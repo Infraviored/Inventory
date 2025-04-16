@@ -13,6 +13,7 @@
   },
   "common": {
     "save": "Save",
+    "update": "Update",
     "cancel": "Cancel",
     "delete": "Delete",
     "deleting": "Deleting...",

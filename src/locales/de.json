@@ -13,6 +13,7 @@
   },
   "common": {
     "save": "Speichern",
+    "update": "Aktualisieren",
     "cancel": "Abbrechen",
     "delete": "Löschen",
     "deleting": "Wird gelöscht...",
