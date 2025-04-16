@@ -28,7 +28,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const region = await request.json();
     
     // Create the region
-    const newRegion = await storage.addLocationRegion(locationId, region);
+    const newRegion = await storage.createRegion(locationId, region);
     
     return NextResponse.json(newRegion, { status: 201 });
   } catch (error: any) {

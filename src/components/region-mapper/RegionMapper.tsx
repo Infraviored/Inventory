@@ -52,6 +52,15 @@ export function RegionMapper({
   // Add a ref to track if we're interacting with the form
   const formInteractionRef = useRef(false);
 
+  // Add state for snap indicators
+  const [snapGuides, setSnapGuides] = useState<{
+    horizontal: number[] | null,
+    vertical: number[] | null
+  }>({
+    horizontal: null,
+    vertical: null
+  });
+
   // Listen for custom event to start drawing new regions
   useEffect(() => {
     const startDrawingHandler = () => {
@@ -264,6 +273,15 @@ export function RegionMapper({
       // Apply snapping
       const snapped = applySnapping(newX, newY, draggingRegion.width, draggingRegion.height, regions, draggingRegion, imageSize);
       
+      // Set snap guides if snapping occurred
+      const showHorizontalGuide = snapped.y !== newY;
+      const showVerticalGuide = snapped.x !== newX;
+      
+      setSnapGuides({
+        horizontal: showHorizontalGuide ? [snapped.y, snapped.y + draggingRegion.height] : null,
+        vertical: showVerticalGuide ? [snapped.x, snapped.x + draggingRegion.width] : null
+      });
+      
       // Update region position
       const updatedRegions = regions.map(r => {
         if (r.id === draggingRegion.id) {
@@ -354,6 +372,12 @@ export function RegionMapper({
 
   // Handle mouse up (finish drawing or stop drag/resize)
   const handleMouseUp = (e: React.MouseEvent) => {
+    // Clear snap guides
+    setSnapGuides({
+      horizontal: null,
+      vertical: null
+    });
+    
     // If we were interacting with the form, reset the flag and don't process this event
     if (formInteractionRef.current) {
       formInteractionRef.current = false;
@@ -586,6 +610,29 @@ export function RegionMapper({
             onToggleResize={handleToggleResize}
             onDuplicate={handleDuplicateRegion}
             onRemove={handleRemoveRegion}
+          />
+        ))}
+        
+        {/* Snap guides for alignment feedback */}
+        {snapGuides.horizontal && snapGuides.horizontal.map((yPos, index) => (
+          <div 
+            key={`h-guide-${index}`} 
+            className="absolute left-0 w-full bg-yellow-500 dark:bg-yellow-400 opacity-60 pointer-events-none z-50" 
+            style={{ 
+              top: `${yPos}px`, 
+              height: '1px' 
+            }} 
+          />
+        ))}
+        
+        {snapGuides.vertical && snapGuides.vertical.map((xPos, index) => (
+          <div 
+            key={`v-guide-${index}`} 
+            className="absolute top-0 h-full bg-yellow-500 dark:bg-yellow-400 opacity-60 pointer-events-none z-50" 
+            style={{ 
+              left: `${xPos}px`, 
+              width: '1px' 
+            }} 
           />
         ))}
         

@@ -35,4 +35,6 @@ export interface SnapPositions {
   y: number[];
   right: number[];
   bottom: number[];
+  centerX: number[];
+  centerY: number[];
 }
