@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
 import { AlertCircle } from 'lucide-react';
+import { useLanguage } from '@/lib/language';
 
 interface ImageInputProps {
   onImageChange: (file: File | null, croppedImage?: string) => void;
@@ -14,6 +15,7 @@ interface ImageInputProps {
 }
 
 export function ImageInput({ onImageChange, label = 'Bild', initialPreview = null, hideLabel = false }: ImageInputProps) {
+  const { t } = useLanguage();
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(initialPreview);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -25,32 +27,35 @@ export function ImageInput({ onImageChange, label = 'Bild', initialPreview = nul
       setImage(file);
       setImageError(null);
       
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        setPreview(result);
-        
-        // Create a temporary image to check if it loads properly
-        const img = document.createElement('img');
-        img.onload = () => {
-          // Successfully loaded
-          onImageChange(file, result);
-        };
-        img.onerror = () => {
-          setImageError('Bild konnte nicht geladen werden. Bitte versuchen Sie ein anderes Format.');
-          setPreview(null);
-          onImageChange(null);
-        };
-        img.src = result;
+      // Use URL.createObjectURL instead of FileReader for previews
+      const objectUrl = URL.createObjectURL(file);
+      setPreview(objectUrl);
+      
+      // Create a temporary image to check if it loads properly
+      const img = document.createElement('img');
+      img.onload = () => {
+        // Successfully loaded
+        onImageChange(file, objectUrl);
       };
-      reader.onerror = () => {
-        setImageError('Fehler beim Lesen der Datei.');
+      img.onerror = () => {
+        setImageError('Bild konnte nicht geladen werden. Bitte versuchen Sie ein anderes Format.');
+        URL.revokeObjectURL(objectUrl);
         setPreview(null);
         onImageChange(null);
       };
-      reader.readAsDataURL(file);
+      img.src = objectUrl;
     }
   };
+
+  // Clean up object URLs when component unmounts
+  React.useEffect(() => {
+    return () => {
+      // Clean up the object URL when preview changes or component unmounts
+      if (preview && preview.startsWith('blob:')) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview]);
 
   const handleCameraCapture = () => {
     if (fileInputRef.current) {
@@ -90,7 +95,7 @@ export function ImageInput({ onImageChange, label = 'Bild', initialPreview = nul
             onClick={() => fileInputRef.current?.click()}
             className="flex-1"
           >
-            Bild auswählen
+            {t('images.selectImage') || 'Select Image'}
           </Button>
           
           <Button 
@@ -99,7 +104,7 @@ export function ImageInput({ onImageChange, label = 'Bild', initialPreview = nul
             onClick={handleCameraCapture}
             className="flex-1"
           >
-            Foto aufnehmen
+            {t('images.takePhoto') || 'Take Photo'}
           </Button>
         </div>
         
@@ -115,7 +120,7 @@ export function ImageInput({ onImageChange, label = 'Bild', initialPreview = nul
             <div className="relative aspect-video w-full overflow-hidden rounded-md border">
               <Image
                 src={preview}
-                alt="Vorschau"
+                alt={t('images.preview') || "Preview"}
                 fill
                 className="object-contain"
               />
@@ -128,13 +133,13 @@ export function ImageInput({ onImageChange, label = 'Bild', initialPreview = nul
                 onClick={handleRemoveImage}
                 className="flex-1"
               >
-                Entfernen
+                {t('images.remove') || 'Remove'}
               </Button>
             </div>
             
             <div className="p-3 border border-blue-200 rounded-md bg-blue-50 text-blue-800 text-sm">
-              <p className="font-medium">Bild erfolgreich hochgeladen!</p>
-              <p>Sie können jetzt Regionen auf diesem Bild definieren.</p>
+              <p className="font-medium">{t('images.uploadSuccess') || 'Image uploaded successfully!'}</p>
+              <p>{t('images.defineRegions') || 'You can now define regions on this image.'}</p>
             </div>
           </div>
         )}

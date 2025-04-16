@@ -90,7 +90,6 @@ export default function LocationManagement({ parentId }: { parentId?: number }) 
 
       {showAddForm && (
         <div className="mb-6 p-4 border rounded shadow">
-          <h3 className="text-xl font-semibold mb-4">Add New Location</h3>
           <LocationForm parentId={parentId} onSuccess={() => {
             setShowAddForm(false);
             const fetchLocations = async () => {

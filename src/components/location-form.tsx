@@ -7,8 +7,61 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { ImageInput } from './image-input';
-import { RegionMapper } from './region-mapper/index';
+import { RegionMapper } from './region-mapper';
 import { useLanguage } from '@/lib/language';
+import { XIcon, PlusIcon } from 'lucide-react';
+
+// Custom wrapper to constrain RegionMapper to fixed dimensions
+function FixedSizeRegionMapper({
+  imageSrc, 
+  initialRegions, 
+  onComplete, 
+  autoStartDrawing
+}: {
+  imageSrc: string;
+  initialRegions: Array<{name: string, x: number, y: number, width: number, height: number}>;
+  onComplete: (regions: Array<{name: string, x: number, y: number, width: number, height: number}>) => void;
+  autoStartDrawing?: boolean;
+}) {
+  // Add CSS to ensure RegionMapper's image uses object-contain scaling
+  useEffect(() => {
+    // Add a style tag to force the RegionMapper's image to use object-contain
+    const styleTag = document.createElement('style');
+    styleTag.innerHTML = `
+      .region-mapper img {
+        object-fit: contain !important;
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 400px !important;
+      }
+      .region-mapper .relative.border.rounded-md.overflow-hidden {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 400px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+    `;
+    document.head.appendChild(styleTag);
+    
+    return () => {
+      document.head.removeChild(styleTag);
+    };
+  }, []);
+
+  return (
+    <div className="relative region-mapper" style={{ maxWidth: '100%', height: '100%', overflow: 'hidden' }}>
+      <RegionMapper
+        key="region-mapper"
+        imageSrc={imageSrc}
+        initialRegions={initialRegions}
+        onComplete={onComplete}
+        autoStartDrawing={autoStartDrawing}
+      />
+    </div>
+  );
+}
 
 interface LocationFormProps {
   parentId?: number | null;
@@ -25,11 +78,54 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
   const [regions, setRegions] = useState<Array<{name: string, x: number, y: number, width: number, height: number}>>([]);
   const [locationType, setLocationType] = useState<string>('');
   const [showRegionMapper, setShowRegionMapper] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState<{name: string, x: number, y: number, width: number, height: number} | null>(null);
   const router = useRouter();
+  const imageUrlRef = useRef<string | null>(null);
+  // Store the actual image file data
+  const [imageData, setImageData] = useState<string | null>(null);
+  
+  // A small transparent placeholder image as fallback (1x1 pixel transparent PNG)
+  const placeholderImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
-  const handleImageChange = (file: File | null, croppedImage?: string) => {
+  // Function to convert blob URL to data URL for persistence
+  const convertBlobToDataURL = async (blobUrl: string): Promise<string> => {
+    try {
+      const response = await fetch(blobUrl);
+      const blob = await response.blob();
+      
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error converting blob to data URL:', error);
+      return blobUrl; // Return original as fallback
+    }
+  };
+
+  // Handle image loading and ensure it's converted to a data URL
+  const handleImageChange = async (file: File | null, croppedImage?: string) => {
     setImage(file);
     setImagePreview(croppedImage || null);
+    
+    if (croppedImage && croppedImage.startsWith('blob:')) {
+      try {
+        // Convert to data URL right away
+        const dataUrl = await convertBlobToDataURL(croppedImage);
+        setImageData(dataUrl);
+        imageUrlRef.current = dataUrl;
+        console.log('Image converted and stored as data URL');
+      } catch (error) {
+        console.error('Failed to convert image:', error);
+        setImageData(croppedImage);
+        imageUrlRef.current = croppedImage;
+      }
+    } else if (croppedImage) {
+      setImageData(croppedImage);
+      imageUrlRef.current = croppedImage;
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -139,34 +235,33 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
     }
   };
 
-  const handleDefineRegions = () => {
-    if (imagePreview) {
-      console.log('Opening RegionMapper with image:', imagePreview);
-      setShowRegionMapper(!showRegionMapper);
-    } else {
-      console.error('Cannot define regions: No image available');
-    }
-  };
-
-  // Use a ref to prevent unnecessary state updates
-  const prevRegionsRef = useRef<string>('');
-  
-  const handleRegionsComplete = (definedRegions: Array<{name: string, x: number, y: number, width: number, height: number}>) => {
-    // Convert to string for comparison
-    const regionsString = JSON.stringify(definedRegions);
-    
-    // Only update state if regions have actually changed
-    if (regionsString !== prevRegionsRef.current) {
-      console.log('Regions defined:', definedRegions);
-      prevRegionsRef.current = regionsString;
-      setRegions(definedRegions);
-    }
+  const handleRegionsChange = (newRegions: Array<{name: string, x: number, y: number, width: number, height: number}>) => {
+    setRegions(newRegions);
   };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">{t('locations.addNew')}</h2>
-      
+      {/* Progress indicator */}
+      <div className="w-full mb-6">
+        <div className="flex justify-between mb-2">
+          <div className={`text-sm font-medium ${!imagePreview ? 'text-blue-500' : ''}`}>{t('form.steps.basicInfo') || 'Basic Info'}</div>
+          <div className={`text-sm font-medium ${imagePreview && !regions.length ? 'text-blue-500' : ''}`}>{t('form.steps.image') || 'Image'}</div>
+          <div className={`text-sm font-medium ${regions.length > 0 ? 'text-blue-500' : ''}`}>{t('form.steps.regions') || 'Regions'}</div>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2.5">
+          <div 
+            className="bg-blue-500 h-2.5 rounded-full transition-all duration-300"
+            style={{ 
+              width: imagePreview 
+                ? regions.length > 0 
+                  ? '100%' 
+                  : '66%' 
+                : '33%' 
+            }}
+          ></div>
+        </div>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">{t('locations.name')} *</Label>
@@ -211,80 +306,147 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="image">{`${t('locations.image')} (${t('common.optional')})`}</Label>
-            <div className="relative">
-              {/* Show ImageInput only when not in region mapper mode */}
-              {!showRegionMapper && (
+            
+            {!imagePreview ? (
+              <div className="flex flex-col items-center justify-center h-[400px] border border-dashed border-gray-300 rounded-md bg-gray-50 p-6 text-center">
+                <div className="mb-4">
+                  <div className="text-lg font-medium mb-2">{t('locations.uploadImage') || 'Upload an Image'}</div>
+                  <p className="text-gray-500 mb-4">{t('locations.imageInstructions') || 'Upload an image to add regions and create a visual map of your location.'}</p>
+                </div>
                 <ImageInput 
                   onImageChange={handleImageChange}
                   initialPreview={imagePreview}
                   hideLabel={true}
                 />
-              )}
-              
-              {imagePreview && (
-                <div className="mt-4 relative">
-                  {/* Only show the image once - either in region mapper or with region indicators */}
-                  {showRegionMapper ? (
-                    <RegionMapper
-                      imageSrc={imagePreview}
-                      onComplete={handleRegionsComplete}
-                      initialRegions={regions}
-                      autoStartDrawing={true}
+              </div>
+            ) : (
+              <div className="relative rounded overflow-hidden" style={{ maxWidth: '100%', height: '400px', border: '1px solid #ccc' }}>
+                {/* Hide the image when RegionMapper is displayed */}
+                {!showRegionMapper ? (
+                  <>
+                    <img 
+                      src={imagePreview} 
+                      alt={t('locations.imagePreview') || "Location preview"}
+                      className="object-contain w-full h-full"
                     />
-                  ) : (
-                    <div className="relative border rounded-md overflow-hidden">
-                      {/* Don't show the image preview here since ImageInput already shows it */}
-                      {regions.length > 0 && (
-                        <>
-                          <img 
-                            src={imagePreview} 
-                            alt={t('locations.image')} 
-                            className="max-w-full h-auto"
-                          />
-                          
-                          {/* Region indicators when not in edit mode */}
-                          {regions.map((region, index) => (
-                            <div 
-                              key={index}
-                              className="absolute border-2 border-primary bg-primary/30"
-                              style={{
-                                left: `${region.x}px`,
-                                top: `${region.y}px`,
-                                width: `${region.width}px`,
-                                height: `${region.height}px`,
-                              }}
-                            >
-                              <div className="absolute top-0 left-0 px-1 py-0.5 text-xs bg-primary text-primary-foreground">
-                                {region.name}
+                    
+                    {!regions.length && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 text-white p-6 text-center">
+                        <div className="bg-black bg-opacity-50 p-6 rounded-lg max-w-md">
+                          <p className="text-xl font-bold mb-2">{t('regions.defineAreas') || 'Define Areas'}</p>
+                          <p className="mb-4">{t('regions.defineAreasDescription') || 'Mark important areas on your image to make items easier to find.'}</p>
+                          <button
+                            type="button"
+                            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center justify-center mx-auto"
+                            onClick={() => setShowRegionMapper(true)}
+                          >
+                            <PlusIcon className="w-5 h-5 mr-2" /> 
+                            {t('regions.startDefining') || 'Start Defining Regions'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {regions.length > 0 && (
+                      <div className="absolute inset-0">
+                        {regions.map((region, i) => (
+                          <div
+                            key={i}
+                            className="absolute border-2 border-blue-500 bg-blue-200 bg-opacity-30 hover:bg-blue-300 hover:bg-opacity-40 transition-all duration-200 cursor-pointer"
+                            style={{
+                              left: `${region.x}%`,
+                              top: `${region.y}%`,
+                              width: `${region.width}%`,
+                              height: `${region.height}%`,
+                            }}
+                            onClick={() => {
+                              setSelectedRegion(region);
+                              // Ensure image data is available before showing mapper
+                              if (!imageData && imagePreview) {
+                                convertBlobToDataURL(imagePreview).then(dataUrl => {
+                                  setImageData(dataUrl);
+                                  setShowRegionMapper(true);
+                                }).catch(err => {
+                                  console.error('Failed to convert image before showing RegionMapper:', err);
+                                  setImageData(imagePreview);
+                                  setShowRegionMapper(true);
+                                });
+                              } else {
+                                setShowRegionMapper(true);
+                              }
+                            }}
+                          >
+                            <div className="absolute top-0 left-0 bg-blue-500 text-white text-xs px-1">
+                              {region.name || `${t('regions.region') || 'Region'} ${i + 1}`}
+                            </div>
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                              <div className="bg-blue-600 bg-opacity-70 text-white rounded-md px-2 py-1 text-xs shadow-md">
+                                {t('regions.clickToEdit') || 'Click to edit'}
                               </div>
                             </div>
-                          ))}
-                        </>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Region controls */}
-                  <div className="mt-2 flex justify-between items-center">
-                    <div>
-                      {regions.length > 0 && (
-                        <div className="text-sm text-muted-foreground">
-                          {t('regions.definedRegions')}: {regions.length}
-                        </div>
-                      )}
-                    </div>
-                    <Button 
-                      type="button" 
-                      variant={showRegionMapper ? "secondary" : "outline"} 
-                      size="sm"
-                      onClick={handleDefineRegions}
-                    >
-                      {showRegionMapper ? t('common.done') : (regions.length > 0 ? t('common.edit') : t('regions.addNew'))}
-                    </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="absolute inset-0 bg-white z-10" style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+                    <FixedSizeRegionMapper
+                      imageSrc={imageData || imageUrlRef.current || placeholderImage}
+                      initialRegions={regions}
+                      onComplete={handleRegionsChange}
+                      autoStartDrawing={true}
+                    />
+                    {/* Debug info to see if image source is available */}
+                    {(!imageData && !imageUrlRef.current) && (
+                      <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded z-50">
+                        Image data not available. Please try uploading again.
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+                
+                {/* Toggle button for RegionMapper */}
+                <button
+                  type="button"
+                  className="absolute bottom-4 right-4 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md flex items-center z-50"
+                  onClick={() => {
+                    // Only toggle if we have a valid image
+                    if (!showRegionMapper && !imageData && imagePreview) {
+                      // Try to convert if we don't have image data yet
+                      convertBlobToDataURL(imagePreview).then(dataUrl => {
+                        setImageData(dataUrl);
+                        setShowRegionMapper(true);
+                      }).catch(err => {
+                        console.error('Failed to convert image before showing RegionMapper:', err);
+                        // Try to show anyway with original preview
+                        setImageData(imagePreview);
+                        setShowRegionMapper(true);
+                      });
+                    } else {
+                      setShowRegionMapper(!showRegionMapper);
+                    }
+                  }}
+                >
+                  {showRegionMapper ? (
+                    <>
+                      <XIcon className="w-4 h-4 mr-1" /> {t('regions.closeEditor') || 'Close Region Editor'}
+                    </>
+                  ) : (
+                    <>
+                      <PlusIcon className="w-4 h-4 mr-1" /> {regions.length > 0 ? t('regions.editRegions') || 'Edit Regions' : t('regions.addRegion') || 'Add Region'}
+                    </>
+                  )}
+                </button>
+                
+                {/* Region count indicator */}
+                {regions.length > 0 && !showRegionMapper && (
+                  <div className="absolute top-4 right-4 bg-blue-500 text-white text-sm px-2 py-1 rounded-full">
+                    {regions.length} {regions.length === 1 ? t('regions.regionSingular') || 'region' : t('regions.regionPlural') || 'regions'}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
         

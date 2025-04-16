@@ -476,7 +476,7 @@ export function RegionMapper({
 
   return (
     <div className="space-y-4">
-      {/* Image container */}
+      {/* Image container with fixed dimensions */}
       <div 
         ref={containerRef}
         className="relative border rounded-md overflow-hidden"
@@ -484,7 +484,11 @@ export function RegionMapper({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        style={{ position: 'relative' }}
+        style={{ 
+          position: 'relative',
+          maxWidth: '100%',
+          maxHeight: '100%'
+        }}
       >
         {/* Image */}
         <img 
