@@ -98,10 +98,11 @@ export function createNewRegion(
   y: number, 
   width: number, 
   height: number, 
+  customId?: string,
   name: string = ''
 ): ActiveRegion {
   return {
-    id: `region-${Date.now()}`,
+    id: customId || `region-${Date.now()}`,
     x,
     y,
     width,

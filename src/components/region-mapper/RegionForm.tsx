@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,91 +23,87 @@ export function RegionForm({
   isMobile 
 }: RegionFormProps) {
   const { t } = useLanguage();
-  const [regionName, setRegionName] = useState(selectedRegion?.name || '');
+  const [regionName, setRegionName] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const formRef = useRef<HTMLDivElement>(null);
-
-  // Get form position
-  const getFormPosition = () => {
-    if (!selectedRegion) return {};
-    
-    // Position form next to region
-    let x = position.x;
-    let y = position.y;
-    
-    // Adjust position if it would go off-screen
-    if (formRef.current) {
-      const formRect = formRef.current.getBoundingClientRect();
-      
-      // Form width (approximate)
-      const formWidth = isMobile ? window.innerWidth : 240;
-      
-      // Check if form would go off right edge
-      if (x + formWidth > window.innerWidth) {
-        // Position to the left of the region instead
-        x = Math.max(0, selectedRegion.x - formWidth - 10);
-      }
-      
-      // Check if form would go off bottom edge
-      if (y + 200 > window.innerHeight) {
-        // Position above the region instead
-        y = Math.max(0, window.innerHeight - 200);
-      }
+  
+  // Debug log when component mounts
+  useEffect(() => {
+    console.log("RegionForm mounted with selectedRegion:", selectedRegion);
+  }, []);
+  
+  // Initialize name when selectedRegion changes
+  useEffect(() => {
+    if (selectedRegion) {
+      console.log("RegionForm initializing with selectedRegion:", JSON.stringify(selectedRegion));
+      setRegionName(selectedRegion.name || '');
+      console.log("Set initial region name to:", selectedRegion.name || '(empty)');
     }
-    
-    return {
-      left: `${x}px`,
-      top: `${y}px`
-    };
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
+  }, [selectedRegion]);
+  
+  const handleSave = () => {
     if (!regionName.trim()) {
       setError(t('regions.allRegionsNeedNames'));
       return;
     }
     
-    console.log('Saving region name:', regionName);
+    console.log("=== FORM SUBMIT ===");
+    console.log("Saving name:", regionName);
+    console.log("Selected region:", selectedRegion ? JSON.stringify(selectedRegion) : 'null');
+    console.log("Region ID:", selectedRegion?.id);
+    console.log("==================");
+    
     onNameRegion(regionName.trim());
-    setError(null);
   };
-
+  
+  // Handle form submission with Enter key
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      console.log("Enter key pressed, submitting form");
+      handleSave();
+    }
+  };
+  
+  // Stop click propagation for all mouse events
+  const stopPropagation = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    console.log("Form event stopped from propagating");
+  };
+  
   return (
     <div 
-      ref={formRef}
-      className={`absolute z-10 bg-background border rounded-md shadow-md p-3 ${isMobile ? 'w-full' : 'w-60'}`}
-      style={getFormPosition()}
-      onClick={(e) => e.stopPropagation()}
+      className={`bg-background border rounded-md shadow-md p-3 ${isMobile ? 'w-full' : 'w-60'}`}
+      onClick={stopPropagation}
+      onMouseDown={stopPropagation}
+      onMouseUp={stopPropagation}
+      onMouseMove={stopPropagation}
+      data-region-form="true"
     >
       <div className="space-y-3">
         <h4 className="font-medium text-sm">{t('regions.nameRegion')}</h4>
+        
         {error && (
           <div className="p-2 bg-red-100 text-red-700 rounded-md text-xs">
             {error}
           </div>
         )}
+        
         <div className="space-y-2">
           <Label htmlFor="region-name" className="text-xs">{t('regions.name')}</Label>
           <Input
             id="region-name"
             value={regionName}
-            onChange={(e) => setRegionName(e.target.value)}
+            onChange={(e) => {
+              setRegionName(e.target.value);
+              console.log("Input changed to:", e.target.value);
+            }}
+            onKeyDown={handleKeyDown}
             placeholder={t('regions.enterName')}
-            required
             className="h-8"
             autoFocus
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              // Prevent Enter key from submitting the form and closing the region mapper
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handleSubmit(e);
-              }
-            }}
+            onClick={stopPropagation}
+            onMouseDown={stopPropagation}
           />
         </div>
         
@@ -116,18 +112,21 @@ export function RegionForm({
             type="button" 
             size="sm" 
             className="flex-1"
-            onClick={handleSubmit}
+            onClick={(e) => {
+              stopPropagation(e);
+              handleSave();
+            }}
           >
             {t('common.save')}
           </Button>
           <Button 
             type="button" 
             size="sm" 
-            variant="outline" 
+            variant="outline"
             onClick={(e) => {
-              e.stopPropagation();
+              stopPropagation(e);
               onCancel();
-            }} 
+            }}
             className="flex-1"
           >
             {t('common.cancel')}

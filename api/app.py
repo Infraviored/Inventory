@@ -430,4 +430,5 @@ def led_route(item_id):
         return jsonify({"error": "Failed to fetch LED activation data"}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get('FLASK_PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
