@@ -32,15 +32,16 @@ function FixedSizeRegionMapper({
     styleTag.innerHTML = `
       .region-mapper img {
         object-fit: contain !important;
-        width: 100% !important;
-        height: 100% !important;
-        max-height: 600px !important;
+        width: auto !important;
+        height: auto !important;
+        max-width: 100% !important;
+        max-height: 1000px !important;
       }
       .region-mapper .relative.border.rounded-md.overflow-hidden,
       .region-mapper .relative.border.border-border.rounded-md.overflow-hidden.dark\\:border-border {
         width: 100% !important;
-        height: 100% !important;
-        max-height: 600px !important;
+        max-height: 1000px !important;
+        height: auto !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
