@@ -74,9 +74,6 @@ export default function HomePage() {
               {t('search.button')}
             </Button>
           </form>
-          <div className="mt-3 text-sm text-muted-foreground text-center">
-            {t('search.searchTip')}
-          </div>
         </div>
       </div>
       

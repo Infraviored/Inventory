@@ -39,22 +39,34 @@
     "all": "Alle",
     "saving": "Wird gespeichert...",
     "lastUpdated": "Zuletzt aktualisiert",
-    "done": "Fertig"
+    "done": "Fertig",
+    "fields": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "image": "Bild"
+    }
+  },
+  "form": {
+    "steps": {
+      "basicInfo": "Grundinformationen",
+      "image": "Bild", 
+      "regions": "Regionen"
+    }
   },
   "locations": {
     "title": "Lagerorte",
     "description": "Verwalten Sie Lagerorte mit präziser Regionszuordnung",
     "manage": "Lagerorte verwalten",
     "addNew": "Neuen Lagerort hinzufügen",
-    "name": "Name",
-    "description": "Beschreibung",
     "type": "Typ",
-    "image": "Bild",
     "noLocations": "Keine Lagerorte gefunden. Fügen Sie einen neuen Lagerort hinzu, um zu beginnen.",
     "deleteConfirm": "Sind Sie sicher, dass Sie diesen Lagerort löschen möchten? Dies löscht auch alle untergeordneten Lagerorte und dort gelagerten Objekte.",
     "filter": "Nach Lagerort filtern",
     "none": "Kein Lagerort",
     "noImage": "Kein Lagerortbild",
+    "imagePreview": "Lagerortvorschau",
+    "uploadImage": "Bild hochladen",
+    "imageInstructions": "Laden Sie ein Bild hoch, um Regionen hinzuzufügen und eine visuelle Karte Ihres Lagerorts zu erstellen.",
     "types": {
       "room": "Raum",
       "cabinet": "Schrank",
@@ -67,10 +79,12 @@
   },
   "regions": {
     "title": "Region Mapper",
-    "addNew": "Region hinzufügen",
+    "addRegion": "Region hinzufügen",
     "name": "Region benennen",
     "namePlaceholder": "Regionsnamen eingeben",
     "nameRegion": "Region benennen",
+    "regionName": "Regionsname",
+    "enterRegionName": "Regionsnamen eingeben",
     "instructions": "Klicken und ziehen Sie auf dem Bild, um eine Region zu definieren. Nach dem Zeichnen werden Sie aufgefordert, die Region zu benennen.",
     "snapping": "Regionen werden automatisch an nahe gelegenen Kanten ausgerichtet, um eine präzise Ausrichtung zu ermöglichen.",
     "duplicateMode": "Verwenden Sie den Duplikationsmodus, um mehrere Regionen gleicher Größe zu erstellen.",
@@ -79,8 +93,6 @@
     "noRegions": "Noch keine Regionen definiert. Zeichnen Sie eine Region auf dem Bild, um zu beginnen.",
     "duplicateModeOn": "Duplikationsmodus: AN",
     "duplicateModeOff": "Duplikationsmodus: AUS",
-    "add3Vertical": "+ 3 Vertikale Regionen",
-    "add3Horizontal": "+ 3 Horizontale Regionen",
     "color": "Farbe:",
     "draw": "Region zeichnen",
     "drawing": "Zeichnen...",
@@ -96,6 +108,8 @@
     "count": "Anzahl der Regionen",
     "locationImage": "Lagerortbild",
     "unnamed": "Unbenannte Region",
+    "region": "Region",
+    "clickToEdit": "Zum Bearbeiten klicken",
     "rename": "Region umbenennen",
     "enterName": "Regionsnamen eingeben",
     "closeEditor": "Regions-Editor schließen",
@@ -112,12 +126,9 @@
     "fullList": "Vollständige Inventarliste",
     "description": "Alle Ihre Inventarobjekte anzeigen und verwalten",
     "addNew": "Neues Objekt hinzufügen",
-    "name": "Name",
-    "description": "Beschreibung",
     "quantity": "Anzahl",
     "location": "Lagerort",
     "region": "Region",
-    "image": "Bild",
     "noItems": "Keine Objekte gefunden. Fügen Sie ein neues Objekt hinzu, um zu beginnen.",
     "deleteConfirm": "Sind Sie sicher, dass Sie dieses Objekt löschen möchten?",
     "selectLocation": "-- Lagerort auswählen --",
@@ -171,6 +182,14 @@
     "recentSearches": "Letzte Suchanfragen",
     "enterQuery": "Geben Sie einen Suchbegriff ein, um Objekte in Ihrem Inventar zu finden",
     "withLocation": "Mit Lagerort",
-    "withoutLocation": "Ohne Lagerort"
+    "withoutLocation": "Ohne Lagerort",
+    "searchTip": "Versuchen Sie nach Objektnamen, Beschreibung oder Lagerort zu suchen"
+  },
+  "images": {
+    "selectImage": "Bild auswählen",
+    "takePhoto": "Foto aufnehmen",
+    "noImage": "Kein Bild ausgewählt",
+    "imageUploaded": "Bild hochgeladen",
+    "imageUploadError": "Fehler beim Hochladen des Bildes"
   }
 }

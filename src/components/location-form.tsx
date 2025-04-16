@@ -34,13 +34,13 @@ function FixedSizeRegionMapper({
         object-fit: contain !important;
         width: 100% !important;
         height: 100% !important;
-        max-height: 400px !important;
+        max-height: 600px !important;
       }
       .region-mapper .relative.border.rounded-md.overflow-hidden,
       .region-mapper .relative.border.border-border.rounded-md.overflow-hidden.dark\\:border-border {
         width: 100% !important;
         height: 100% !important;
-        max-height: 400px !important;
+        max-height: 600px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -100,6 +100,7 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
   const [locationType, setLocationType] = useState<string>('');
   const [showRegionMapper, setShowRegionMapper] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<{name: string, x: number, y: number, width: number, height: number} | null>(null);
+  const [isDrawingActive, setIsDrawingActive] = useState(false);
   const router = useRouter();
   const imageUrlRef = useRef<string | null>(null);
   // Store the actual image file data
@@ -107,6 +108,26 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
   
   // A small transparent placeholder image as fallback (1x1 pixel transparent PNG)
   const placeholderImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+
+  // Auto-show the RegionMapper whenever an image is available
+  useEffect(() => {
+    if (imagePreview) {
+      // Automatically show RegionMapper whenever an image is available
+      setShowRegionMapper(true);
+      
+      // Ensure image data is converted if needed
+      if (!imageData && imagePreview.startsWith('blob:')) {
+        convertBlobToDataURL(imagePreview).then(dataUrl => {
+          setImageData(dataUrl);
+          imageUrlRef.current = dataUrl;
+        }).catch(err => {
+          console.error('Failed to convert image:', err);
+          setImageData(imagePreview);
+          imageUrlRef.current = imagePreview;
+        });
+      }
+    }
+  }, [imagePreview]);
 
   // Function to convert blob URL to data URL for persistence
   const convertBlobToDataURL = async (blobUrl: string): Promise<string> => {
@@ -260,24 +281,39 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
     setRegions(newRegions);
   };
 
+  // New function to trigger drawing mode in RegionMapper
+  const startDrawingNewRegion = () => {
+    // Add a custom event that the RegionMapper can listen for
+    const event = new CustomEvent('startDrawingRegion', { bubbles: true });
+    document.dispatchEvent(event);
+    setIsDrawingActive(true);
+  };
+
+  // Listen for when drawing is completed
+  useEffect(() => {
+    const handleDrawingComplete = () => setIsDrawingActive(false);
+    document.addEventListener('drawingComplete', handleDrawingComplete);
+    return () => document.removeEventListener('drawingComplete', handleDrawingComplete);
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* Progress indicator */}
       <div className="w-full mb-6">
         <div className="flex justify-between mb-2">
-          <div className={`text-sm font-medium ${!imagePreview ? 'text-blue-500 dark:text-blue-400' : 'text-foreground'}`}>
-            {t('form.steps.basicInfo') || 'Basic Info'}
+          <div className={`text-sm font-medium ${!imagePreview ? 'text-primary dark:text-primary' : 'text-foreground'}`}>
+            {t('form.steps.basicInfo')}
           </div>
-          <div className={`text-sm font-medium ${imagePreview && !regions.length ? 'text-blue-500 dark:text-blue-400' : 'text-foreground'}`}>
-            {t('form.steps.image') || 'Image'}
+          <div className={`text-sm font-medium ${imagePreview && !regions.length ? 'text-primary dark:text-primary' : 'text-foreground'}`}>
+            {t('form.steps.image')}
           </div>
-          <div className={`text-sm font-medium ${regions.length > 0 ? 'text-blue-500 dark:text-blue-400' : 'text-foreground'}`}>
-            {t('form.steps.regions') || 'Regions'}
+          <div className={`text-sm font-medium ${regions.length > 0 ? 'text-primary dark:text-primary' : 'text-foreground'}`}>
+            {t('form.steps.regions')}
           </div>
         </div>
-        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+        <div className="w-full bg-muted dark:bg-muted rounded-full h-2.5">
           <div 
-            className="bg-blue-500 dark:bg-blue-400 h-2.5 rounded-full transition-all duration-300"
+            className="bg-primary dark:bg-primary h-2.5 rounded-full transition-all duration-300"
             style={{ 
               width: imagePreview 
                 ? regions.length > 0 
@@ -291,12 +327,12 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="name">{t('locations.name')} *</Label>
+          <Label htmlFor="name">{t('common.fields.name')} *</Label>
           <Input
             id="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder={t('locations.name')}
+            placeholder={t('common.fields.name')}
             required
           />
         </div>
@@ -320,25 +356,25 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="description">{t('locations.description')}</Label>
+          <Label htmlFor="description">{t('common.fields.description')}</Label>
           <Textarea
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder={t('locations.description')}
+            placeholder={t('common.fields.description')}
             rows={3}
           />
         </div>
         
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="image">{`${t('locations.image')} (${t('common.optional')})`}</Label>
+            <Label htmlFor="image">{`${t('common.fields.image')} (${t('common.optional')})`}</Label>
             
             {!imagePreview ? (
-              <div className="flex flex-col items-center justify-center h-[400px] border border-dashed border-border rounded-md bg-gray-50 dark:bg-gray-900/50 dark:border-border p-6 text-center">
+              <div className="flex flex-col items-center justify-center h-[600px] border border-dashed border-border rounded-md bg-muted/50 dark:bg-muted/20 dark:border-border p-6 text-center">
                 <div className="mb-4">
-                  <div className="text-lg font-medium mb-2 text-foreground">{t('locations.uploadImage') || 'Upload an Image'}</div>
-                  <p className="text-muted-foreground mb-4">{t('locations.imageInstructions') || 'Upload an image to add regions and create a visual map of your location.'}</p>
+                  <div className="text-lg font-medium mb-2 text-foreground">{t('locations.uploadImage')}</div>
+                  <p className="text-muted-foreground mb-4">{t('locations.imageInstructions')}</p>
                 </div>
                 <ImageInput 
                   onImageChange={handleImageChange}
@@ -347,29 +383,29 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                 />
               </div>
             ) : (
-              <div className="relative rounded overflow-hidden" style={{ maxWidth: '100%', height: '400px', border: '1px solid var(--border)' }}>
+              <div className="relative rounded overflow-hidden" style={{ maxWidth: '100%', height: '600px', border: '1px solid var(--border)' }}>
                 {/* Hide the image when RegionMapper is displayed */}
                 {!showRegionMapper ? (
                   <>
                     <img 
                       src={imagePreview} 
-                      alt={t('locations.imagePreview') || "Location preview"}
-                      className="object-contain w-full h-full bg-white dark:bg-gray-900"
+                      alt={t('locations.imagePreview')}
+                      className="object-contain w-full h-full bg-background dark:bg-muted"
                     />
                     
                     {!regions.length && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 text-white p-6 text-center dark:bg-black dark:bg-opacity-50">
-                        <div className="bg-black bg-opacity-50 p-6 rounded-lg max-w-md dark:bg-black dark:bg-opacity-70">
-                          <p className="text-xl font-bold mb-2">{t('regions.defineAreas') || 'Define Areas'}</p>
-                          <p className="mb-4">{t('regions.defineAreasDescription') || 'Mark important areas on your image to make items easier to find.'}</p>
-                          <button
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 text-white p-6 text-center dark:bg-black dark:bg-opacity-60">
+                        <div className="bg-black bg-opacity-70 p-6 rounded-lg max-w-md dark:bg-black/80">
+                          <p className="text-xl font-bold mb-2">{t('regions.defineAreas')}</p>
+                          <p className="mb-4">{t('regions.defineAreasDescription')}</p>
+                          <Button
                             type="button"
-                            className="bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center justify-center mx-auto"
+                            className="flex items-center"
                             onClick={() => setShowRegionMapper(true)}
                           >
                             <PlusIcon className="w-5 h-5 mr-2" /> 
-                            {t('regions.startDefining') || 'Start Defining Regions'}
-                          </button>
+                            {t('regions.startDefining')}
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -379,7 +415,7 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                         {regions.map((region, i) => (
                           <div
                             key={i}
-                            className="absolute border-2 border-blue-500 dark:border-blue-400 bg-blue-200 bg-opacity-30 dark:bg-blue-500/20 hover:bg-blue-300 hover:bg-opacity-40 dark:hover:bg-blue-500/30 transition-all duration-200 cursor-pointer"
+                            className="absolute border-2 border-primary dark:border-primary bg-primary/20 dark:bg-primary/20 hover:bg-primary/30 dark:hover:bg-primary/30 transition-all duration-200 cursor-pointer"
                             style={{
                               left: `${region.x}%`,
                               top: `${region.y}%`,
@@ -403,12 +439,12 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                               }
                             }}
                           >
-                            <div className="absolute top-0 left-0 bg-blue-500 dark:bg-blue-600 text-white text-xs px-1">
-                              {region.name || `${t('regions.region') || 'Region'} ${i + 1}`}
+                            <div className="absolute top-0 left-0 bg-primary dark:bg-primary text-primary-foreground text-xs px-1">
+                              {region.name || `${t('regions.region')} ${i + 1}`}
                             </div>
                             <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                              <div className="bg-blue-600 dark:bg-blue-700 bg-opacity-70 text-white rounded-md px-2 py-1 text-xs shadow-md">
-                                {t('regions.clickToEdit') || 'Click to edit'}
+                              <div className="bg-primary/70 dark:bg-primary/70 text-primary-foreground rounded-md px-2 py-1 text-xs shadow-md">
+                                {t('regions.clickToEdit')}
                               </div>
                             </div>
                           </div>
@@ -417,7 +453,7 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                     )}
                   </>
                 ) : (
-                  <div className="absolute inset-0 bg-background z-10" style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+                  <div className="absolute inset-0 bg-background dark:bg-background z-10" style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
                     <FixedSizeRegionMapper
                       imageSrc={imageData || imageUrlRef.current || placeholderImage}
                       initialRegions={regions}
@@ -426,50 +462,26 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                     />
                     {/* Debug info to see if image source is available */}
                     {(!imageData && !imageUrlRef.current) && (
-                      <div className="absolute top-2 left-2 bg-destructive text-white text-xs px-2 py-1 rounded z-50 dark:bg-red-600">
-                        {t('regions.noImage') || 'Image data not available. Please try uploading again.'}
+                      <div className="absolute top-2 left-2 bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded z-50">
+                        {t('regions.noImage')}
                       </div>
                     )}
+                    
+                    {/* Add Region Button - Always visible while RegionMapper is open */}
+                    <Button
+                      type="button"
+                      className={`absolute bottom-4 right-4 z-50 ${isDrawingActive ? 'bg-secondary text-secondary-foreground hover:bg-secondary/90' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
+                      onClick={startDrawingNewRegion}
+                    >
+                      <PlusIcon className="w-4 h-4 mr-1" /> {isDrawingActive ? t('regions.drawing') : t('regions.addRegion')}
+                    </Button>
                   </div>
                 )}
                 
-                {/* Toggle button for RegionMapper */}
-                <button
-                  type="button"
-                  className="absolute bottom-4 right-4 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white px-3 py-2 rounded-md flex items-center z-50"
-                  onClick={() => {
-                    // Only toggle if we have a valid image
-                    if (!showRegionMapper && !imageData && imagePreview) {
-                      // Try to convert if we don't have image data yet
-                      convertBlobToDataURL(imagePreview).then(dataUrl => {
-                        setImageData(dataUrl);
-                        setShowRegionMapper(true);
-                      }).catch(err => {
-                        console.error('Failed to convert image before showing RegionMapper:', err);
-                        // Try to show anyway with original preview
-                        setImageData(imagePreview);
-                        setShowRegionMapper(true);
-                      });
-                    } else {
-                      setShowRegionMapper(!showRegionMapper);
-                    }
-                  }}
-                >
-                  {showRegionMapper ? (
-                    <>
-                      <XIcon className="w-4 h-4 mr-1" /> {t('regions.closeEditor') || 'Close Region Editor'}
-                    </>
-                  ) : (
-                    <>
-                      <PlusIcon className="w-4 h-4 mr-1" /> {regions.length > 0 ? t('regions.editRegions') || 'Edit Regions' : t('regions.addRegion') || 'Add Region'}
-                    </>
-                  )}
-                </button>
-                
-                {/* Region count indicator */}
-                {regions.length > 0 && !showRegionMapper && (
-                  <div className="absolute top-4 right-4 bg-blue-500 dark:bg-blue-600 text-white text-sm px-2 py-1 rounded-full">
-                    {regions.length} {regions.length === 1 ? t('regions.regionSingular') || 'region' : t('regions.regionPlural') || 'regions'}
+                {/* Region count indicator - Always shown even when the mapper is open */}
+                {regions.length > 0 && (
+                  <div className="absolute top-4 right-4 bg-primary text-primary-foreground text-sm px-2 py-1 rounded-full z-50">
+                    {regions.length} {regions.length === 1 ? t('regions.regionSingular') : t('regions.regionPlural')}
                   </div>
                 )}
               </div>

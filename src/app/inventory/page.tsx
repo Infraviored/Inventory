@@ -29,19 +29,25 @@ import {
   MapPin,
   Filter
 } from 'lucide-react';
-import { getInventoryItems } from '@/lib/api';
+import { getInventoryItems, type InventoryItem } from '@/lib/api';
 import { useLanguage } from '@/lib/language';
+
+// Define interface for location
+interface Location {
+  id: number | null;
+  name: string | null;
+}
 
 export default function InventoryPage() {
   const { t } = useLanguage();
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
   const [locationFilter, setLocationFilter] = useState('all');
-  const [locations, setLocations] = useState([]);
+  const [locations, setLocations] = useState<Location[]>([]);
 
   // Fetch inventory items
   useEffect(() => {
@@ -97,16 +103,16 @@ export default function InventoryPage() {
         const locB = b.locationName || '';
         comparison = locA.localeCompare(locB);
       } else if (sortField === 'updatedAt') {
-        const dateA = new Date(a.updatedAt);
-        const dateB = new Date(b.updatedAt);
-        comparison = dateA - dateB;
+        const dateA = new Date(a.updatedAt || '');
+        const dateB = new Date(b.updatedAt || '');
+        comparison = dateA.getTime() - dateB.getTime();
       }
       
       return sortDirection === 'asc' ? comparison : -comparison;
     });
 
   // Toggle sort direction or change sort field
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     if (field === sortField) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -154,7 +160,7 @@ export default function InventoryPage() {
                   <SelectItem value="all">{t('common.all')}</SelectItem>
                   <SelectItem value="none">{t('locations.none')}</SelectItem>
                   {locations.map(location => (
-                    <SelectItem key={location.id} value={location.id.toString()}>
+                    <SelectItem key={location.id?.toString()} value={location.id?.toString() || ''}>
                       {location.name}
                     </SelectItem>
                   ))}
@@ -195,7 +201,7 @@ export default function InventoryPage() {
                   <TableHead className="w-12"></TableHead>
                   <TableHead className="cursor-pointer" onClick={() => handleSort('name')}>
                     <div className="flex items-center">
-                      {t('items.name')}
+                      {t('common.fields.name')}
                       <ArrowUpDown className="ml-2 h-4 w-4" />
                       {sortField === 'name' && (
                         <span className="ml-1 text-xs">
@@ -327,4 +333,4 @@ export default function InventoryPage() {
       )}
     </div>
   );
-}
+} 

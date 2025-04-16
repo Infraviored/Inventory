@@ -27,14 +27,14 @@ import {
   List,
   Grid
 } from 'lucide-react';
-import { getInventoryItems } from '@/lib/api';
+import { getInventoryItems, type InventoryItem } from '@/lib/api';
 import { useLanguage } from '@/lib/language';
 
 export default function InventoryListPage() {
   const { t } = useLanguage();
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
@@ -79,16 +79,16 @@ export default function InventoryListPage() {
         const locB = b.locationName || '';
         comparison = locA.localeCompare(locB);
       } else if (sortField === 'updatedAt') {
-        const dateA = new Date(a.updatedAt);
-        const dateB = new Date(b.updatedAt);
-        comparison = dateA - dateB;
+        const dateA = new Date(a.updatedAt || '');
+        const dateB = new Date(b.updatedAt || '');
+        comparison = dateA.getTime() - dateB.getTime();
       }
       
       return sortDirection === 'asc' ? comparison : -comparison;
     });
 
   // Toggle sort direction or change sort field
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     if (field === sortField) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -157,7 +157,7 @@ export default function InventoryListPage() {
                 <DropdownMenuLabel>{t('common.sortBy')}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => handleSort('name')}>
-                  {t('items.name')} {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  {t('common.fields.name')} {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleSort('quantity')}>
                   {t('items.quantity')} {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}

@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RegionMapperProps, ActiveRegion, Region, Point } from './types';
 import { applySnapping, createNewRegion, getRectangleDimensions } from './utils';
-import { RegionForm } from './RegionForm';
 import { RegionList } from './RegionList';
 import { RegionDisplay } from './RegionDisplay';
 import { useLanguage } from '@/lib/language';
@@ -39,6 +38,7 @@ export function RegionMapper({
   const [isMobile, setIsMobile] = useState(false);
   const [dragStartPos, setDragStartPos] = useState<Point | null>(null);
   const [resizeStartDims, setResizeStartDims] = useState<{width: number, height: number} | null>(null);
+  const [regionName, setRegionName] = useState('');
 
   // Drawing state
   const [startPoint, setStartPoint] = useState<Point | null>(null);
@@ -51,6 +51,28 @@ export function RegionMapper({
 
   // Add a ref to track if we're interacting with the form
   const formInteractionRef = useRef(false);
+
+  // Listen for custom event to start drawing new regions
+  useEffect(() => {
+    const startDrawingHandler = () => {
+      // Deselect all regions when entering drawing mode
+      setRegions(regions.map(r => ({ ...r, isSelected: false })));
+      setSelectedRegionId(null);
+      setShowForm(false);
+      // Enable drawing mode
+      setIsCreating(true);
+      setStartPoint(null);
+      setCurrentPoint(null);
+    };
+    
+    // Add event listener
+    document.addEventListener('startDrawingRegion', startDrawingHandler);
+    
+    // Clean up on unmount
+    return () => {
+      document.removeEventListener('startDrawingRegion', startDrawingHandler);
+    };
+  }, [regions]);
 
   // Check if device is mobile
   useEffect(() => {
@@ -201,10 +223,11 @@ export function RegionMapper({
         y: clickedRegion.y
       });
       
-      // Show form if region is unnamed
-      if (!clickedRegion.name) {
-        setShowForm(true);
-      }
+      // Set the region name in the form
+      setRegionName(clickedRegion.name || '');
+      
+      // Always show the form when a region is clicked
+      setShowForm(true);
     } else {
       // Clicked outside any region, deselect all
       setRegions(regions.map(r => ({ ...r, isSelected: false, isDragging: false, isResizing: false })));
@@ -357,6 +380,9 @@ export function RegionMapper({
         // Select the new region
         setSelectedRegionId(newRegionId);
         
+        // Reset the region name for the form
+        setRegionName('');
+        
         // Position form near the new region
         // Calculate form position - try to keep it within the container
         const containerWidth = containerRef.current.offsetWidth;
@@ -376,6 +402,9 @@ export function RegionMapper({
         
         // Exit creation mode 
         setIsCreating(false);
+        
+        // Dispatch event to notify that drawing is complete
+        document.dispatchEvent(new CustomEvent('drawingComplete', { bubbles: true }));
       } else {
         console.log('Region too small, not creating');
       }
@@ -443,6 +472,9 @@ export function RegionMapper({
       setRegions(regions.map(r => ({ ...r, isSelected: false })));
       setSelectedRegionId(null);
       setShowForm(false);
+    } else {
+      // Dispatch event when exiting drawing mode
+      document.dispatchEvent(new CustomEvent('drawingComplete', { bubbles: true }));
     }
   };
 
@@ -539,21 +571,75 @@ export function RegionMapper({
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <RegionForm
-              selectedRegion={regions.find(r => r.id === selectedRegionId) || null}
-              onNameRegion={handleNameRegion}
-              onCancel={() => {
-                setShowForm(false);
-                setError(null);
-                // If the region is new and has no name, remove it
-                const region = regions.find(r => r.id === selectedRegionId);
-                if (region && !region.name) {
-                  handleRemoveRegion(selectedRegionId);
-                }
-              }}
-              position={{ x: 0, y: 0 }} // Position is now handled by the wrapper
-              isMobile={isMobile}
-            />
+            <div 
+              className="bg-background/30 backdrop-blur-sm border border-border rounded-md shadow-md p-3 dark:border-border dark:shadow-lg dark:shadow-black/20 w-60"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseUp={(e) => e.stopPropagation()}
+              onMouseMove={(e) => e.stopPropagation()}
+              data-region-form="true"
+            >
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm text-foreground">{t('regions.nameRegion') || "Name Region"}</h4>
+                
+                {error && (
+                  <div className="p-2 bg-destructive/10 text-destructive rounded-md text-xs dark:bg-red-900/30 dark:text-red-400">
+                    {error}
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <input
+                    id="region-name"
+                    value={regionName}
+                    onChange={(e) => setRegionName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleNameRegion(regionName.trim());
+                      }
+                    }}
+                    placeholder={t('regions.namePlaceholder') || "Enter region name"}
+                    className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 dark:border-border"
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  />
+                </div>
+                
+                <div className="flex space-x-2">
+                  <Button 
+                    type="button" 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNameRegion(regionName.trim());
+                    }}
+                  >
+                    {t('common.save') || "Save"}
+                  </Button>
+                  <Button 
+                    type="button" 
+                    size="sm" 
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowForm(false);
+                      setError(null);
+                      // If the region is new and has no name, remove it
+                      const region = regions.find(r => r.id === selectedRegionId);
+                      if (region && !region.name) {
+                        handleRemoveRegion(selectedRegionId);
+                      }
+                    }}
+                    className="flex-1 dark:border-border dark:hover:bg-muted"
+                  >
+                    {t('common.cancel') || "Cancel"}
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -567,7 +653,7 @@ export function RegionMapper({
             size="sm"
             onClick={handleToggleDrawing}
           >
-            {isCreating ? t('common.done') || "Done" : t('regions.addNew') || "Add Region"}
+            {isCreating ? t('common.done') || "Done" : t('regions.addRegion') || "Add Region"}
           </Button>
         </div>
         

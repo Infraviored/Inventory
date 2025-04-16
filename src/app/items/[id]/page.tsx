@@ -52,7 +52,7 @@ import {
   getInventoryItemById, 
   getLocationById, 
   getLocationRegions, 
-  getAllLocations,
+  getLocations,
   updateInventoryItem,
   deleteInventoryItem
 } from '@/lib/api';
@@ -105,7 +105,7 @@ export default function ItemPage({ params }: ItemParams) {
         setSelectedRegionId(itemData.regionId ? itemData.regionId.toString() : null);
         
         // Fetch all locations for the dropdown
-        const locationsData = await getAllLocations();
+        const locationsData = await getLocations();
         setLocations(locationsData);
         
         // If item has a location, fetch its regions

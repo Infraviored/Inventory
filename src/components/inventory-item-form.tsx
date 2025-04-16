@@ -86,7 +86,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
     e.preventDefault();
     
     if (!name.trim()) {
-      alert(t('inventory.name') + ' ' + t('common.required'));
+      alert(t('common.fields.name') + ' ' + t('common.required'));
       return;
     }
     
@@ -155,7 +155,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
       
       <div>
         <label htmlFor="name" className="block text-sm font-medium mb-1">
-          {t('inventory.name')} <span className="text-red-500">*</span>
+          {t('common.fields.name')} <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
@@ -169,7 +169,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
       
       <div>
         <label htmlFor="description" className="block text-sm font-medium mb-1">
-          {t('inventory.description')} ({t('common.optional')})
+          {t('common.fields.description')} ({t('common.optional')})
         </label>
         <textarea
           id="description"
@@ -286,7 +286,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
       
       <div>
         <label className="block text-sm font-medium mb-1">
-          {t('inventory.image')} ({t('common.optional')})
+          {t('common.fields.image')} ({t('common.optional')})
         </label>
         <ImageInput onImageChange={(file) => setImage(file)} />
       </div>
