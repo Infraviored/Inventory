@@ -2,6 +2,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@lib/db';
 
+// Force dynamic rendering/evaluation for this route
+export const dynamic = 'force-dynamic';
+
 // Helper to format region data (consistent format)
 function formatRegion(region: any): any {
     if (!region) return null;
@@ -19,13 +22,19 @@ function formatRegion(region: any): any {
 }
 
 // GET /api/locations/:id/regions - Fetches regions for a specific location
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-    const { id } = params;
+export async function GET(request: NextRequest) {
+    // Extract ID from pathname
+    const pathname = request.nextUrl.pathname;
+    const segments = pathname.split('/'); // e.g., ['', 'api', 'locations', '11', 'regions']
+    const id = segments[segments.length - 2]; // ID is the second to last segment
+
+    console.log(`[GET /locations/.../regions] Parsed ID from pathname (${pathname}): ${id}`);
+
     const locationId = parseInt(id);
     const db = getDb();
 
     if (isNaN(locationId)) {
-        return NextResponse.json({ error: 'Invalid location ID' }, { status: 400 });
+        return NextResponse.json({ error: 'Invalid location ID format in URL' }, { status: 400 });
     }
 
     try {

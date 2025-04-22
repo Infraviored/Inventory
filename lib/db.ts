@@ -4,37 +4,121 @@ import fs from 'fs';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const DB_PATH = path.join(DATA_DIR, 'inventory.db');
-const MIGRATION_FILE = path.resolve(process.cwd(), 'api/migrations/0001_initial.sql');
+// const MIGRATION_FILE = path.resolve(process.cwd(), 'api/migrations/0001_initial.sql'); // REMOVED
 
 // Ensure data directory exists
 fs.mkdirSync(DATA_DIR, { recursive: true });
+
+// Define the database schema directly as a string
+const SCHEMA_SQL = `
+-- Locations Table
+CREATE TABLE IF NOT EXISTS locations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    parent_id INTEGER,
+    image_path TEXT,
+    location_type TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (parent_id) REFERENCES locations (id) ON DELETE SET NULL
+);
+
+-- Location Regions Table
+CREATE TABLE IF NOT EXISTS location_regions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    location_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    x_coord REAL NOT NULL,
+    y_coord REAL NOT NULL,
+    width REAL NOT NULL,
+    height REAL NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (location_id) REFERENCES locations (id) ON DELETE CASCADE
+);
+
+-- Items Table
+CREATE TABLE IF NOT EXISTS items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    quantity INTEGER DEFAULT 1,
+    image_path TEXT,
+    location_id INTEGER NOT NULL, -- Made location_id NOT NULL based on API logic
+    region_id INTEGER,   -- Allow NULL
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (location_id) REFERENCES locations (id) ON DELETE CASCADE, -- Cascade delete items if location deleted
+    FOREIGN KEY (region_id) REFERENCES location_regions (id) ON DELETE SET NULL
+);
+
+-- Item Tags Table
+CREATE TABLE IF NOT EXISTS item_tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id INTEGER NOT NULL,
+    tag TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE CASCADE,
+    UNIQUE (item_id, tag)
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_locations_parent_id ON locations (parent_id);
+CREATE INDEX IF NOT EXISTS idx_location_regions_location_id ON location_regions (location_id);
+CREATE INDEX IF NOT EXISTS idx_items_location_id ON items (location_id);
+CREATE INDEX IF NOT EXISTS idx_items_region_id ON items (region_id);
+CREATE INDEX IF NOT EXISTS idx_item_tags_item_id ON item_tags (item_id);
+CREATE INDEX IF NOT EXISTS idx_item_tags_tag ON item_tags (tag);
+
+-- Triggers for updated_at
+CREATE TRIGGER locations_updated_at AFTER UPDATE ON locations FOR EACH ROW
+BEGIN
+    UPDATE locations SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+END;
+
+CREATE TRIGGER location_regions_updated_at AFTER UPDATE ON location_regions FOR EACH ROW
+BEGIN
+    UPDATE location_regions SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+END;
+
+CREATE TRIGGER items_updated_at AFTER UPDATE ON items FOR EACH ROW
+BEGIN
+    UPDATE items SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+END;
+`;
 
 let db: Database.Database;
 
 function initializeDatabase(): Database.Database {
     console.log(`Connecting to database at: ${DB_PATH}`);
-    const dbInstance = new Database(DB_PATH, { verbose: console.log }); // Add verbose logging for debugging
+    const dbInstance = new Database(DB_PATH, { verbose: console.log });
 
-    // Check if migration needs to run (e.g., check for a specific table)
-    const tableCheck = dbInstance.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='locations'").get();
+    // Check if all essential tables exist
+    const tablesToCheck = ['locations', 'location_regions', 'items', 'item_tags'];
+    let allTablesExist = true;
+    for (const tableName of tablesToCheck) {
+         const tableCheck = dbInstance.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='${tableName}'`).get();
+         if (!tableCheck) {
+              allTablesExist = false;
+              console.log(`Table '${tableName}' not found.`);
+              break; // No need to check further if one is missing
+         }
+    }
 
-    if (!tableCheck) {
-        console.log('Database appears empty or locations table missing. Running initial migration...');
+    if (!allTablesExist) {
+        console.log('Database appears incomplete. Running schema creation...');
         try {
-            if (!fs.existsSync(MIGRATION_FILE)) {
-                throw new Error(`Migration file not found: ${MIGRATION_FILE}`);
-            }
-            const migrationSql = fs.readFileSync(MIGRATION_FILE, 'utf8');
-            dbInstance.exec(migrationSql);
-            console.log('Database initialized successfully from migration file.');
+            // Execute the embedded schema SQL
+            dbInstance.exec(SCHEMA_SQL);
+            console.log('Database initialized successfully from embedded schema.');
         } catch (error) {
-            console.error('Failed to initialize database:', error);
-            // Close connection if initialization failed?
+            console.error('Failed to initialize database schema:', error);
             dbInstance.close();
-            throw error; // Re-throw error to prevent app start?
+            throw error;
         }
     } else {
-        console.log('Database already initialized (locations table exists).');
+        console.log('Database already initialized (all essential tables exist).');
     }
 
     // Enable WAL mode for better concurrency
@@ -43,8 +127,7 @@ function initializeDatabase(): Database.Database {
     return dbInstance;
 }
 
-// Singleton instance - initialize lazily or immediately
-// Initialize immediately for simplicity in API routes
+// Singleton instance - initialize immediately
 try {
     db = initializeDatabase();
 } catch (error) {
@@ -55,15 +138,12 @@ try {
 
 // Function to get the singleton DB instance
 export function getDb(): Database.Database {
-    if (!db) {
-        console.error("Database not initialized. Attempting re-initialization.");
-        // This might happen if the initial attempt failed.
-        // Be cautious about re-throwing errors here in a server context.
+    if (!db || !db.open) { // Add check for closed db
+        console.error("Database not initialized or closed. Attempting re-initialization.");
         try {
            db = initializeDatabase();
         } catch (error) {
              console.error("CRITICAL: Subsequent database initialization failed.");
-             // Handle this case appropriately - maybe return null or throw a specific error?
              throw new Error("Database connection is unavailable.");
         }
     }

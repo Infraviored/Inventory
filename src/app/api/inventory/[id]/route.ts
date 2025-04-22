@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
-import { saveUpload, deleteUpload } from '@/lib/file-handler'; // Use alias
+import { getDb } from '@lib/db';
+import { saveUpload, deleteUpload } from '@lib/file-handler'; // CORRECT ALIAS
 // import { saveUpload, deleteUpload } from '../../../../lib/file-handler'; // Use relative path for now
 import Database from 'better-sqlite3'; // Import Database for SqliteError check
 
@@ -234,7 +234,7 @@ export async function PUT(
         if (txResult.shouldUpload && imageFile) {
              try {
                   const uploadedPath = await saveUpload(imageFile);
-                  finalImagePath = uploadedPath;
+                  finalImagePath = uploadedPath as any; // Use type assertion to any
                   // Update the DB again with the actual path
                   db.prepare('UPDATE items SET image_path = ? WHERE id = ?').run(finalImagePath, itemId);
                   console.log(`[PUT /inventory/${itemId}] DB updated with final image path: ${finalImagePath}`);
@@ -249,7 +249,10 @@ export async function PUT(
         else if (clearImage) {
              finalImagePath = null;
              // Update the DB (might have been set to null already if !txResult.shouldUpload)
-             db.prepare('UPDATE items SET image_path = ? WHERE id = ?').run(finalImagePath, itemId);
+             db.prepare('UPDATE items SET image_path = ? WHERE id = ?').run(
+                 finalImagePath === null ? null : finalImagePath, // Explicitly pass null
+                 itemId
+             );
         }
 
         // Handle old image deletion *after* successful transaction and potential new upload

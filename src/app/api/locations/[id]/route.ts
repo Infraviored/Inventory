@@ -175,17 +175,22 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // DELETE /api/locations/:id - Deletes a specific location
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-    // Read request object to mark route as dynamic (workaround for params error)
-    const url = request.url;
-    console.log(`[DELETE] Request URL: ${url}`); // Optional: log for confirmation
+// Modify signature to only accept request, parse ID from URL
+export async function DELETE(request: NextRequest) {
+    // Extract ID from pathname: e.g., /api/locations/123 -> 123
+    const pathname = request.nextUrl.pathname;
+    const segments = pathname.split('/');
+    const id = segments[segments.length - 1]; // Get the last segment
     
-    const { id } = params;
+    console.log(`[DELETE] Parsed ID from pathname (${pathname}): ${id}`);
+
+    // const { id } = params; // REMOVED - Use ID parsed from URL
     const locationId = parseInt(id);
     const db = getDb();
 
     if (isNaN(locationId)) {
-        return NextResponse.json({ error: 'Invalid location ID' }, { status: 400 });
+        // Return error if ID parsing failed
+        return NextResponse.json({ error: 'Invalid location ID format in URL' }, { status: 400 });
     }
 
     try {
@@ -194,7 +199,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
             // 1. Get current location
             const location: { image_path: string | null } | undefined = db.prepare(
                  'SELECT image_path FROM locations WHERE id = ?'
-                 ).get(locationId) as { image_path: string | null } | undefined;
+                 ).get(locationId) as { image_path: string | null } | undefined; // Use parsed locationId
             
              if (!location) {
                 return { success: false, status: 404, error: 'Location not found' };
@@ -202,7 +207,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
             const imagePathToDelete = location.image_path; // Now safe to access
 
             // 2. Delete from database
-            const info = db.prepare('DELETE FROM locations WHERE id = ?').run(locationId);
+            const info = db.prepare('DELETE FROM locations WHERE id = ?').run(locationId); // Use parsed locationId
 
             if (info.changes === 0) {
                  return { success: false, status: 404, error: 'Location not found during delete' };

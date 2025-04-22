@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
-import { saveUpload, deleteUpload } from '@/lib/file-handler'; // Use alias
+import { getDb } from '@lib/db';
+import { saveUpload, deleteUpload } from '@lib/file-handler';
 // import { saveUpload, deleteUpload } from '../../../../lib/file-handler'; // Use relative path
 
 // Interface for the item data including joined names
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     const db = getDb();
     let savedImagePath: string | null = null;
-    let newItemId: number | bigint | null = null; // Keep track of ID for potential cleanup
+    let newItemId: number | null = null; // Use number, ensure cleanup logic checks null
 
     try {
         const formData = await request.formData();
@@ -122,8 +122,8 @@ export async function POST(request: NextRequest) {
         const quantity = quantityStr ? parseInt(quantityStr) : 1;
         const locationId = parseInt(locationIdStr);
         const regionId = regionIdStr ? parseInt(regionIdStr) : null;
-        if (isNaN(locationId) || (quantityStr && isNaN(quantity)) || (regionIdStr && regionId === null)) {
-            return NextResponse.json({ error: 'Invalid number format for ID or quantity' }, { status: 400 });
+        if (isNaN(locationId) || (quantityStr && isNaN(quantity)) || (regionIdStr && regionId === null && regionIdStr !== '' && regionIdStr !== 'null')) {
+             return NextResponse.json({ error: 'Invalid number format for ID or quantity' }, { status: 400 });
         }
         const locationCheck = db.prepare('SELECT id FROM locations WHERE id = ?').get(locationId);
         if (!locationCheck) {
@@ -147,9 +147,8 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // --- Database Transaction --- 
-        const createItemAndTagsTx = db.transaction((data) => {
-            // 1. Insert Item
+        // --- Database Transaction (Item Insert Only) --- 
+        const createItemTx = db.transaction((data) => {
             const insertItemStmt = db.prepare(
                 'INSERT INTO items (name, description, quantity, location_id, region_id, image_path) VALUES (?, ?, ?, ?, ?, ?)'
             );
@@ -159,36 +158,13 @@ export async function POST(request: NextRequest) {
                 data.quantity,
                 data.locationId,
                 data.regionId,
-                data.savedImagePath // Use path saved before transaction
+                data.savedImagePath
             );
-            const createdItemId = info.lastInsertRowid;
-
-            // 2. Insert Tags (using Python logic: name + description words > 3 chars)
-            const insertTagStmt = db.prepare('INSERT INTO item_tags (item_id, tag) VALUES (?, ?)');
-            const tags = new Set<string>();
-
-            if (data.name) {
-                 tags.add(data.name.toLowerCase());
-            }
-            if (data.description) {
-                data.description.toLowerCase().split(/\s+/).forEach((word: any) => {
-                    const cleanWord = word.replace(/[^a-z0-9]/gi, ''); // Basic alphanumeric cleaning
-                    if (cleanWord.length > 3) {
-                        tags.add(cleanWord);
-                    }
-                });
-            }
-
-            for (const tag of tags) {
-                 insertTagStmt.run(createdItemId, tag);
-            }
-            console.log(`Inserted ${tags.size} tags for item ID ${createdItemId}`);
-
-            return createdItemId; // Return the ID for fetching later
+            return Number(info.lastInsertRowid); // Return the ID as number
         });
 
-        // Execute Transaction
-        newItemId = createItemAndTagsTx({
+        // Execute Item Insert Transaction
+        newItemId = createItemTx({
             name,
             description,
             quantity,
@@ -196,9 +172,38 @@ export async function POST(request: NextRequest) {
             regionId,
             savedImagePath
         });
+        console.log(`Successfully inserted item ID ${newItemId} within transaction.`);
+        // --- End Item Insert Transaction ---
 
-        console.log(`Successfully inserted item ID ${newItemId} and tags within transaction.`);
-        // --- End Database Transaction ---
+        // --- Insert Tags (Separate Operation) ---
+        if (newItemId !== null) {
+             try {
+                  const insertTagStmt = db.prepare('INSERT INTO item_tags (item_id, tag) VALUES (?, ?)');
+                  const tags = new Set<string>();
+                  if (name) {
+                       tags.add(name.toLowerCase());
+                  }
+                  if (description) {
+                       description.toLowerCase().split(/\s+/).forEach((word: any) => {
+                            const cleanWord = word.replace(/[^a-z0-9]/gi, '');
+                            if (cleanWord.length > 3) tags.add(cleanWord);
+                       });
+                  }
+                  // Use a transaction for tag insertion for efficiency
+                  const insertTagsTx = db.transaction((tagsToInsert) => {
+                       for (const tag of tagsToInsert) {
+                            insertTagStmt.run(newItemId, tag);
+                       }
+                  });
+                  insertTagsTx(tags);
+                  console.log(`Inserted ${tags.size} tags for item ID ${newItemId} (post-transaction).`);
+             } catch (tagError: any) {
+                  // Log error but proceed - item was already created.
+                  console.error(`Error inserting tags for item ID ${newItemId} (item creation succeeded):`, tagError);
+                  // Potential future enhancement: Add flag to response indicating tag failure?
+             }
+        }
+        // --- End Tag Insertion ---
 
         // Fetch the newly created item to return
         const newItem = db.prepare(`
@@ -210,32 +215,26 @@ export async function POST(request: NextRequest) {
         `).get(newItemId);
 
         const newItemTyped = newItem as ItemQueryResult | undefined;
-
         if (!newItemTyped) {
-             // This case is less likely if transaction succeeded, but handle anyway
-             console.error(`Failed to fetch newly created item ID ${newItemId} AFTER successful transaction.`);
-             // Don't delete image here as the item *was* created
+             console.error(`Failed to fetch newly created item ID ${newItemId} AFTER successful transaction and tag insertion.`);
              return NextResponse.json({ error: 'Failed to retrieve item after creation despite successful transaction' }, { status: 500 });
         }
-
         const formattedNewItem = {
              ...formatItem(newItemTyped),
              locationName: newItemTyped.location_name,
              regionName: newItemTyped.region_name
         };
-
         return NextResponse.json(formattedNewItem, { status: 201 });
 
     } catch (error: any) {
         console.error('Error during item creation process:', error);
-        // Clean up uploaded file ONLY if an error occurred AFTER upload but BEFORE or DURING transaction
-        if (savedImagePath && newItemId === null) { // Check if upload happened but transaction didn't return ID
+        // Clean up uploaded file ONLY if an error occurred AFTER upload but BEFORE item insertion
+        if (savedImagePath && newItemId === null) { 
             console.warn(`Error occurred after upload for ${savedImagePath}. Cleaning up...`);
             deleteUpload(savedImagePath).catch((cleanupError: any) => {
                 console.error('Failed to cleanup uploaded file after error:', cleanupError);
             });
         }
-        // Consider specific DB error types (e.g., UNIQUE constraints)
         return NextResponse.json({ error: `Failed to create item: ${error.message || 'Unknown error'}` }, { status: 500 });
     }
 }
