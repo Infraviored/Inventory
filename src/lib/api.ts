@@ -23,6 +23,16 @@ export interface Region {
   width: number;
   height: number;
   color?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UpdateRegionData {
+  name?: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface InventoryItem {
@@ -114,7 +124,7 @@ export async function updateLocation(id: number, formData: FormData): Promise<Lo
 }
 
 export async function deleteLocation(id: number): Promise<void> {
-  const response = await fetch(`/api/proxy/locations/${id}`, {
+  const response = await fetch(`/api/locations/${id}`, {
     method: 'DELETE',
     cache: 'no-store',
   });
@@ -301,4 +311,53 @@ export async function getLedData(itemId: number): Promise<{
   }
   
   return response.json();
+}
+
+// ADD: Function to update a specific region
+export async function updateLocationRegion(
+    locationId: number,
+    regionId: number,
+    updateData: UpdateRegionData
+): Promise<Region> {
+    const response = await fetch(`/api/locations/${locationId}/regions/${regionId}`, {
+        method: 'PUT',
+        headers: {
+             'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+        console.error('API request failed:', errorMessage);
+        throw new Error(errorMessage);
+    }
+
+    return response.json();
+}
+
+// ADD: Function to delete a specific region
+export async function deleteLocationRegion(
+    locationId: number,
+    regionId: number
+): Promise<void> {
+    const response = await fetch(`/api/locations/${locationId}/regions/${regionId}`, {
+        method: 'DELETE',
+        cache: 'no-store',
+    });
+
+    if (!response.ok) {
+        // Handle 204 No Content as success for DELETE
+        if (response.status === 204) {
+             console.log('Region deleted successfully (204 No Content).');
+             return;
+        }
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
+        console.error('API request failed:', errorMessage);
+        throw new Error(errorMessage);
+    }
+    // Also handle cases where server returns 200/OK with message (though 204 is standard)
+    console.log('Region deleted successfully.');
 }
