@@ -171,17 +171,14 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
       formData.append('name', name);
       formData.append('description', description);
       formData.append('locationType', locationType);
-      
-      if (parentId !== null) {
-        formData.append('parentId', parentId.toString());
-      }
-      
-      // Use the original File object if available, otherwise convert dataURL back
+      if (parentId !== null) formData.append('parentId', parentId.toString());
+
+      // Append image file if exists
       if (imageFile) {
-        console.log('Adding original image file to form data:', imageFile.name);
+        console.log('[handleSubmit] Adding original image file to form data:', imageFile.name);
         formData.append('image', imageFile);
-      } else if (imagePreview) { // Use imagePreview (dataURL) as fallback
-        console.log('Converting image preview data URL back to file for upload');
+      } else if (imagePreview) {
+        console.log('[handleSubmit] Converting image preview data URL back to file for upload');
         try {
           const response = await fetch(imagePreview);
           const blob = await response.blob();
@@ -190,79 +187,94 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
           const uploadFile = new File([blob], `image.${fileExtension}`, { type: mimeType });
           formData.append('image', uploadFile);
         } catch (error) {
-          console.error('Error converting image preview data URL to file for upload:', error);
+          console.error('[handleSubmit] Error converting image preview data URL to file:', error);
+          // Decide if submission should continue without image
         }
       }
-      
-      // Add regions data if available
+
       if (regions.length > 0) {
-        console.log('Saving location with regions:', regions);
+        console.log('[handleSubmit] Saving location with regions:', regions);
         formData.append('regions', JSON.stringify(regions));
       }
       
-      console.log('Submitting location form data');
-      const response = await fetch('/api/locations', {
+      // --- CHANGE: Call Flask backend directly --- 
+      const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!backendBaseUrl) {
+          throw new Error("API base URL is not configured. Set NEXT_PUBLIC_API_BASE_URL environment variable.");
+      }
+      const targetUrl = `${backendBaseUrl}/api/locations`; // Construct direct URL
+      console.log(`[handleSubmit] Submitting location form data directly to: ${targetUrl}`);
+      
+      const response = await fetch(targetUrl, { // Use direct backend URL
         method: 'POST',
         body: formData,
+        // No Content-Type header needed here, fetch handles it for FormData
       });
+      // --- END CHANGE --- 
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        let errorData = { error: 'Unknown error' };
+        try {
+            // Try to parse error response from backend
+            errorData = await response.json();
+        } catch (parseError) {
+            // If parsing fails, use the status text
+            errorData.error = response.statusText;
+        }
         const errorMessage = errorData.error || `Server responded with status: ${response.status}`;
-        console.error('API request failed:', errorMessage);
+        console.error(`[handleSubmit] API request failed: ${errorMessage}`);
         throw new Error(errorMessage);
       }
       
       const data = await response.json();
-      console.log('Location created successfully:', data);
+      console.log('[handleSubmit] Location created successfully via direct API call:', data);
       
-      // If we have regions, save them (Keep sequential saving for stability)
+      // --- CHANGE: Save regions using direct backend API call --- 
       if (regions.length > 0 && data.id) {
-        console.log(`Saving ${regions.length} regions for location ID ${data.id}`);
-        let failedCount = 0;
-        for (const region of regions) {
-          try {
-            const regionResponse = await fetch(`/api/locations/${data.id}/regions`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(region),
-            });
-            
-            if (!regionResponse.ok) {
-              const errorText = await regionResponse.text();
-              console.error(`Failed to save region: ${errorText}`);
-              failedCount++;
-            } else {
-              console.log(`Region "${region.name}" saved successfully`);
-            }
-          } catch (error) {
-            console.error('Error saving region:', error);
-            failedCount++;
-          }
-        }
-        if (failedCount > 0) console.error(`${failedCount} regions failed to save`);
-        else console.log('All regions saved successfully');
+         console.log(`[handleSubmit] Saving ${regions.length} regions for location ID ${data.id} directly`);
+         let failedCount = 0;
+         const regionTargetUrlBase = `${backendBaseUrl}/api/locations/${data.id}/regions`;
+         for (const region of regions) {
+           try {
+             const regionResponse = await fetch(regionTargetUrlBase, { // Use direct backend URL
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify(region),
+             });
+             if (!regionResponse.ok) {
+               const errorText = await regionResponse.text();
+               console.error(`[handleSubmit] Failed to save region: ${errorText}`);
+               failedCount++;
+             } else {
+               const savedRegion = await regionResponse.json(); // Assuming backend returns saved region
+               console.log(`[handleSubmit] Region "${savedRegion.name}" saved successfully directly`);
+             }
+           } catch (error) {
+             console.error('[handleSubmit] Error saving region directly:', error);
+             failedCount++;
+           }
+         }
+         if (failedCount > 0) console.error(`[handleSubmit] ${failedCount} regions failed to save directly`);
+         else console.log('[handleSubmit] All regions saved successfully directly');
       }
+      // --- END CHANGE --- 
       
-      // Clear form state AFTER successful submission and region saving
+      // Clear form state AFTER successful submission
+      console.log('[handleSubmit] Clearing form state');
       setName('');
       setDescription('');
       setImageFile(null);
-      setImagePreview(null); // This triggers the useEffect to hide the mapper
+      setImagePreview(null);
       setRegions([]);
       setLocationType('');
       
-      if (onSuccess) {
-        onSuccess();
-      }
-      
-      router.refresh(); // Refresh to show updated data
+      if (onSuccess) onSuccess();
+      console.log('[handleSubmit] Refreshing router');
+      router.refresh();
     } catch (error) {
-      console.error('Error creating location:', error);
-      // Add user feedback here (e.g., toast notification)
-      alert(`Error creating location: ${error instanceof Error ? error.message : String(error)}`); // Simple placeholder alert
+      console.error('[handleSubmit] Error creating location:', error);
+      // TODO: Implement better user feedback (e.g., toast notification)
+      alert(`Error creating location: ${error instanceof Error ? error.message : String(error)}`); 
     } finally {
       setIsSubmitting(false);
     }
