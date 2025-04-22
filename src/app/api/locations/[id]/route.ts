@@ -25,8 +25,7 @@ function formatLocation(location: any): any {
 
 // GET /api/locations/:id - Fetches a specific location
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-    const { id } = params;
-    const locationId = parseInt(id);
+    const locationId = parseInt(params.id);
     const db = getDb();
 
     if (isNaN(locationId)) {
@@ -55,7 +54,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const db = getDb();
     let savedImagePath: string | null = null;
     let oldImagePath: string | null = null;
-    let newImageUploaded = false; // Flag to track if a new file was processed
+    let newImageUploaded = false;
 
     if (isNaN(locationId)) {
         return NextResponse.json({ error: 'Invalid location ID' }, { status: 400 });
@@ -65,13 +64,31 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         const formData = await request.formData();
         console.log(`[PUT /locations/${locationId}] Received FormData keys:`, Array.from(formData.keys()));
 
+        // Extract standard fields
         const name = formData.get('name') as string | null;
         const description = formData.get('description') as string | null;
         const parentIdStr = formData.get('parentId') as string | null;
         const locationType = formData.get('locationType') as string | null;
         const imageFile = formData.get('image') as File | null;
-        // Note: We might get 'null' as a string if checkbox/clearing logic sends it
-        const clearImage = formData.get('clearImage') === 'true'; 
+        const clearImage = formData.get('clearImage') === 'true';
+
+        // Extract and parse regions
+        const regionsStr = formData.get('regions') as string | null;
+        let regionsToUpdate: Array<{name: string, x: number, y: number, width: number, height: number}> | null = null;
+        if (regionsStr) {
+            try {
+                regionsToUpdate = JSON.parse(regionsStr);
+                if (!Array.isArray(regionsToUpdate)) {
+                    console.warn(`[PUT /locations/${locationId}] Parsed regions data is not an array:`, regionsToUpdate);
+                    regionsToUpdate = null; // Treat as invalid
+                } else {
+                     console.log(`[PUT /locations/${locationId}] Parsed ${regionsToUpdate.length} regions from form data.`);
+                }
+            } catch (e) {
+                console.error(`[PUT /locations/${locationId}] Failed to parse regions JSON:`, e);
+                return NextResponse.json({ error: 'Invalid format for regions data' }, { status: 400 });
+            }
+        }
 
         if (!name) {
             return NextResponse.json({ error: 'Missing required field: name' }, { status: 400 });
@@ -80,95 +97,133 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         const parentId = parentIdStr ? parseInt(parentIdStr) : null;
 
         // Start transaction
-        const updateTx = db.transaction(async (data) => {
-            // 1. Get current location
-            const currentLocation: { image_path: string | null } | undefined = db.prepare(
-                'SELECT image_path FROM locations WHERE id = ?'
-            ).get(data.locationId) as { image_path: string | null } | undefined;
-            
+        const updateTx = db.transaction((data) => { // Pass data object
+            // 1. Get current location image path
+            const currentLocation = db.prepare('SELECT image_path FROM locations WHERE id = ?').get(data.locationId) as { image_path: string | null } | undefined;
             if (!currentLocation) {
                 throw new Error('LocationNotFound');
             }
-            oldImagePath = currentLocation.image_path; // Now safe to access
+            oldImagePath = currentLocation.image_path;
             savedImagePath = oldImagePath;
-
             let imagePathToUpdate: string | null = oldImagePath;
 
             // 2. Handle image upload/clearing
-            if (clearImage) {
+            if (data.clearImage) {
                  console.log(`[PUT /locations/${data.locationId}] Clearing image.`);
                  imagePathToUpdate = null;
-                 newImageUploaded = true; // Mark as processed to trigger old image deletion
-            } else if (imageFile && imageFile.size > 0) {
+                 newImageUploaded = true;
+            } else if (data.imageFile && data.imageFile.size > 0) {
                 console.log(`[PUT /locations/${data.locationId}] New image file found.`);
                 newImageUploaded = true;
-                try {
-                    savedImagePath = await saveUpload(imageFile);
-                    imagePathToUpdate = savedImagePath; // Update DB with the new path
-                    console.log(`[PUT /locations/${data.locationId}] New image saved: ${savedImagePath}`);
-                } catch (uploadError) {
-                    console.error(`[PUT /locations/${data.locationId}] File upload failed:`, uploadError);
-                    // Re-throw to abort transaction
-                    throw new Error(`Failed to save uploaded image: ${uploadError instanceof Error ? uploadError.message : String(uploadError)}`);
-                }
+                // Image saving will happen AFTER transaction if needed
+                imagePathToUpdate = "TEMP_NEEDS_UPLOAD"; 
             } else {
                  console.log(`[PUT /locations/${data.locationId}] No new image or clear flag.`);
             }
 
-            // 3. Update database record
-            const stmt = db.prepare(
+            // 3. Update location record (use old image path if new one is pending)
+            const updateLocationStmt = db.prepare(
                 'UPDATE locations SET name = ?, parent_id = ?, description = ?, image_path = ?, location_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
             );
-            const info = stmt.run(
+            const info = updateLocationStmt.run(
                 data.name,
                 data.parentId,
                 data.description,
-                imagePathToUpdate,
+                imagePathToUpdate === "TEMP_NEEDS_UPLOAD" ? oldImagePath : imagePathToUpdate, // Use old path for now
                 data.locationType,
                 data.locationId
             );
-
             if (info.changes === 0) {
                  throw new Error('LocationNotFoundDuringUpdate');
             }
-            
-            // 4. Delete old image AFTER DB update succeeds and if conditions met
-            if (newImageUploaded && oldImagePath && oldImagePath !== savedImagePath) {
-                 deleteUpload(oldImagePath)
-                    .then(() => console.log(`[PUT /locations/${data.locationId}] Old image ${oldImagePath} deleted successfully.`))
-                    .catch((err: any) => console.error(`[PUT /locations/${data.locationId}] Failed to delete old image ${oldImagePath}:`, err)); // Added type for err
+
+            // --- ADDED: Update Regions --- 
+            if (data.regionsData !== null) { // Only update regions if data was provided
+                const deleteRegionsStmt = db.prepare('DELETE FROM location_regions WHERE location_id = ?');
+                const insertRegionStmt = db.prepare('INSERT INTO location_regions (location_id, name, x_coord, y_coord, width, height) VALUES (?, ?, ?, ?, ?, ?)');
+                
+                // Delete existing regions first
+                const deleteInfo = deleteRegionsStmt.run(data.locationId);
+                console.log(`[PUT /locations/${data.locationId}] Deleted ${deleteInfo.changes} existing regions.`);
+                
+                // Insert new regions
+                let insertedCount = 0;
+                for (const region of data.regionsData) {
+                    // Add validation for region data if needed
+                    insertRegionStmt.run(data.locationId, region.name, region.x, region.y, region.width, region.height);
+                    insertedCount++;
+                }
+                console.log(`[PUT /locations/${data.locationId}] Inserted ${insertedCount} new regions.`);
             }
-            
-            return info.changes > 0;
+            // --- END: Update Regions --- 
+
+            // Return necessary info for post-transaction steps
+            return {
+                 changes: info.changes,
+                 shouldUpload: imagePathToUpdate === "TEMP_NEEDS_UPLOAD",
+                 imagePathToUpdate: savedImagePath // Keep track of potential new path
+            };
         });
         
-        // Execute transaction
-        const success = updateTx({ locationId, name, parentId, description, locationType });
+        // Prepare data for transaction
+        const txData = {
+            locationId,
+            name,
+            parentId,
+            description,
+            locationType,
+            clearImage,
+            imageFile,
+            regionsData: regionsToUpdate // Pass parsed regions to transaction
+        };
 
-        if (!success) {
-             return NextResponse.json({ error: 'Location not found or update failed' }, { status: 404 });
+        // Execute transaction
+        const txResult = updateTx(txData);
+
+        // Handle image upload *after* successful transaction if needed
+        let finalImagePath = oldImagePath;
+        if (txResult.shouldUpload && imageFile) {
+             try {
+                  const uploadedPath = await saveUpload(imageFile);
+                  finalImagePath = uploadedPath as any;
+                  // Update the DB again with the actual path
+                  db.prepare('UPDATE locations SET image_path = ? WHERE id = ?').run(finalImagePath, locationId);
+                  console.log(`[PUT /locations/${locationId}] DB updated with final image path: ${finalImagePath}`);
+             } catch (uploadError: any) {
+                  console.error(`[PUT /locations/${locationId}] Post-transaction image upload failed:`, uploadError);
+                  // Transaction succeeded, but upload failed. Item state might be inconsistent.
+                  return NextResponse.json({ error: 'Database updated, but image upload failed' }, { status: 500 });
+             }
+        } else if (clearImage) {
+            // Image path was already set to null in the transaction
+            finalImagePath = null;
+        } else {
+             // No upload, no clear, keep old path
+             finalImagePath = oldImagePath;
         }
 
-        // Fetch and return updated location
-        const updatedLocation = db.prepare('SELECT * FROM locations WHERE id = ?').get(locationId);
-        return NextResponse.json(formatLocation(updatedLocation));
+        // Handle old image deletion *after* successful transaction and potential new upload
+        if (newImageUploaded && oldImagePath && oldImagePath !== finalImagePath) {
+             deleteUpload(oldImagePath)
+                .then(() => console.log(`[PUT /locations/${locationId}] Old image ${oldImagePath} deleted successfully.`))
+                .catch((err: any) => console.error(`[PUT /locations/${locationId}] Failed to delete old image ${oldImagePath}:`, err));
+        }
+        
+        // Fetch and return updated location (including image path)
+        const updatedLocationResult = db.prepare('SELECT * FROM locations WHERE id = ?').get(locationId);
+        return NextResponse.json(formatLocation(updatedLocationResult)); // Use existing format helper
 
     } catch (error: any) {
         console.error(`[PUT /locations/${locationId}] Error updating location:`, error);
 
         // Handle specific transaction errors
-        if (error.message === 'LocationNotFound') {
+        if (error.message === 'LocationNotFound' || error.message === 'LocationNotFoundDuringUpdate') {
             return NextResponse.json({ error: 'Location not found' }, { status: 404 });
         }
-        if (error.message === 'LocationNotFoundDuringUpdate') {
-             return NextResponse.json({ error: 'Location not found during update' }, { status: 404 });
-        }
 
-        // Clean up newly uploaded file if the transaction failed
-        if (newImageUploaded && savedImagePath && savedImagePath !== oldImagePath) {
-            console.warn(`[PUT /locations/${locationId}] Transaction failed after new image upload. Cleaning up ${savedImagePath}...`);
-            deleteUpload(savedImagePath).catch((err: any) => console.error('Failed cleanup delete', err)); // Added type for err
-        }
+        // Clean up newly uploaded file if the main transaction failed *before* upload attempt
+        // If upload happened post-transaction and failed, it's handled above.
+        // This cleanup logic might need adjustment if saveUpload happens post-transaction
 
         return NextResponse.json({ error: `Failed to update location: ${error.message || 'Unknown error'}` }, { status: 500 });
     }

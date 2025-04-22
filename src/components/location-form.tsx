@@ -86,10 +86,12 @@ function FixedSizeRegionMapper({
 
 interface LocationFormProps {
   parentId?: number | null;
+  locationId?: number | null;
   onSuccess?: () => void;
 }
 
-export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) {
+export function LocationForm({ parentId = null, locationId = null, onSuccess }: LocationFormProps) {
+  // --- HOOKS --- 
   const { t } = useLanguage();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -101,19 +103,89 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
   const [showRegionMapper, setShowRegionMapper] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<{name: string, x: number, y: number, width: number, height: number} | null>(null);
   const [isDrawingActive, setIsDrawingActive] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [clearImage, setClearImage] = useState(false);
   const router = useRouter();
   
+  // --- DEFINE isEditing EARLY --- 
+  const isEditing = locationId !== null;
+
   // A small transparent placeholder image as fallback (1x1 pixel transparent PNG)
   const placeholderImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
-  // Simplified useEffect to control RegionMapper visibility based on stable imagePreview
+  // Fetch location data when editing
   useEffect(() => {
-    if (imagePreview) {
-      setShowRegionMapper(true);
-    } else {
-      setShowRegionMapper(false);
-    }
-  }, [imagePreview]);
+    const fetchLocationData = async () => {
+      if (!locationId || initialLoadComplete) return; // Only fetch if locationId is provided and not loaded yet
+
+      console.log(`[LocationForm Edit Mode] Fetching data for location ID: ${locationId}`);
+      setIsLoading(true);
+      setClearImage(false); // Ensure clear flag is false on load
+      try {
+        // Use Promise.all for concurrent fetching
+        const [locationRes, regionsRes] = await Promise.all([
+          fetch(`/api/locations/${locationId}`),
+          fetch(`/api/locations/${locationId}/regions`)
+        ]);
+
+        if (!locationRes.ok) {
+          throw new Error(`Failed to fetch location details: ${locationRes.statusText}`);
+        }
+        if (!regionsRes.ok) {
+          throw new Error(`Failed to fetch location regions: ${regionsRes.statusText}`);
+        }
+
+        const locationData = await locationRes.json();
+        const fetchedRegions = await regionsRes.json();
+
+        console.log('[LocationForm Edit Mode] Fetched Location:', locationData);
+        console.log('[LocationForm Edit Mode] Fetched Regions:', fetchedRegions);
+
+        // Populate form state
+        setName(locationData.name || '');
+        setDescription(locationData.description || '');
+        setLocationType(locationData.locationType || '');
+        // IMPORTANT: Set imagePreview directly from the path provided by the API
+        // The API returns paths like '/uploads/xyz.png', which the browser can load directly
+        setImagePreview(locationData.imagePath || null); 
+        // Do NOT set imageFile here, it will be handled during submission if needed
+
+        // Ensure fetchedRegions is an array and format matches expectations
+        if (Array.isArray(fetchedRegions)) {
+           // Map API response (x, y, width, height) to the state format if needed
+           // Assuming the API returns regions in the correct format: {name, x, y, width, height}
+           setRegions(fetchedRegions.map((r: any) => ({ // Ensure structure matches state
+               name: r.name,
+               x: r.x, // Ensure API returns x, y, width, height
+               y: r.y,
+               width: r.width,
+               height: r.height
+           })));
+        } else {
+            console.warn("Fetched regions data is not an array:", fetchedRegions);
+            setRegions([]);
+        }
+        
+        setInitialLoadComplete(true); // Mark initial load as complete
+
+      } catch (error: any) {
+        console.error('Error fetching location data:', error);
+        alert(`Error loading location data: ${error.message}`);
+        // Optionally redirect or show an error state
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLocationData();
+  // Add initialLoadComplete to dependency array to prevent re-fetch after successful load
+  }, [locationId, initialLoadComplete]); 
+
+  // Display loading indicator while fetching
+  if (isLoading && locationId) {
+    return <div className="text-center p-10">{t('common.loading')}</div>;
+  }
 
   // Function to convert blob URL to data URL for persistence
   const convertBlobToDataURL = async (blobUrl: string): Promise<string> => {
@@ -136,9 +208,13 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
     });
   };
 
-  // Handle image loading and ensure it's converted to a data URL immediately
+  // Handle image loading and change clearImage logic
   const handleImageChange = async (file: File | null, previewUrl?: string) => {
-    setImageFile(file); // Keep the original file if available
+    // Reset clearImage if a new file is selected
+    if (file || (previewUrl && !previewUrl.startsWith('blob:'))) { 
+      setClearImage(false);
+    }
+    setImageFile(file); 
 
     if (previewUrl) {
       if (previewUrl.startsWith('blob:')) {
@@ -154,12 +230,15 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
           setImageFile(null); // Clear file if conversion failed
         }
       } else {
-        // Assume it's already a data URL or a usable non-blob URL
         setImagePreview(previewUrl);
       }
     } else {
-      // Image cleared
+      // Image cleared via ImageInput component
       setImagePreview(null);
+      if (isEditing) { 
+        console.log("Image cleared during edit, setting clearImage flag.");
+        setClearImage(true);
+      }
     }
   };
 
@@ -173,39 +252,27 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
       formData.append('locationType', locationType);
       if (parentId !== null) formData.append('parentId', parentId.toString());
 
-      // Append image file if exists or convert from preview
+      // Image handling - append new file or check clear flag
       if (imageFile) {
         formData.append('image', imageFile);
-      } else if (imagePreview) {
-        try {
-          const response = await fetch(imagePreview);
-          const blob = await response.blob();
-          const mimeType = imagePreview.match(/data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+).*,.*/)?.[1] || 'image/jpeg';
-          const fileExtension = mimeType.split('/')[1] || 'jpg';
-          const uploadFile = new File([blob], `image.${fileExtension}`, { type: mimeType });
-          formData.append('image', uploadFile);
-        } catch (error) {
-          console.error('[handleSubmit] Error converting image preview data URL to file:', error);
-          // Optionally handle this error, maybe notify user?
-        }
+      } else if (isEditing && clearImage) {
+        formData.append('clearImage', 'true');
+        console.log('[handleSubmit] Sending clearImage=true flag.');
       }
 
-      // Append regions array as JSON string IF it has items
+      // Region handling
       if (regions.length > 0) {
-        console.log('[handleSubmit] Adding regions to form data:', regions);
         formData.append('regions', JSON.stringify(regions));
+      } else if (isEditing) {
+         formData.append('regions', '[]');
       }
       
-      // --- CHANGE: Call Next.js API route --- 
-      const targetUrl = '/api/locations'; // Use relative path for Next.js API route
-      console.log(`[handleSubmit] Submitting location form data to Next.js API: ${targetUrl}`);
+      const targetUrl = isEditing ? `/api/locations/${locationId}` : '/api/locations';
+      const method = isEditing ? 'PUT' : 'POST';
+
+      console.log(`[handleSubmit] ${method} location form data to Next.js API: ${targetUrl}`);
       
-      const response = await fetch(targetUrl, { // Use Next.js API endpoint
-        method: 'POST',
-        body: formData,
-        // No Content-Type header needed here, fetch handles it for FormData
-      });
-      // --- END CHANGE --- 
+      const response = await fetch(targetUrl, { method: method, body: formData });
       
       if (!response.ok) {
         let errorData = { error: 'Unknown error' };
@@ -220,23 +287,29 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
       }
       
       const data = await response.json();
-      console.log('[handleSubmit] Location and regions created successfully via Next.js API:', data);
+      console.log(`[handleSubmit] Location ${isEditing ? 'updated' : 'created'} successfully via Next.js API:`, data);
       
-      setName('');
-      setDescription('');
-      setImageFile(null);
-      setImagePreview(null);
-      setRegions([]);
-      setLocationType('');
+      // Reset only for create mode (or if explicitly requested by onSuccess?)
+      if (!isEditing) {
+        setName('');
+        setDescription('');
+        setImageFile(null);
+        setImagePreview(null);
+        setRegions([]);
+        setLocationType('');
+        setClearImage(false);
+      }
+
       if (onSuccess) {
         onSuccess();
       } else {
-        // Redirect or refresh as needed
-        router.push(`/locations/${data.id}`); // Redirect to the new location's page
-        // router.refresh(); // Or just refresh if staying on same page
+        // Redirect to the updated location page after edit, or new page after create
+        const resultLocationId = isEditing ? locationId : data.id; 
+        router.push(`/locations/${resultLocationId}`); 
+        router.refresh(); // Refresh data on the target page
       }
     } catch (error: any) {
-      console.error('Error submitting location:', error);
+      console.error(`Error ${isEditing ? 'updating' : 'submitting'} location:`, error);
       alert(`${t('location_form.error')}: ${error.message}`);
     } finally {
       setIsSubmitting(false);
@@ -379,7 +452,7 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                       <div className="absolute inset-0">
                         {regions.map((region, i) => (
                           <div
-                            key={i}
+                            key={`static-${i}`}
                             className="absolute border-2 border-primary dark:border-primary bg-primary/20 dark:bg-primary/20 hover:bg-primary/30 dark:hover:bg-primary/30 transition-all duration-200 cursor-pointer"
                             style={{
                               left: `${region.x}%`,
@@ -389,11 +462,7 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                             }}
                             onClick={() => {
                               setSelectedRegion(region);
-                              if (imagePreview) {
-                                setShowRegionMapper(true);
-                              } else {
-                                console.warn("Trying to show region mapper but no imagePreview is available.");
-                              }
+                              setShowRegionMapper(true);
                             }}
                           >
                             <div className="absolute top-0 left-0 bg-primary dark:bg-primary text-primary-foreground text-xs px-1">
@@ -412,10 +481,11 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                 ) : (
                   <div className="bg-background dark:bg-background" style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
                     <FixedSizeRegionMapper
+                      key={imagePreview}
                       imageSrc={imagePreview || placeholderImage}
                       initialRegions={regions}
                       onComplete={handleRegionsChange}
-                      autoStartDrawing={true}
+                      autoStartDrawing={!regions.length} // Revert autoStartDrawing logic
                     />
                     {/* Debug info to see if image source is available */}
                     {(!imagePreview) && (
@@ -424,11 +494,12 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                       </div>
                     )}
                     
-                    {/* Add Region Button - Always visible while RegionMapper is open */}
+                    {/* Add Region Button */}
                     <Button
                       type="button"
                       className={`absolute bottom-4 right-4 z-50 ${isDrawingActive ? 'bg-secondary text-secondary-foreground hover:bg-secondary/90' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
                       onClick={startDrawingNewRegion}
+                      disabled={!imagePreview}
                     >
                       <PlusIcon className="w-4 h-4 mr-1" /> {isDrawingActive ? t('regions.drawing') : t('regions.addRegion')}
                     </Button>
@@ -446,7 +517,11 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
           </div>
         </div>
         
-        <Button type="submit" disabled={isSubmitting} className="w-full">
+        <Button 
+          type="submit" 
+          disabled={isSubmitting || (isLoading && locationId !== null)} 
+          className="w-full"
+        >
           {isSubmitting ? t('common.loading') : t('common.save')}
         </Button>
       </form>

@@ -17,15 +17,7 @@ export function RegionMapper({
   const { t } = useLanguage();
   
   // Region state
-  const [regions, setRegions] = useState<ActiveRegion[]>(
-    initialRegions.map((r, i) => ({
-      ...r,
-      id: `region-${i}-${Date.now()}`,
-      isSelected: false,
-      isResizing: false,
-      isDragging: false,
-    }))
-  );
+  const [regions, setRegions] = useState<ActiveRegion[]>([]);
   
   // UI state
   const [isCreating, setIsCreating] = useState(autoStartDrawing);
@@ -60,6 +52,28 @@ export function RegionMapper({
     horizontal: null,
     vertical: null
   });
+
+  // EFFECT TO SYNC WITH INITIAL REGIONS PROP
+  useEffect(() => {
+    console.log('[RegionMapper] initialRegions prop changed:', initialRegions);
+    // Create a comparable representation of the internal state
+    const currentInternalRegionsComparable = regions.map(({ name, x, y, width, height }) => ({ name, x, y, width, height }));
+    // Compare stringified versions to avoid deep object comparison issues
+    if (JSON.stringify(initialRegions) !== JSON.stringify(currentInternalRegionsComparable)) {
+      console.log('[RegionMapper] Prop differs from state. Updating internal regions state.');
+      setRegions(
+        initialRegions.map((r, i) => ({
+          ...r,
+          id: `region-${i}-${Date.now()}-${Math.random()}`, // Ensure unique ID on sync
+          isSelected: false,
+          isResizing: false,
+          isDragging: false,
+        }))
+      );
+    } else {
+        console.log('[RegionMapper] Prop matches state. No update needed.');
+    }
+  }, [initialRegions]); // Dependency array includes initialRegions
 
   // Listen for custom event to start drawing new regions
   useEffect(() => {
