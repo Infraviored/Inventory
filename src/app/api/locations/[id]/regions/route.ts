@@ -24,7 +24,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const locationId = parseInt(params.id);
+    const { id } = params; // Destructure the 'id' property
+    const locationId = parseInt(id); // Parse the destructured 'id'
     const region = await request.json();
     
     // Create the region

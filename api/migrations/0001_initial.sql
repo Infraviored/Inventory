@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS locations (
     parent_id INTEGER,
     description TEXT,
     image_path TEXT,
+    location_type TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (parent_id) REFERENCES locations(id) ON DELETE CASCADE

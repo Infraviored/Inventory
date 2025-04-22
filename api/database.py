@@ -94,17 +94,20 @@ def get_location_by_id(location_id):
         return dict(location)
     return None
 
-def add_location(name, parent_id=None, description=None, image_path=None):
+def add_location(name, parent_id=None, description=None, image_path=None, location_type=None):
     """Add a new location"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
+    # *** DEBUGGING POINT ***
+    print(f"DATABASE: Inserting location '{name}' with image_path: {image_path}, location_type: {location_type}")
+    
     cursor.execute(
         '''
-        INSERT INTO locations (name, parent_id, description, image_path)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO locations (name, parent_id, description, image_path, location_type)
+        VALUES (?, ?, ?, ?, ?)
         ''',
-        (name, parent_id, description, image_path)
+        (name, parent_id, description, image_path, location_type)
     )
     
     location_id = cursor.lastrowid
@@ -113,7 +116,7 @@ def add_location(name, parent_id=None, description=None, image_path=None):
     
     return location_id
 
-def update_location(location_id, name, parent_id=None, description=None, image_path=None):
+def update_location(location_id, name, parent_id=None, description=None, image_path=None, location_type=None):
     """Update an existing location"""
     conn = get_db_connection()
     
@@ -126,13 +129,16 @@ def update_location(location_id, name, parent_id=None, description=None, image_p
         if current:
             image_path = current['image_path']
     
+    # *** DEBUGGING POINT ***
+    print(f"DATABASE: Updating location {location_id} with image_path: {image_path}, location_type: {location_type}")
+
     conn.execute(
         '''
         UPDATE locations
-        SET name = ?, parent_id = ?, description = ?, image_path = ?, updated_at = CURRENT_TIMESTAMP
+        SET name = ?, parent_id = ?, description = ?, image_path = ?, location_type = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         ''',
-        (name, parent_id, description, image_path, location_id)
+        (name, parent_id, description, image_path, location_type, location_id)
     )
     
     conn.commit()

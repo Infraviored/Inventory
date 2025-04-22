@@ -110,7 +110,9 @@ export async function DELETE(
   { params }: { params: { path: string[] } }
 ) {
   try {
-    const path = params.path.join('/');
+    const { path: pathSegments } = params; // Destructure the 'path' array
+    const path = pathSegments.join('/'); // Join the destructured array
+    
     // Get backend URL from environment variable or use default for local development
     const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
     const backendUrl = `${backendBaseUrl}/api/${path}`;

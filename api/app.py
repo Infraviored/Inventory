@@ -43,14 +43,17 @@ def handle_image_upload(image_file, old_image_path=None):
 
 # Helper function to format location data
 def format_location(location):
+    # Ensure location is a dictionary (it should be from sqlite3.Row)
+    location_dict = dict(location) if location else {}
     return {
-        'id': location['id'],
-        'name': location['name'],
-        'description': location['description'],
-        'parentId': location['parent_id'],
-        'imagePath': f"/uploads/{location['image_path']}" if location['image_path'] else None,
-        'createdAt': location['created_at'],
-        'updatedAt': location['updated_at']
+        'id': location_dict.get('id'),
+        'name': location_dict.get('name'),
+        'description': location_dict.get('description'),
+        'parentId': location_dict.get('parent_id'),
+        'imagePath': f"/uploads/{location_dict['image_path']}" if location_dict.get('image_path') else None,
+        'locationType': location_dict.get('location_type'), # Read from DB
+        'createdAt': location_dict.get('created_at'),
+        'updatedAt': location_dict.get('updated_at')
     }
 
 # Helper function to format inventory item data
@@ -96,16 +99,20 @@ def get_locations_route():
 @app.route('/api/locations', methods=['POST'])
 def add_location_route():
     try:
+        # *** DEBUGGING POINT ***
+        print(f"APP.PY: Received request form data: {request.form}")
+        print(f"APP.PY: Received request files: {request.files}")
+
         # Validate required fields
         if 'name' not in request.form:
             return jsonify({"error": "Missing required field: name"}), 400
-        
+
         name = request.form.get('name')
         description = request.form.get('description')
         parent_id_str = request.form.get('parentId')
         parent_id = int(parent_id_str) if parent_id_str else None
         location_type = request.form.get('locationType')
-        
+
         # Process regions data if available
         regions_data = []
         regions_json = request.form.get('regions')
@@ -116,12 +123,23 @@ def add_location_route():
                     regions_data = []
             except json.JSONDecodeError:
                 regions_data = []
-        
+
         # Handle image upload
-        image_path = handle_image_upload(request.files.get('image'))
-        
-        # Create the location
-        location_id = add_location(name, parent_id, description, image_path)
+        image_file = request.files.get('image')
+        # *** DEBUGGING POINT ***
+        print(f"APP.PY: request.files.get('image') resulted in: {type(image_file)} - {image_file}")
+        image_path = handle_image_upload(image_file)
+        # *** DEBUGGING POINT ***
+        print(f"APP.PY: handle_image_upload returned: {image_path}")
+
+        # Create the location, passing location_type
+        location_id = add_location(name, parent_id, description, image_path, location_type)
+        # *** DEBUGGING POINT ***
+        print(f"APP.PY: Called database.add_location with image_path: {image_path}, location_type: {location_type}")
+
+        new_location = get_location_by_id(location_id)
+        # *** DEBUGGING POINT ***
+        print(f"APP.PY: Fetched new_location from DB: {dict(new_location) if new_location else None}")
         
         # Add regions if provided
         if regions_data and location_id:
@@ -136,27 +154,33 @@ def add_location_route():
                         region['height']
                     )
         
-        new_location = get_location_by_id(location_id)
-        
-        # Get the regions for this location
+        # Get the regions for this location (if needed in response)
         location_regions = []
-        regions = get_location_regions(location_id)
-        location_regions = [{
-            'id': r['id'],
-            'name': r['name'],
-            'x': r['x_coord'],
-            'y': r['y_coord'],
-            'width': r['width'],
-            'height': r['height']
-        } for r in regions]
-        
-        response = format_location(new_location)
-        response['regions'] = location_regions
-        response['locationType'] = location_type
-        
-        return jsonify(response), 201
+        if new_location:
+            regions = get_location_regions(location_id)
+            location_regions = [{
+                'id': r['id'],
+                'name': r['name'],
+                'x': r['x_coord'],
+                'y': r['y_coord'],
+                'width': r['width'],
+                'height': r['height']
+            } for r in regions]
+            
+            response = format_location(new_location) # Formats the DB result including locationType
+            # *** DEBUGGING POINT ***
+            print(f"APP.PY: Formatted response (before adding regions manually): {response}")
+            response['regions'] = location_regions # Add regions to the final response
+            
+            return jsonify(response), 201
+        else:
+             return jsonify({"error": "Failed to create or retrieve location after adding"}), 500
+
     except Exception as e:
         print(f"Error creating location: {e}")
+        # Log the full traceback for detailed debugging
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": f"Failed to create location: {str(e)}"}), 500
 
 @app.route('/api/locations/<int:location_id>', methods=['GET', 'PUT', 'DELETE'])

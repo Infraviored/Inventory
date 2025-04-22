@@ -93,7 +93,7 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
   const { t } = useLanguage();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [image, setImage] = useState<File | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [regions, setRegions] = useState<Array<{name: string, x: number, y: number, width: number, height: number}>>([]);
@@ -102,71 +102,64 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
   const [selectedRegion, setSelectedRegion] = useState<{name: string, x: number, y: number, width: number, height: number} | null>(null);
   const [isDrawingActive, setIsDrawingActive] = useState(false);
   const router = useRouter();
-  const imageUrlRef = useRef<string | null>(null);
-  // Store the actual image file data
-  const [imageData, setImageData] = useState<string | null>(null);
   
   // A small transparent placeholder image as fallback (1x1 pixel transparent PNG)
   const placeholderImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
-  // Auto-show the RegionMapper whenever an image is available
+  // Simplified useEffect to control RegionMapper visibility based on stable imagePreview
   useEffect(() => {
     if (imagePreview) {
-      // Automatically show RegionMapper whenever an image is available
       setShowRegionMapper(true);
-      
-      // Ensure image data is converted if needed
-      if (!imageData && imagePreview.startsWith('blob:')) {
-        convertBlobToDataURL(imagePreview).then(dataUrl => {
-          setImageData(dataUrl);
-          imageUrlRef.current = dataUrl;
-        }).catch(err => {
-          console.error('Failed to convert image:', err);
-          setImageData(imagePreview);
-          imageUrlRef.current = imagePreview;
-        });
-      }
+    } else {
+      setShowRegionMapper(false);
     }
   }, [imagePreview]);
 
   // Function to convert blob URL to data URL for persistence
   const convertBlobToDataURL = async (blobUrl: string): Promise<string> => {
-    try {
-      const response = await fetch(blobUrl);
-      const blob = await response.blob();
-      
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error('Error converting blob to data URL:', error);
-      return blobUrl; // Return original as fallback
+    // No try-catch here, let the caller handle errors
+    console.log('Attempting to fetch blob:', blobUrl);
+    const response = await fetch(blobUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch blob: ${response.status} ${response.statusText}`);
     }
+    const blob = await response.blob();
+    
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => {
+        console.error("FileReader error:", error);
+        reject(error);
+      };
+      reader.readAsDataURL(blob);
+    });
   };
 
-  // Handle image loading and ensure it's converted to a data URL
-  const handleImageChange = async (file: File | null, croppedImage?: string) => {
-    setImage(file);
-    setImagePreview(croppedImage || null);
-    
-    if (croppedImage && croppedImage.startsWith('blob:')) {
-      try {
-        // Convert to data URL right away
-        const dataUrl = await convertBlobToDataURL(croppedImage);
-        setImageData(dataUrl);
-        imageUrlRef.current = dataUrl;
-        console.log('Image converted and stored as data URL');
-      } catch (error) {
-        console.error('Failed to convert image:', error);
-        setImageData(croppedImage);
-        imageUrlRef.current = croppedImage;
+  // Handle image loading and ensure it's converted to a data URL immediately
+  const handleImageChange = async (file: File | null, previewUrl?: string) => {
+    setImageFile(file); // Keep the original file if available
+
+    if (previewUrl) {
+      if (previewUrl.startsWith('blob:')) {
+        try {
+          console.log('Converting blob URL immediately:', previewUrl);
+          const dataUrl = await convertBlobToDataURL(previewUrl);
+          setImagePreview(dataUrl); // Set preview to stable data URL
+          console.log('Image converted and stored as data URL for preview');
+          // URL.revokeObjectURL(previewUrl); // Optional: revoke if needed
+        } catch (error) {
+          console.error('Failed to convert blob to data URL immediately:', error);
+          setImagePreview(null);
+          setImageFile(null); // Clear file if conversion failed
+        }
+      } else {
+        // Assume it's already a data URL or a usable non-blob URL
+        setImagePreview(previewUrl);
       }
-    } else if (croppedImage) {
-      setImageData(croppedImage);
-      imageUrlRef.current = croppedImage;
+    } else {
+      // Image cleared
+      setImagePreview(null);
     }
   };
 
@@ -183,20 +176,21 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
         formData.append('parentId', parentId.toString());
       }
       
-      // Ensure image is included in the form data
-      if (image) {
-        console.log('Adding image to form data:', image.name);
-        formData.append('image', image);
-      } else if (imagePreview) {
-        // If we have an image preview but no File object, convert the data URL to a File
-        console.log('Converting image preview to file');
+      // Use the original File object if available, otherwise convert dataURL back
+      if (imageFile) {
+        console.log('Adding original image file to form data:', imageFile.name);
+        formData.append('image', imageFile);
+      } else if (imagePreview) { // Use imagePreview (dataURL) as fallback
+        console.log('Converting image preview data URL back to file for upload');
         try {
           const response = await fetch(imagePreview);
           const blob = await response.blob();
-          const file = new File([blob], 'image.jpg', { type: 'image/jpeg' });
-          formData.append('image', file);
+          const mimeType = imagePreview.match(/data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+).*,.*/)?.[1] || 'image/jpeg';
+          const fileExtension = mimeType.split('/')[1] || 'jpg';
+          const uploadFile = new File([blob], `image.${fileExtension}`, { type: mimeType });
+          formData.append('image', uploadFile);
         } catch (error) {
-          console.error('Error converting image preview to file:', error);
+          console.error('Error converting image preview data URL to file for upload:', error);
         }
       }
       
@@ -222,15 +216,13 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
       const data = await response.json();
       console.log('Location created successfully:', data);
       
-      // If we have regions, save them
+      // If we have regions, save them (Keep sequential saving for stability)
       if (regions.length > 0 && data.id) {
         console.log(`Saving ${regions.length} regions for location ID ${data.id}`);
-        
-        // Save regions sequentially instead of using Promise.all
         let failedCount = 0;
         for (const region of regions) {
           try {
-            const response = await fetch(`/api/locations/${data.id}/regions`, {
+            const regionResponse = await fetch(`/api/locations/${data.id}/regions`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -238,8 +230,8 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
               body: JSON.stringify(region),
             });
             
-            if (!response.ok) {
-              const errorText = await response.text();
+            if (!regionResponse.ok) {
+              const errorText = await regionResponse.text();
               console.error(`Failed to save region: ${errorText}`);
               failedCount++;
             } else {
@@ -250,18 +242,15 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
             failedCount++;
           }
         }
-        
-        if (failedCount > 0) {
-          console.error(`${failedCount} regions failed to save`);
-        } else {
-          console.log('All regions saved successfully');
-        }
+        if (failedCount > 0) console.error(`${failedCount} regions failed to save`);
+        else console.log('All regions saved successfully');
       }
       
+      // Clear form state AFTER successful submission and region saving
       setName('');
       setDescription('');
-      setImage(null);
-      setImagePreview(null);
+      setImageFile(null);
+      setImagePreview(null); // This triggers the useEffect to hide the mapper
       setRegions([]);
       setLocationType('');
       
@@ -269,9 +258,11 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
         onSuccess();
       }
       
-      router.refresh();
+      router.refresh(); // Refresh to show updated data
     } catch (error) {
       console.error('Error creating location:', error);
+      // Add user feedback here (e.g., toast notification)
+      alert(`Error creating location: ${error instanceof Error ? error.message : String(error)}`); // Simple placeholder alert
     } finally {
       setIsSubmitting(false);
     }
@@ -283,7 +274,6 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
 
   // New function to trigger drawing mode in RegionMapper
   const startDrawingNewRegion = () => {
-    // Add a custom event that the RegionMapper can listen for
     const event = new CustomEvent('startDrawingRegion', { bubbles: true });
     document.dispatchEvent(event);
     setIsDrawingActive(true);
@@ -378,17 +368,16 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                 </div>
                 <ImageInput 
                   onImageChange={handleImageChange}
-                  initialPreview={imagePreview}
+                  initialPreview={null}
                   hideLabel={true}
                 />
               </div>
             ) : (
               <div className="relative rounded overflow-visible" style={{ width: '100%', height: 'auto', border: '1px solid var(--border)' }}>
-                {/* Hide the image when RegionMapper is displayed */}
                 {!showRegionMapper ? (
                   <>
                     <img 
-                      src={imagePreview} 
+                      src={imagePreview}
                       alt={t('locations.imagePreview')}
                       className="object-contain w-full bg-background dark:bg-muted"
                       style={{ maxHeight: '80vh' }}
@@ -425,18 +414,10 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                             }}
                             onClick={() => {
                               setSelectedRegion(region);
-                              // Ensure image data is available before showing mapper
-                              if (!imageData && imagePreview) {
-                                convertBlobToDataURL(imagePreview).then(dataUrl => {
-                                  setImageData(dataUrl);
-                                  setShowRegionMapper(true);
-                                }).catch(err => {
-                                  console.error('Failed to convert image before showing RegionMapper:', err);
-                                  setImageData(imagePreview);
-                                  setShowRegionMapper(true);
-                                });
-                              } else {
+                              if (imagePreview) {
                                 setShowRegionMapper(true);
+                              } else {
+                                console.warn("Trying to show region mapper but no imagePreview is available.");
                               }
                             }}
                           >
@@ -456,13 +437,13 @@ export function LocationForm({ parentId = null, onSuccess }: LocationFormProps) 
                 ) : (
                   <div className="bg-background dark:bg-background" style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
                     <FixedSizeRegionMapper
-                      imageSrc={imageData || imageUrlRef.current || placeholderImage}
+                      imageSrc={imagePreview || placeholderImage}
                       initialRegions={regions}
                       onComplete={handleRegionsChange}
                       autoStartDrawing={true}
                     />
                     {/* Debug info to see if image source is available */}
-                    {(!imageData && !imageUrlRef.current) && (
+                    {(!imagePreview) && (
                       <div className="absolute top-2 left-2 bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded z-50">
                         {t('regions.noImage')}
                       </div>
