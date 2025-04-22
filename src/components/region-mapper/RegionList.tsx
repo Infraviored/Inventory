@@ -1,16 +1,17 @@
 "use client";
 
 import React from 'react';
-import { ActiveRegion } from './types';
+import { Region } from './types';
 import { useLanguage } from '@/lib/language';
 
 interface RegionListProps {
-  regions: ActiveRegion[];
-  onSelectRegion: (regionId: string) => void;
-  onRemoveRegion: (regionId: string) => void;
+  regions: Region[];
+  selectedRegionIndex: number | null;
+  onSelectRegion: (index: number) => void;
+  onRemoveRegion: (index: number) => void;
 }
 
-export function RegionList({ regions, onSelectRegion, onRemoveRegion }: RegionListProps) {
+export function RegionList({ regions, selectedRegionIndex, onSelectRegion, onRemoveRegion }: RegionListProps) {
   const { t } = useLanguage();
 
   if (regions.length === 0) {
@@ -24,20 +25,20 @@ export function RegionList({ regions, onSelectRegion, onRemoveRegion }: RegionLi
       </h4>
       <div className="max-h-[400px] overflow-y-auto">
         <ul className="space-y-2">
-          {regions.map((region) => (
+          {regions.map((region, index) => (
             <li 
-              key={region.id} 
+              key={`list-region-${index}`}
               className={`flex justify-between items-center p-2 rounded-md cursor-pointer
-                         ${region.isSelected 
+                         ${index === selectedRegionIndex
                            ? 'bg-yellow-500/10 border border-yellow-500 dark:bg-yellow-500/5 dark:border-yellow-400' 
                            : 'bg-background hover:bg-muted dark:hover:bg-muted/50'}`}
-              onClick={() => onSelectRegion(region.id)}
+              onClick={() => onSelectRegion(index)}
             >
               <div className="flex items-center space-x-2">
                 <div 
-                  className={`w-4 h-4 ${region.isSelected ? 'bg-yellow-500 dark:bg-yellow-400' : 'bg-primary dark:bg-primary'}`}
+                  className={`w-4 h-4 ${index === selectedRegionIndex ? 'bg-yellow-500 dark:bg-yellow-400' : 'bg-primary dark:bg-primary'}`}
                   style={{
-                    aspectRatio: `${region.width} / ${region.height}`
+                    aspectRatio: region.width && region.height ? `${region.width} / ${region.height}` : '1 / 1'
                   }}
                 />
                 <span className="text-foreground">
@@ -50,7 +51,7 @@ export function RegionList({ regions, onSelectRegion, onRemoveRegion }: RegionLi
                   className="p-1 text-destructive hover:bg-destructive/10 rounded-sm dark:text-red-400 dark:hover:bg-red-900/30"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onRemoveRegion(region.id);
+                    onRemoveRegion(index);
                   }}
                   aria-label={t('common.delete') || "Delete"}
                   title={t('common.delete') || "Delete"}

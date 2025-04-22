@@ -45,7 +45,8 @@
       "name": "Name",
       "description": "Description",
       "image": "Image"
-    }
+    },
+    "clearImage": "Clear Image"
   },
   "form": {
     "steps": {
@@ -191,6 +192,10 @@
     "takePhoto": "Take Photo",
     "noImage": "No Image",
     "imageUploaded": "Image Uploaded",
-    "imageUploadError": "Image Upload Error"
+    "imageUploadError": "Image Upload Error",
+    "preview": "Preview",
+    "remove": "Remove",
+    "uploadSuccess": "Image uploaded successfully",
+    "defineRegions": "Define Regions"
   }
 }

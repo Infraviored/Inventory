@@ -11,6 +11,29 @@ import { RegionMapper } from './region-mapper';
 import { useLanguage } from '@/lib/language';
 import { XIcon, PlusIcon } from 'lucide-react';
 
+// --- Type Definitions --- 
+// (These should ideally be in a shared types file)
+interface LocationRegion {
+    name: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+interface Location {
+    id: number;
+    name: string;
+    description: string | null;
+    parentId: number | null;
+    imagePath: string | null;
+    locationType: string | null;
+    createdAt?: string; // Optional fields from DB
+    updatedAt?: string;
+}
+interface LocationDetails extends Location {
+    regions: LocationRegion[];
+}
+
 // Custom wrapper to constrain RegionMapper to fixed dimensions
 function FixedSizeRegionMapper({
   imageSrc, 
@@ -19,8 +42,8 @@ function FixedSizeRegionMapper({
   autoStartDrawing
 }: {
   imageSrc: string;
-  initialRegions: Array<{name: string, x: number, y: number, width: number, height: number}>;
-  onComplete: (regions: Array<{name: string, x: number, y: number, width: number, height: number}>) => void;
+  initialRegions: LocationRegion[];
+  onComplete: (regions: LocationRegion[]) => void;
   autoStartDrawing?: boolean;
 }) {
   const { t } = useLanguage();
@@ -84,112 +107,88 @@ function FixedSizeRegionMapper({
   );
 }
 
+// --- LocationForm Props --- 
+// Define the explicit shape LocationForm expects for its initial data
+interface LocationFormInitialData {
+    id: number;
+    name: string;
+    description: string | null;
+    locationType: string | null;
+    imagePath: string | null;
+    parentId: number | null;
+    regions: LocationRegion[]; // Use the existing LocationRegion type
+}
+
 interface LocationFormProps {
   parentId?: number | null;
-  locationId?: number | null;
+  locationId?: number | null; 
+  initialData?: LocationFormInitialData | null; // Use the new specific type
   onSuccess?: () => void;
 }
 
-export function LocationForm({ parentId = null, locationId = null, onSuccess }: LocationFormProps) {
+export function LocationForm({ 
+    parentId = null, 
+    locationId = null, 
+    initialData = null, // Prop type updated
+    onSuccess 
+}: LocationFormProps) {
   // --- HOOKS --- 
   const { t } = useLanguage();
+  const router = useRouter(); // Keep for potential redirects
+
+  // Form state - Initialized based on initialData later
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [locationType, setLocationType] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null); // For new uploads
+  const [imagePreview, setImagePreview] = useState<string | null>(null); // Current image shown
+  const [regions, setRegions] = useState<LocationRegion[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [regions, setRegions] = useState<Array<{name: string, x: number, y: number, width: number, height: number}>>([]);
-  const [locationType, setLocationType] = useState<string>('');
-  const [showRegionMapper, setShowRegionMapper] = useState(false);
-  const [selectedRegion, setSelectedRegion] = useState<{name: string, x: number, y: number, width: number, height: number} | null>(null);
-  const [isDrawingActive, setIsDrawingActive] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  const [clearImage, setClearImage] = useState(false);
-  const router = useRouter();
+  const [clearImage, setClearImage] = useState(false); // Flag to signal image removal on submit
   
-  // --- DEFINE isEditing EARLY --- 
+  // Region Mapper related state
+  const [showRegionMapper, setShowRegionMapper] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState<LocationRegion | null>(null);
+  const [isDrawingActive, setIsDrawingActive] = useState(false);
+
+  // --- Determine edit mode --- 
   const isEditing = locationId !== null;
 
-  // A small transparent placeholder image as fallback (1x1 pixel transparent PNG)
+  // Placeholder image remains the same
   const placeholderImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
-  // Fetch location data when editing
+  // --- Effect to initialize state from initialData --- 
   useEffect(() => {
-    const fetchLocationData = async () => {
-      if (!locationId || initialLoadComplete) return; // Only fetch if locationId is provided and not loaded yet
+    console.log("[LocationForm] Initializing state with initialData:", initialData);
+    if (initialData) {
+      setName(initialData.name || '');
+      setDescription(initialData.description || '');
+      setLocationType(initialData.locationType || '');
+      setImagePreview(initialData.imagePath || null);
+      setRegions(Array.isArray(initialData.regions) ? initialData.regions : []);
+      
+      // Show mapper immediately if editing with an image 
+      setShowRegionMapper(!!initialData.imagePath);
+      
+      // Reset other flags
+      setImageFile(null); 
+      setClearImage(false); 
+      setSelectedRegion(null);
+    } else {
+      // Reset form for create mode 
+      setName('');
+      setDescription('');
+      setLocationType('');
+      setImagePreview(null);
+      setRegions([]);
+      setImageFile(null);
+      setClearImage(false);
+      setShowRegionMapper(false); // Ensure mapper is hidden for create mode initially
+    }
+  }, [initialData]);
 
-      console.log(`[LocationForm Edit Mode] Fetching data for location ID: ${locationId}`);
-      setIsLoading(true);
-      setClearImage(false); // Ensure clear flag is false on load
-      try {
-        // Use Promise.all for concurrent fetching
-        const [locationRes, regionsRes] = await Promise.all([
-          fetch(`/api/locations/${locationId}`),
-          fetch(`/api/locations/${locationId}/regions`)
-        ]);
-
-        if (!locationRes.ok) {
-          throw new Error(`Failed to fetch location details: ${locationRes.statusText}`);
-        }
-        if (!regionsRes.ok) {
-          throw new Error(`Failed to fetch location regions: ${regionsRes.statusText}`);
-        }
-
-        const locationData = await locationRes.json();
-        const fetchedRegions = await regionsRes.json();
-
-        console.log('[LocationForm Edit Mode] Fetched Location:', locationData);
-        console.log('[LocationForm Edit Mode] Fetched Regions:', fetchedRegions);
-
-        // Populate form state
-        setName(locationData.name || '');
-        setDescription(locationData.description || '');
-        setLocationType(locationData.locationType || '');
-        // IMPORTANT: Set imagePreview directly from the path provided by the API
-        // The API returns paths like '/uploads/xyz.png', which the browser can load directly
-        setImagePreview(locationData.imagePath || null); 
-        // Do NOT set imageFile here, it will be handled during submission if needed
-
-        // Ensure fetchedRegions is an array and format matches expectations
-        if (Array.isArray(fetchedRegions)) {
-           // Map API response (x, y, width, height) to the state format if needed
-           // Assuming the API returns regions in the correct format: {name, x, y, width, height}
-           setRegions(fetchedRegions.map((r: any) => ({ // Ensure structure matches state
-               name: r.name,
-               x: r.x, // Ensure API returns x, y, width, height
-               y: r.y,
-               width: r.width,
-               height: r.height
-           })));
-        } else {
-            console.warn("Fetched regions data is not an array:", fetchedRegions);
-            setRegions([]);
-        }
-        
-        setInitialLoadComplete(true); // Mark initial load as complete
-
-      } catch (error: any) {
-        console.error('Error fetching location data:', error);
-        alert(`Error loading location data: ${error.message}`);
-        // Optionally redirect or show an error state
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchLocationData();
-  // Add initialLoadComplete to dependency array to prevent re-fetch after successful load
-  }, [locationId, initialLoadComplete]); 
-
-  // Display loading indicator while fetching
-  if (isLoading && locationId) {
-    return <div className="text-center p-10">{t('common.loading')}</div>;
-  }
-
-  // Function to convert blob URL to data URL for persistence
+  // Function to convert blob URL remains the same
   const convertBlobToDataURL = async (blobUrl: string): Promise<string> => {
-    // No try-catch here, let the caller handle errors
     console.log('Attempting to fetch blob:', blobUrl);
     const response = await fetch(blobUrl);
     if (!response.ok) {
@@ -208,40 +207,42 @@ export function LocationForm({ parentId = null, locationId = null, onSuccess }: 
     });
   };
 
-  // Handle image loading and change clearImage logic
+  // Handle image loading and change clearImage logic (mostly unchanged)
   const handleImageChange = async (file: File | null, previewUrl?: string) => {
-    // Reset clearImage if a new file is selected
     if (file || (previewUrl && !previewUrl.startsWith('blob:'))) { 
-      setClearImage(false);
+      setClearImage(false); // Reset clear flag if new image selected
     }
     setImageFile(file); 
 
     if (previewUrl) {
       if (previewUrl.startsWith('blob:')) {
         try {
+          // Convert blob immediately for stability
           console.log('Converting blob URL immediately:', previewUrl);
           const dataUrl = await convertBlobToDataURL(previewUrl);
-          setImagePreview(dataUrl); // Set preview to stable data URL
+          setImagePreview(dataUrl);
           console.log('Image converted and stored as data URL for preview');
-          // URL.revokeObjectURL(previewUrl); // Optional: revoke if needed
         } catch (error) {
           console.error('Failed to convert blob to data URL immediately:', error);
           setImagePreview(null);
-          setImageFile(null); // Clear file if conversion failed
+          setImageFile(null);
         }
       } else {
+        // Use provided non-blob URL directly
         setImagePreview(previewUrl);
       }
     } else {
       // Image cleared via ImageInput component
       setImagePreview(null);
       if (isEditing) { 
+        // Only set clear flag if editing and image explicitly cleared
         console.log("Image cleared during edit, setting clearImage flag.");
         setClearImage(true);
       }
     }
   };
 
+  // handleSubmit remains largely the same, using isEditing flag
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -256,17 +257,15 @@ export function LocationForm({ parentId = null, locationId = null, onSuccess }: 
       if (imageFile) {
         formData.append('image', imageFile);
       } else if (isEditing && clearImage) {
+        // Only send clearImage flag if editing and flag is true
         formData.append('clearImage', 'true');
         console.log('[handleSubmit] Sending clearImage=true flag.');
       }
 
-      // Region handling
-      if (regions.length > 0) {
-        formData.append('regions', JSON.stringify(regions));
-      } else if (isEditing) {
-         formData.append('regions', '[]');
-      }
+      // Region handling - always send regions array (even if empty)
+      formData.append('regions', JSON.stringify(regions));
       
+      // Determine URL and Method based on isEditing
       const targetUrl = isEditing ? `/api/locations/${locationId}` : '/api/locations';
       const method = isEditing ? 'PUT' : 'POST';
 
@@ -289,24 +288,21 @@ export function LocationForm({ parentId = null, locationId = null, onSuccess }: 
       const data = await response.json();
       console.log(`[handleSubmit] Location ${isEditing ? 'updated' : 'created'} successfully via Next.js API:`, data);
       
-      // Reset only for create mode (or if explicitly requested by onSuccess?)
+      // Reset form fields only if CREATING a new location successfully
+      // In edit mode, parent component handles closing dialog, no need to reset here
       if (!isEditing) {
-        setName('');
-        setDescription('');
-        setImageFile(null);
-        setImagePreview(null);
-        setRegions([]);
-        setLocationType('');
-        setClearImage(false);
+          // No need to reset here if onSuccess is called, parent handles state.
+          // If needed, add reset logic here for standalone create form.
       }
 
+      // Call onSuccess callback (provided by parent)
       if (onSuccess) {
         onSuccess();
       } else {
-        // Redirect to the updated location page after edit, or new page after create
+        // Fallback redirect if no onSuccess provided (less common with dialogs)
         const resultLocationId = isEditing ? locationId : data.id; 
         router.push(`/locations/${resultLocationId}`); 
-        router.refresh(); // Refresh data on the target page
+        router.refresh();
       }
     } catch (error: any) {
       console.error(`Error ${isEditing ? 'updating' : 'submitting'} location:`, error);
@@ -316,27 +312,29 @@ export function LocationForm({ parentId = null, locationId = null, onSuccess }: 
     }
   };
 
-  const handleRegionsChange = (newRegions: Array<{name: string, x: number, y: number, width: number, height: number}>) => {
+  // handleRegionsChange remains the same
+  const handleRegionsChange = (newRegions: LocationRegion[]) => {
     setRegions(newRegions);
   };
 
-  // New function to trigger drawing mode in RegionMapper
+  // startDrawingNewRegion remains the same
   const startDrawingNewRegion = () => {
     const event = new CustomEvent('startDrawingRegion', { bubbles: true });
     document.dispatchEvent(event);
     setIsDrawingActive(true);
   };
 
-  // Listen for when drawing is completed
+  // drawingComplete listener remains the same
   useEffect(() => {
     const handleDrawingComplete = () => setIsDrawingActive(false);
     document.addEventListener('drawingComplete', handleDrawingComplete);
     return () => document.removeEventListener('drawingComplete', handleDrawingComplete);
   }, []);
 
+  // --- RETURN JSX --- 
+  // (JSX structure remains largely the same, but button disabled logic changes)
   return (
     <div className="space-y-6">
-      {/* Progress indicator */}
       <div className="w-full mb-6">
         <div className="flex justify-between mb-2">
           <div className={`text-sm font-medium ${!imagePreview ? 'text-primary dark:text-primary' : 'text-foreground'}`}>
@@ -363,53 +361,54 @@ export function LocationForm({ parentId = null, locationId = null, onSuccess }: 
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="name">{t('common.fields.name')} *</Label>
-          <Input
-            id="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t('common.fields.name')}
-            required
-          />
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="locationType">{t('locations.type')} ({t('common.optional')})</Label>
-          <select
-            id="locationType"
-            value={locationType}
-            onChange={(e) => setLocationType(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border"
-          >
-            <option value="">{t('locations.types.selectType')}</option>
-            <option value="room">{t('locations.types.room')}</option>
-            <option value="cabinet">{t('locations.types.cabinet')}</option>
-            <option value="drawer">{t('locations.types.drawer')}</option>
-            <option value="shelf">{t('locations.types.shelf')}</option>
-            <option value="box">{t('locations.types.box')}</option>
-            <option value="other">{t('locations.types.other')}</option>
-          </select>
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="description">{t('common.fields.description')}</Label>
-          <Textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder={t('common.fields.description')}
-            rows={3}
-          />
-        </div>
-        
-        <div className="space-y-4">
+      <form onSubmit={handleSubmit} className="flex flex-col space-y-4 h-full flex-grow">
+        <div className="space-y-4 flex-shrink-0">
           <div className="space-y-2">
-            <Label htmlFor="image">{`${t('common.fields.image')} (${t('common.optional')})`}</Label>
+            <Label htmlFor="name">{t('common.fields.name')} *</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t('common.fields.name')}
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="locationType">{t('locations.type')} ({t('common.optional')})</Label>
+            <select
+              id="locationType"
+              value={locationType}
+              onChange={(e) => setLocationType(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border"
+            >
+              <option value="">{t('locations.types.selectType')}</option>
+              <option value="room">{t('locations.types.room')}</option>
+              <option value="cabinet">{t('locations.types.cabinet')}</option>
+              <option value="drawer">{t('locations.types.drawer')}</option>
+              <option value="shelf">{t('locations.types.shelf')}</option>
+              <option value="box">{t('locations.types.box')}</option>
+              <option value="other">{t('locations.types.other')}</option>
+            </select>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="description">{t('common.fields.description')}</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={t('common.fields.description')}
+              rows={3}
+            />
+          </div>
+        </div>
+        
+        <div className="space-y-2 flex-grow min-h-0">
+          <Label htmlFor="image">{`${t('common.fields.image')} (${t('common.optional')})`}</Label>
             
             {!imagePreview ? (
-              <div className="flex flex-col items-center justify-center border border-dashed border-border rounded-md bg-muted/50 dark:bg-muted/20 dark:border-border p-6 text-center">
+              <div className="flex flex-col items-center justify-center border border-dashed border-border rounded-md bg-muted/50 dark:bg-muted/20 dark:border-border p-6 text-center h-full">
                 <div className="mb-4">
                   <div className="text-lg font-medium mb-2 text-foreground">{t('locations.uploadImage')}</div>
                   <p className="text-muted-foreground mb-4">{t('locations.imageInstructions')}</p>
@@ -421,109 +420,55 @@ export function LocationForm({ parentId = null, locationId = null, onSuccess }: 
                 />
               </div>
             ) : (
-              <div className="relative rounded overflow-visible" style={{ width: '100%', height: 'auto', border: '1px solid var(--border)' }}>
-                {!showRegionMapper ? (
-                  <>
-                    <img 
-                      src={imagePreview}
-                      alt={t('locations.imagePreview')}
-                      className="object-contain w-full bg-background dark:bg-muted"
-                      style={{ maxHeight: '80vh' }}
-                    />
-                    
-                    {!regions.length && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 text-white p-6 text-center dark:bg-black dark:bg-opacity-60">
-                        <div className="bg-black bg-opacity-70 p-6 rounded-lg max-w-md dark:bg-black/80">
-                          <p className="text-xl font-bold mb-2">{t('regions.defineAreas')}</p>
-                          <p className="mb-4">{t('regions.defineAreasDescription')}</p>
-                          <Button
-                            type="button"
-                            className="flex items-center"
-                            onClick={() => setShowRegionMapper(true)}
-                          >
-                            <PlusIcon className="w-5 h-5 mr-2" /> 
-                            {t('regions.startDefining')}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {regions.length > 0 && (
-                      <div className="absolute inset-0">
-                        {regions.map((region, i) => (
-                          <div
-                            key={`static-${i}`}
-                            className="absolute border-2 border-primary dark:border-primary bg-primary/20 dark:bg-primary/20 hover:bg-primary/30 dark:hover:bg-primary/30 transition-all duration-200 cursor-pointer"
-                            style={{
-                              left: `${region.x}%`,
-                              top: `${region.y}%`,
-                              width: `${region.width}%`,
-                              height: `${region.height}%`,
-                            }}
-                            onClick={() => {
-                              setSelectedRegion(region);
-                              setShowRegionMapper(true);
-                            }}
-                          >
-                            <div className="absolute top-0 left-0 bg-primary dark:bg-primary text-primary-foreground text-xs px-1">
-                              {region.name || `${t('regions.region')} ${i + 1}`}
-                            </div>
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                              <div className="bg-primary/70 dark:bg-primary/70 text-primary-foreground rounded-md px-2 py-1 text-xs shadow-md">
-                                {t('regions.clickToEdit')}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="bg-background dark:bg-background" style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
-                    <FixedSizeRegionMapper
-                      key={imagePreview}
-                      imageSrc={imagePreview || placeholderImage}
-                      initialRegions={regions}
-                      onComplete={handleRegionsChange}
-                      autoStartDrawing={!regions.length} // Revert autoStartDrawing logic
-                    />
-                    {/* Debug info to see if image source is available */}
-                    {(!imagePreview) && (
-                      <div className="absolute top-2 left-2 bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded z-50">
-                        {t('regions.noImage')}
-                      </div>
-                    )}
-                    
-                    {/* Add Region Button */}
-                    <Button
-                      type="button"
-                      className={`absolute bottom-4 right-4 z-50 ${isDrawingActive ? 'bg-secondary text-secondary-foreground hover:bg-secondary/90' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
-                      onClick={startDrawingNewRegion}
-                      disabled={!imagePreview}
-                    >
-                      <PlusIcon className="w-4 h-4 mr-1" /> {isDrawingActive ? t('regions.drawing') : t('regions.addRegion')}
-                    </Button>
-                  </div>
-                )}
+              <div className="relative rounded border border-border overflow-hidden h-full flex flex-col">
                 
-                {/* Region count indicator - Always shown even when the mapper is open */}
-                {regions.length > 0 && (
-                  <div className="absolute top-4 right-4 bg-primary text-primary-foreground text-sm px-2 py-1 rounded-full z-50">
-                    {regions.length} {regions.length === 1 ? t('regions.regionSingular') : t('regions.regionPlural')}
-                  </div>
-                )}
+                <div className="bg-background dark:bg-background relative flex-grow min-h-0 flex items-center justify-center">
+                  <FixedSizeRegionMapper
+                    key={imagePreview} 
+                    imageSrc={imagePreview || placeholderImage} 
+                    initialRegions={regions}
+                    onComplete={handleRegionsChange}
+                    autoStartDrawing={!isEditing && !regions.length} 
+                  />
+                  
+                  <Button
+                    type="button"
+                    className={`absolute bottom-4 right-4 z-50 ${isDrawingActive ? 'bg-secondary text-secondary-foreground hover:bg-secondary/90' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
+                    onClick={startDrawingNewRegion}
+                    disabled={!imagePreview || isDrawingActive} 
+                  >
+                    <PlusIcon className="w-4 h-4 mr-1" /> {isDrawingActive ? t('regions.drawing') : t('regions.addRegion')}
+                  </Button>
+                  
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="absolute top-4 left-4 z-50"
+                    onClick={() => handleImageChange(null, undefined)} 
+                  >
+                    <XIcon className="w-4 h-4 mr-1" /> {t('common.clearImage')}
+                  </Button>
+                  
+                  {(!imagePreview) && (
+                    <div className="absolute top-12 left-4 bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded z-50">
+                      {t('regions.noImage')}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
-          </div>
         </div>
         
-        <Button 
-          type="submit" 
-          disabled={isSubmitting || (isLoading && locationId !== null)} 
-          className="w-full"
-        >
-          {isSubmitting ? t('common.loading') : t('common.save')}
-        </Button>
+        <div className="flex-shrink-0 pt-4">
+            <Button 
+              type="submit" 
+              disabled={isSubmitting}
+              className="w-full"
+            >
+              {isSubmitting ? t('common.loading') : t('common.save')}
+            </Button>
+        </div>
       </form>
     </div>
   );
