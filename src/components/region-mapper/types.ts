@@ -38,3 +38,12 @@ export interface SnapPositions {
   centerX: number[];
   centerY: number[];
 }
+
+// --- Added Magnetism Configuration Type ---
+export type MagnetismType = 'none' | 'edges' | 'distance';
+
+export interface MagnetismConfig {
+  type: MagnetismType;
+  distance: number;
+}
+// --- End Added Type ---

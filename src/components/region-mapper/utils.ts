@@ -1,14 +1,18 @@
-import { ActiveRegion, SnapPositions, Point, Size } from './types';
+import { ActiveRegion, SnapPositions, Point, Size, MagnetismConfig } from './types';
 
-// Snap threshold in pixels - reduced for more precise control
-export const SNAP_THRESHOLD = 5;
-
-// Find snap positions based on other regions
+// Find snap positions based on other regions and config
 export function findSnapPositions(
   regions: ActiveRegion[], 
   currentRegion: ActiveRegion | null,
-  imageSize: Size
+  imageSize: Size,
+  config: MagnetismConfig
 ): SnapPositions {
+  if (config.type === 'none') {
+    return {
+      x: [], y: [], right: [], bottom: [], centerX: [], centerY: []
+    };
+  }
+
   const snapPositions: SnapPositions = {
     x: [],        // Left edge positions
     y: [],        // Top edge positions
@@ -76,64 +80,60 @@ export function findSnapPositions(
     snapPositions.right.push(region.x + region.width); // Right edge  
     snapPositions.bottom.push(region.y + region.height); // Bottom edge
     
-    // For each edge of other regions, add corresponding alignment positions
-    // This enables edge-to-edge snapping in all directions
-    
-    // Current region left edge can snap to other region right edge
-    snapPositions.x.push(region.x + region.width);
-    
-    // Current region right edge can snap to other region left edge
-    snapPositions.right.push(region.x);
-    
-    // Current region top edge can snap to other region bottom edge
-    snapPositions.y.push(region.y + region.height);
-    
-    // Current region bottom edge can snap to other region top edge
-    snapPositions.bottom.push(region.y);
-    
-    // Now add relative distance snapping positions
-    
-    // For horizontal distances (add to both left and right)
-    horizontalDistances.forEach(distance => {
-      // Left edge at 'distance' away from this region's edges
-      snapPositions.x.push(region.x - distance);
-      snapPositions.x.push(region.x + region.width + distance);
-      
-      // Right edge at 'distance' away from this region's edges
-      snapPositions.right.push(region.x + distance);
-      snapPositions.right.push(region.x + region.width - distance);
-    });
-    
-    // For vertical distances (add to both top and bottom)
-    verticalDistances.forEach(distance => {
-      // Top edge at 'distance' away from this region's edges
-      snapPositions.y.push(region.y - distance);
-      snapPositions.y.push(region.y + region.height + distance);
-      
-      // Bottom edge at 'distance' away from this region's edges
-      snapPositions.bottom.push(region.y + distance);
-      snapPositions.bottom.push(region.y + region.height - distance);
-    });
-    
-    // Add center alignment
-    const centerX = region.x + region.width / 2;
-    const centerY = region.y + region.height / 2;
-    
-    snapPositions.centerX.push(centerX);
-    snapPositions.centerY.push(centerY);
+    // --- Edge Snapping (Applies if type is 'edges' or 'distance') ---
+    if (config.type === 'edges' || config.type === 'distance') {
+      // Current region left edge can snap to other region right edge
+      snapPositions.x.push(region.x + region.width); 
+      // Current region right edge can snap to other region left edge
+      snapPositions.right.push(region.x);
+      // Current region top edge can snap to other region bottom edge
+      snapPositions.y.push(region.y + region.height); 
+      // Current region bottom edge can snap to other region top edge
+      snapPositions.bottom.push(region.y);
+      // Center alignment is also considered part of edge/structure snapping
+      const centerX = region.x + region.width / 2;
+      const centerY = region.y + region.height / 2;
+      snapPositions.centerX.push(centerX);
+      snapPositions.centerY.push(centerY);
+    }
+    // --- End Edge Snapping ---
+
+    // --- Distance Snapping (Only if type is 'distance') ---
+    if (config.type === 'distance') {
+        // For horizontal distances (add to both left and right)
+        horizontalDistances.forEach(distance => {
+          // Left edge at 'distance' away from this region's edges
+          snapPositions.x.push(region.x - distance);
+          snapPositions.x.push(region.x + region.width + distance);
+          // Right edge at 'distance' away from this region's edges
+          snapPositions.right.push(region.x + distance);
+          snapPositions.right.push(region.x + region.width - distance);
+        });
+        
+        // For vertical distances (add to both top and bottom)
+        verticalDistances.forEach(distance => {
+          // Top edge at 'distance' away from this region's edges
+          snapPositions.y.push(region.y - distance);
+          snapPositions.y.push(region.y + region.height + distance);
+          // Bottom edge at 'distance' away from this region's edges
+          snapPositions.bottom.push(region.y + distance);
+          snapPositions.bottom.push(region.y + region.height - distance);
+        });
+    }
+    // --- End Distance Snapping ---
   });
   
   return snapPositions;
 }
 
-// Find nearest snap position
-export function findNearestSnap(value: number, positions: number[]): number | null {
+// Find nearest snap position using configurable distance
+export function findNearestSnap(value: number, positions: number[], snapDistance: number): number | null {
   let nearest = null;
-  let minDistance = SNAP_THRESHOLD + 1;
+  let minDistance = snapDistance + 1;
   
   for (const pos of positions) {
     const distance = Math.abs(value - pos);
-    if (distance < SNAP_THRESHOLD && distance < minDistance) {
+    if (distance < snapDistance && distance < minDistance) {
       nearest = pos;
       minDistance = distance;
     }
@@ -142,7 +142,7 @@ export function findNearestSnap(value: number, positions: number[]): number | nu
   return nearest;
 }
 
-// Apply snapping to coordinates
+// Apply snapping to coordinates using config
 export function applySnapping(
   x: number, 
   y: number, 
@@ -150,52 +150,66 @@ export function applySnapping(
   height: number, 
   regions: ActiveRegion[],
   currentRegion: ActiveRegion | null,
-  imageSize: Size
+  imageSize: Size,
+  config: MagnetismConfig,
+  isResizing: boolean = false
 ): { x: number; y: number; width: number; height: number } {
-  const snapPositions = findSnapPositions(regions, currentRegion, imageSize);
   
-  // Check for snapping on edges
-  const snapX = findNearestSnap(x, snapPositions.x);
-  const snapRight = findNearestSnap(x + width, snapPositions.right);
-  const snapY = findNearestSnap(y, snapPositions.y);
-  const snapBottom = findNearestSnap(y + height, snapPositions.bottom);
+  if (config.type === 'none') {
+    return { x, y, width, height };
+  }
+
+  const snapPositions = findSnapPositions(regions, currentRegion, imageSize, config);
+  const snapDistance = config.distance;
   
-  // Check for center alignment
-  const centerX = x + width / 2;
-  const snapCenterX = findNearestSnap(centerX, snapPositions.centerX);
-  
-  const centerY = y + height / 2;
-  const snapCenterY = findNearestSnap(centerY, snapPositions.centerY);
-  
-  // Calculate new position with priority: edges first, then centers
   let newX = x;
   let newY = y;
-  
-  // Apply edge snapping with priority
-  if (snapX !== null) {
-    newX = snapX;
-  } else if (snapRight !== null) {
-    newX = snapRight - width;
-  } else if (snapCenterX !== null) {
-    // Center alignment (only if edges didn't snap)
-    newX = snapCenterX - width / 2;
+  let newWidth = width;
+  let newHeight = height;
+
+  if (isResizing) {
+    const snapRight = findNearestSnap(x + width, snapPositions.right, snapDistance);
+    const snapBottom = findNearestSnap(y + height, snapPositions.bottom, snapDistance);
+
+    if (snapRight !== null) {
+        newWidth = snapRight - x; 
+    }
+    if (snapBottom !== null) {
+        newHeight = snapBottom - y;
+    }
+    newWidth = Math.max(10, newWidth);
+    newHeight = Math.max(10, newHeight);
+    
+    return { x, y, width: newWidth, height: newHeight };
+
+  } else {
+    const snapX = findNearestSnap(x, snapPositions.x, snapDistance);
+    const snapRight = findNearestSnap(x + width, snapPositions.right, snapDistance);
+    const snapY = findNearestSnap(y, snapPositions.y, snapDistance);
+    const snapBottom = findNearestSnap(y + height, snapPositions.bottom, snapDistance);
+    const centerX = x + width / 2;
+    const snapCenterX = findNearestSnap(centerX, snapPositions.centerX, snapDistance);
+    const centerY = y + height / 2;
+    const snapCenterY = findNearestSnap(centerY, snapPositions.centerY, snapDistance);
+    
+    if (snapX !== null) {
+      newX = snapX;
+    } else if (snapRight !== null) {
+      newX = snapRight - width;
+    } else if (snapCenterX !== null && (config.type === 'edges' || config.type === 'distance')) {
+      newX = snapCenterX - width / 2;
+    }
+    
+    if (snapY !== null) {
+      newY = snapY;
+    } else if (snapBottom !== null) {
+      newY = snapBottom - height;
+    } else if (snapCenterY !== null && (config.type === 'edges' || config.type === 'distance')) {
+      newY = snapCenterY - height / 2;
+    }
+
+    return { x: newX, y: newY, width, height };
   }
-  
-  if (snapY !== null) {
-    newY = snapY;
-  } else if (snapBottom !== null) {
-    newY = snapBottom - height;
-  } else if (snapCenterY !== null) {
-    // Center alignment (only if edges didn't snap)
-    newY = snapCenterY - height / 2;
-  }
-  
-  return {
-    x: newX,
-    y: newY,
-    width,
-    height
-  };
 }
 
 // Create a new region with a unique ID

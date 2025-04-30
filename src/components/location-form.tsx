@@ -53,17 +53,10 @@ function FixedSizeRegionMapper({
     // Add a style tag to force the RegionMapper's image to use object-contain
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
-      .region-mapper img {
-        object-fit: contain !important;
-        width: auto !important;
-        height: auto !important;
-        max-width: 100% !important;
-        max-height: 100vh !important;
-      }
+      /* .region-mapper img removed - conflicting with RegionMapper component styles */
       .region-mapper .relative.border.rounded-md.overflow-hidden,
       .region-mapper .relative.border.border-border.rounded-md.overflow-hidden.dark\\:border-border {
         width: 100% !important;
-        height: auto !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -424,7 +417,6 @@ export function LocationForm({
                 
                 <div className="bg-background dark:bg-background relative flex-grow min-h-0 flex items-center justify-center">
                   <FixedSizeRegionMapper
-                    key={imagePreview} 
                     imageSrc={imagePreview || placeholderImage} 
                     initialRegions={regions}
                     onComplete={handleRegionsChange}

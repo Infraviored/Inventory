@@ -1,59 +1,70 @@
 "use client";
 
 import React from 'react';
-import { Region } from './types';
 import { useLanguage } from '@/lib/language';
 
 interface RegionDisplayProps {
-  region: Region;
+  displayX: number;
+  displayY: number;
+  displayWidth: number;
+  displayHeight: number;
+  name: string | null;
   isSelected: boolean;
   isResizing: boolean;
-  onToggleResize: () => void;
   onDuplicate: () => void;
   onRemove: () => void;
   className?: string;
+  defaultBorderColor: string;
+  selectedBorderColor: string;
+  borderWidth: number;
 }
 
 export function RegionDisplay({
-  region,
+  displayX,
+  displayY,
+  displayWidth,
+  displayHeight,
+  name,
   isSelected,
   isResizing,
-  onToggleResize,
   onDuplicate,
   onRemove,
-  className = ''
+  className = '',
+  defaultBorderColor,
+  selectedBorderColor,
+  borderWidth
 }: RegionDisplayProps) {
   const { t } = useLanguage();
   
   const baseClasses = "absolute";
-  const borderClasses = isSelected 
-      ? 'border-2 border-yellow-500 dark:border-yellow-400' 
-      : 'border border-primary dark:border-primary';
-  const bgClasses = isSelected 
-      ? 'bg-yellow-100/20 dark:bg-yellow-900/10'
-      : 'bg-primary/10 dark:bg-primary/10';
   const zIndex = isSelected ? 20 : 10;
+
+  // Determine border styles based on props and state
+  const borderColor = isSelected ? selectedBorderColor : defaultBorderColor;
+  const bgColor = isSelected ? `${selectedBorderColor}1A` : `${defaultBorderColor}1A`; // Approx bg opacity
 
   return (
     <div
-      className={`${baseClasses} ${borderClasses} ${bgClasses} ${className}`}
+      className={`${baseClasses} ${className}`}
       style={{
-        left: `${region.x}px`,
-        top: `${region.y}px`,
-        width: `${region.width}px`,
-        height: `${region.height}px`,
+        left: `${displayX}px`,
+        top: `${displayY}px`,
+        width: `${displayWidth}px`,
+        height: `${displayHeight}px`,
         pointerEvents: 'none',
-        zIndex: zIndex
+        zIndex: zIndex,
+        border: `${borderWidth}px solid ${borderColor}`,
+        backgroundColor: bgColor,
       }}
     >
       <div 
         className={`absolute top-0 left-0 px-1 text-xs font-medium pointer-events-auto
                      ${isSelected ? 'bg-yellow-500 text-yellow-50 dark:bg-yellow-400 dark:text-yellow-900' 
                                  : 'bg-primary text-primary-foreground dark:bg-primary'}`}
-        title={region.name || t('regions.unnamed') || "Unnamed"}
+        title={name || t('regions.unnamed') || "Unnamed"}
       >
         <span className="block overflow-hidden text-ellipsis whitespace-nowrap max-w-[100px]">
-            {region.name || t('regions.unnamed') || "Unnamed"}
+            {name || t('regions.unnamed') || "Unnamed"}
         </span>
       </div>
       
@@ -102,7 +113,6 @@ export function RegionDisplay({
             height: 24,
             zIndex: 30
           }}
-          onClick={(e) => e.stopPropagation()}
         >
           <div className={`w-5 h-5 ${isResizing ? 'bg-blue-500' : 'bg-yellow-500 dark:bg-yellow-400'} rounded-sm border border-white dark:border-gray-800 shadow-md flex items-center justify-center`}>
           </div>
