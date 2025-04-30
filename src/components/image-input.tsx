@@ -12,9 +12,10 @@ interface ImageInputProps {
   label?: string;
   initialPreview?: string | null;
   hideLabel?: boolean;
+  showUploadSuccessMessage?: boolean;
 }
 
-export function ImageInput({ onImageChange, label = 'Bild', initialPreview = null, hideLabel = false }: ImageInputProps) {
+export function ImageInput({ onImageChange, label, initialPreview = null, hideLabel = false, showUploadSuccessMessage = true }: ImageInputProps) {
   const { t } = useLanguage();
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(initialPreview);
@@ -137,10 +138,12 @@ export function ImageInput({ onImageChange, label = 'Bild', initialPreview = nul
               </Button>
             </div>
             
-            <div className="p-3 border border-blue-200 rounded-md bg-blue-50 text-blue-800 text-sm">
-              <p className="font-medium">{t('images.uploadSuccess') || 'Image uploaded successfully!'}</p>
-              <p>{t('images.defineRegions') || 'You can now define regions on this image.'}</p>
-            </div>
+            {showUploadSuccessMessage && (
+              <div className="p-3 border border-blue-200 rounded-md bg-blue-50 text-blue-800 text-sm">
+                <p className="font-medium">{t('images.uploadSuccess') || 'Image uploaded successfully!'}</p>
+                <p>{t('images.defineRegions') || 'You can now define regions on this image.'}</p>
+              </div>
+            )}
           </div>
         )}
       </div>

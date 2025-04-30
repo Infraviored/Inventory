@@ -148,7 +148,7 @@ export function RegionMapper({
   const [magnetismDistance, setMagnetismDistance] = useState<number>(5); // Natural pixels distance
   const [settingsAnchorEl, setSettingsAnchorEl] = useState<HTMLButtonElement | null>(null);
   // --- End Magnetism/Snapping State ---
-
+  
   // --- NEW: Region Border Styling State ---
   const [defaultBorderColor, setDefaultBorderColor] = useState<string>('#d1d5db'); // Default gray-300 (light grey)
   const [selectedBorderColor, setSelectedBorderColor] = useState<string>('#f59e0b'); // Default amber-500
@@ -472,7 +472,7 @@ export function RegionMapper({
 
   const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
     if (!containerRef.current || formInteractionRef.current) return;
-
+    
     const point = getDisplayCoords(e);
     if (!point) return; // Mouse outside container
 
@@ -536,7 +536,7 @@ export function RegionMapper({
             imageSize, 
               magnetismConfig,
               false // isResizing
-          );
+        );
           // 4. Convert snapped natural rect back to display rect
           const { displayX: finalDisplayX, displayY: finalDisplayY } = naturalToDisplayRect(snappedNatural);
           snappedDisplayX = finalDisplayX;
@@ -556,7 +556,7 @@ export function RegionMapper({
 
         setActiveRegions(currentRegions => currentRegions.map(r => 
           r.id === draggingRegionId ? { ...r, displayX: snappedDisplayX, displayY: snappedDisplayY } : r
-      ));
+        ));
 
       // Update popover if dragging the selected region - Use snapped coords
       if (draggingRegionId === selectedRegionId) {
@@ -621,7 +621,7 @@ export function RegionMapper({
             imageSize, 
             magnetismConfig, 
               true // isResizing = true
-          );
+        );
           // 4. Convert snapped natural W/H back to display W/H
           // We only care about the snapped width/height here, not the x/y
           const { displayWidth: finalDisplayWidth, displayHeight: finalDisplayHeight } = naturalToDisplayRect(snappedNatural);
@@ -638,7 +638,7 @@ export function RegionMapper({
       // Update state with snapped display dimensions
         setActiveRegions(currentRegions => currentRegions.map(r =>
         r.id === resizingRegionId ? { ...r, displayWidth: snappedDisplayWidth, displayHeight: snappedDisplayHeight } : r
-      ));
+        ));
 
       // Update popover if resizing the selected region - Use snapped width
       if (resizingRegionId === selectedRegionId) {
@@ -880,7 +880,7 @@ export function RegionMapper({
           setRegionName(region.name || ''); 
           setMenuPosition(calculatePopoverPosition(region));
           setShowForm(true); 
-      }
+    }
   };
 
   // --- Render Logic (Using Display Coords) ---

@@ -17,6 +17,7 @@ interface RegionDisplayProps {
   defaultBorderColor: string;
   selectedBorderColor: string;
   borderWidth: number;
+  isSelectMode?: boolean;
 }
 
 export function RegionDisplay({
@@ -32,7 +33,8 @@ export function RegionDisplay({
   className = '',
   defaultBorderColor,
   selectedBorderColor,
-  borderWidth
+  borderWidth,
+  isSelectMode = false
 }: RegionDisplayProps) {
   const { t } = useLanguage();
   
@@ -68,7 +70,8 @@ export function RegionDisplay({
         </span>
       </div>
       
-      {isSelected && (
+      {/* Action buttons (Duplicate, Remove) - Hide in Select Mode */}
+      {isSelected && !isSelectMode && (
         <div className="absolute top-0 right-0 flex pointer-events-auto">
           <button 
             type="button"
@@ -103,7 +106,8 @@ export function RegionDisplay({
         </div>
       )}
       
-      {isSelected && (
+      {/* Resize Handle - Hide in Select Mode */}
+      {isSelected && !isSelectMode && (
         <div
           className="absolute flex items-center justify-center cursor-se-resize pointer-events-auto"
           style={{

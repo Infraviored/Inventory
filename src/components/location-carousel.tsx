@@ -5,89 +5,73 @@ import { getLocations, Location } from '@/lib/api';
 import Image from 'next/image';
 
 interface LocationCarouselProps {
+  locations: Location[];
   onSelectLocation: (locationId: number) => void;
   selectedLocationId?: number;
 }
 
-export default function LocationCarousel({ onSelectLocation, selectedLocationId }: LocationCarouselProps) {
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export default function LocationCarousel({ locations, onSelectLocation, selectedLocationId }: LocationCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Fetch locations
   useEffect(() => {
-    const fetchLocations = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const data = await getLocations();
-        setLocations(data);
-        
-        // If a location is already selected, find its index
-        if (selectedLocationId) {
-          const index = data.findIndex(loc => loc.id === selectedLocationId);
-          if (index !== -1) {
-            setCurrentIndex(index);
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching locations:', err);
-        setError('Failed to fetch locations');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchLocations();
-  }, [selectedLocationId]);
+    if (selectedLocationId && locations.length > 0) {
+      const index = locations.findIndex(loc => loc.id === selectedLocationId);
+      setCurrentIndex(index !== -1 ? index : 0);
+    } else if (locations.length > 0) {
+      setCurrentIndex(0);
+    } else {
+      setCurrentIndex(0);
+    }
+  }, [locations, selectedLocationId]);
 
   const goToPrevious = () => {
-    setCurrentIndex((prevIndex) => 
-      prevIndex === 0 ? locations.length - 1 : prevIndex - 1
-    );
-    if (locations.length > 0) {
-      const newIndex = currentIndex === 0 ? locations.length - 1 : currentIndex - 1;
+    const newIndex = currentIndex === 0 ? locations.length - 1 : currentIndex - 1;
+    if (locations.length > 0 && locations[newIndex]) {
+      setCurrentIndex(newIndex);
       onSelectLocation(locations[newIndex].id);
+    } else if (locations.length > 0) {
+      setCurrentIndex(0);
+      onSelectLocation(locations[0].id);
     }
   };
 
   const goToNext = () => {
-    setCurrentIndex((prevIndex) => 
-      prevIndex === locations.length - 1 ? 0 : prevIndex + 1
-    );
-    if (locations.length > 0) {
-      const newIndex = currentIndex === locations.length - 1 ? 0 : currentIndex + 1;
+    const newIndex = currentIndex >= locations.length - 1 ? 0 : currentIndex + 1;
+    if (locations.length > 0 && locations[newIndex]) {
+      setCurrentIndex(newIndex);
       onSelectLocation(locations[newIndex].id);
+    } else if (locations.length > 0) {
+      setCurrentIndex(0);
+      onSelectLocation(locations[0].id);
     }
   };
 
   const handleSelect = (index: number) => {
-    setCurrentIndex(index);
-    onSelectLocation(locations[index].id);
+    if (index >= 0 && index < locations.length) {
+      setCurrentIndex(index);
+      if (locations[index].id !== selectedLocationId) {
+        onSelectLocation(locations[index].id);
+      }
+    }
   };
 
-  if (loading) {
-    return <div className="p-4">Loading locations...</div>;
-  }
-
-  if (error) {
-    return <div className="p-4 text-red-500">Error: {error}</div>;
-  }
-
   if (locations.length === 0) {
-    return <div className="p-4">No locations found. Please add locations first.</div>;
+    return null;
+  }
+
+  const safeCurrentIndex = Math.min(Math.max(0, currentIndex), locations.length - 1);
+  if (locations.length === 0 || !locations[safeCurrentIndex]) {
+    return <div className="p-4 text-muted-foreground">Loading...</div>;
   }
 
   return (
     <div className="relative w-full">
       <div className="overflow-hidden rounded-lg border shadow-md">
-        <div className="relative h-64 bg-gray-200">
-          {locations[currentIndex].imagePath ? (
+        <div className="relative h-64 bg-gray-200 cursor-pointer" onClick={() => handleSelect(safeCurrentIndex)} role="button" tabIndex={0} aria-label={`Select location ${locations[safeCurrentIndex].name}`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSelect(safeCurrentIndex); }}>
+          {locations[safeCurrentIndex].imagePath ? (
             <img
-              src={locations[currentIndex].imagePath}
-              alt={locations[currentIndex].name}
+              src={locations[safeCurrentIndex].imagePath}
+              alt={locations[safeCurrentIndex].name}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -97,9 +81,9 @@ export default function LocationCarousel({ onSelectLocation, selectedLocationId 
           )}
           
           <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2">
-            <h3 className="text-lg font-semibold">{locations[currentIndex].name}</h3>
-            {locations[currentIndex].description && (
-              <p className="text-sm">{locations[currentIndex].description}</p>
+            <h3 className="text-lg font-semibold">{locations[safeCurrentIndex].name}</h3>
+            {locations[safeCurrentIndex].description && (
+              <p className="text-sm">{locations[safeCurrentIndex].description}</p>
             )}
           </div>
         </div>
@@ -110,6 +94,7 @@ export default function LocationCarousel({ onSelectLocation, selectedLocationId 
           onClick={goToPrevious}
           className="bg-gray-200 hover:bg-gray-300 rounded-full p-2"
           aria-label="Previous location"
+          type="button"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -125,6 +110,7 @@ export default function LocationCarousel({ onSelectLocation, selectedLocationId 
                 index === currentIndex ? 'bg-blue-500' : 'bg-gray-300'
               }`}
               aria-label={`Go to location ${index + 1}`}
+              type="button"
             />
           ))}
         </div>
@@ -133,6 +119,7 @@ export default function LocationCarousel({ onSelectLocation, selectedLocationId 
           onClick={goToNext}
           className="bg-gray-200 hover:bg-gray-300 rounded-full p-2"
           aria-label="Next location"
+          type="button"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

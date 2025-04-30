@@ -6,6 +6,12 @@ import { ImageInput } from './image-input';
 import LocationCarousel from './location-carousel';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/lib/language';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { RegionSelector } from '@/components/region-selector';
+import { XIcon } from 'lucide-react';
 
 interface InventoryItemFormProps {
   onSubmit?: (formData: FormData) => Promise<void>;
@@ -33,7 +39,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [useCarouselView, setUseCarouselView] = useState(false);
+  const [locationSearch, setLocationSearch] = useState('');
 
   // Fetch locations
   useEffect(() => {
@@ -147,158 +153,139 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
 
   const handleLocationSelect = (id: number) => {
     setLocationId(id);
+    // Reset region when location changes
+    setRegionId(undefined);
   };
 
+  // Get details of the currently selected location (for image/regions)
+  const selectedLocationDetails = locations.find(loc => loc.id === locationId);
+
+  // Filter locations based on search
+  const filteredLocations = locations.filter(loc =>
+    loc.name.toLowerCase().includes(locationSearch.toLowerCase()) ||
+    (loc.description && loc.description.toLowerCase().includes(locationSearch.toLowerCase()))
+  );
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6">
       {error && <div className="p-3 bg-red-100 text-red-700 rounded">{error}</div>}
       
-      <div>
-        <label htmlFor="name" className="block text-sm font-medium mb-1">
+      <div className="space-y-2">
+        <Label htmlFor="name" className="block text-sm font-medium mb-1">
           {t('common.fields.name')} <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
+        </Label>
+        <Input
           id="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full border rounded px-3 py-2"
+          className="w-full"
           required
         />
       </div>
       
-      <div>
-        <label htmlFor="description" className="block text-sm font-medium mb-1">
+      <div className="space-y-2">
+        <Label htmlFor="description" className="block text-sm font-medium mb-1">
           {t('common.fields.description')} ({t('common.optional')})
-        </label>
-        <textarea
+        </Label>
+        <Textarea
           id="description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="w-full border rounded px-3 py-2"
+          className="w-full"
           rows={3}
         />
       </div>
       
-      <div>
-        <label htmlFor="quantity" className="block text-sm font-medium mb-1">
-          {t('inventory.quantity')}
-        </label>
-        <input
-          type="number"
-          id="quantity"
-          value={quantity}
-          onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-          min="1"
-          className="w-full border rounded px-3 py-2"
-        />
+      <div className="space-y-2">
+        <Label className="block text-sm font-medium mb-1">
+          {t('common.fields.image')} ({t('common.optional')})
+        </Label>
+        <ImageInput onImageChange={(file) => setImage(file)} showUploadSuccessMessage={false} />
       </div>
       
-      <div>
-        <div className="flex justify-between items-center mb-1">
-          <label htmlFor="location" className="block text-sm font-medium">
-            {t('inventory.location')} ({t('common.optional')})
-          </label>
-          <button
-            type="button"
-            onClick={() => setUseCarouselView(!useCarouselView)}
-            className="text-sm text-blue-500 hover:text-blue-700"
-          >
-            {useCarouselView ? t('inventory.switchToDropdown') : t('inventory.switchToCarousel')}
-          </button>
-        </div>
-        
-        {useCarouselView ? (
-          <div className="mb-4">
-            <LocationCarousel 
-              onSelectLocation={handleLocationSelect}
-              selectedLocationId={locationId}
+      {/* === Location Selection Section (Conditional) === */}
+      {!locationId && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="location-search" className="block text-sm font-medium">
+              {t('inventory.searchLocation') || 'Search Location'}
+            </Label>
+            <Input
+              id="location-search"
+              placeholder={t('common.searchPlaceholder') || 'Search by name or description...'}
+              value={locationSearch}
+              onChange={(e) => setLocationSearch(e.target.value)}
+              className="w-full"
             />
           </div>
-        ) : (
-          <select
-            id="location"
-            value={locationId || ''}
-            onChange={(e) => setLocationId(e.target.value ? parseInt(e.target.value) : undefined)}
-            className="w-full border rounded px-3 py-2"
+
+          <div className="space-y-2">
+            <Label className="block text-sm font-medium">
+              {t('inventory.selectLocation') || 'Select Location'} ({t('common.optional')})
+            </Label>
+            {loading && <div className="p-4 text-center">{t('common.loading') || 'Loading locations...'}</div>}
+            {!loading && error && <div className="p-4 text-red-500 text-center">{error}</div>}
+            {!loading && !error && filteredLocations.length === 0 && (
+              <div className="p-4 text-center text-muted-foreground">
+                {locationSearch
+                  ? t('locations.searchNotFound') || 'No locations match your search.'
+                  : t('locations.noneFound') || 'No locations found. Please add one first.'}
+              </div>
+            )}
+            {!loading && !error && filteredLocations.length > 0 && (
+              <div className="mb-4">
+                <LocationCarousel
+                  locations={filteredLocations}
+                  onSelectLocation={handleLocationSelect}
+                  selectedLocationId={locationId}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* === Region Selection Section (Conditional) === */}
+      {locationId && selectedLocationDetails && (
+        <div className="space-y-2 relative border rounded-md p-4 pt-10">
+          {/* Deselect Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => { setLocationId(undefined); setRegionId(undefined); }}
+            className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive"
+            aria-label={t('locations.deselect') || 'Deselect Location'}
+            type="button"
           >
-            <option value="">{t('inventory.selectLocation')}</option>
-            {locations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.name}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
-      
-      {locationId && (
-        <div>
-          <label htmlFor="region" className="block text-sm font-medium mb-1">
-            {t('inventory.region')} ({t('common.optional')})
-          </label>
-          {regions.length > 0 ? (
-            <div className="grid grid-cols-2 gap-2">
-              {regions.map((region) => (
-                <div 
-                  key={region.id}
-                  onClick={() => setRegionId(region.id)}
-                  className={`border rounded p-2 cursor-pointer ${
-                    regionId === region.id ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
-                  }`}
-                >
-                  <div className="text-sm font-medium">{region.name}</div>
-                  <div 
-                    className="mt-1 w-full h-4 rounded"
-                    style={{ 
-                      backgroundColor: region.color ? `#${region.color}` : '#3b82f6',
-                      opacity: 0.7
-                    }}
-                  ></div>
-                </div>
-              ))}
+            <XIcon className="h-5 w-5" />
+          </Button>
+
+          <Label htmlFor="region" className="block text-sm font-medium mb-1">
+            {regions.length > 0 ? t('inventory.selectRegion') : `${t('inventory.region')} (${t('regions.noRegions')})`}
+            <span className="text-muted-foreground"> ({selectedLocationDetails.name})</span>
+          </Label>
+          {selectedLocationDetails.imagePath && regions.length > 0 ? (
+            <div className="overflow-hidden">
+              <RegionSelector
+                key={selectedLocationDetails.id}
+                imageSrc={selectedLocationDetails.imagePath}
+                regions={regions}
+                selectedRegionId={regionId?.toString() ?? null}
+                onSelectRegion={(id: string | null) => setRegionId(id ? parseInt(id) : undefined)}
+              />
             </div>
           ) : (
-            <div>
-              <select
-                id="region"
-                value={regionId || ''}
-                onChange={(e) => setRegionId(e.target.value ? parseInt(e.target.value) : undefined)}
-                className="w-full border rounded px-3 py-2"
-                disabled={regions.length === 0}
-              >
-                <option value="">{t('inventory.selectRegion')}</option>
-                {regions.map((region) => (
-                  <option key={region.id} value={region.id}>
-                    {region.name}
-                  </option>
-                ))}
-              </select>
-              {regions.length === 0 && locationId && (
-                <p className="text-sm text-gray-500 mt-1">
-                  {t('inventory.noRegionsDefined')}
-                </p>
-              )}
+            <div className="p-4 border rounded text-center text-muted-foreground">
+              {selectedLocationDetails.imagePath ? t('regions.noRegions') : t('locations.noImage')}
             </div>
           )}
         </div>
       )}
-      
-      <div>
-        <label className="block text-sm font-medium mb-1">
-          {t('common.fields.image')} ({t('common.optional')})
-        </label>
-        <ImageInput onImageChange={(file) => setImage(file)} />
-      </div>
-      
+
       <div className="pt-4">
-        <button
-          type="submit"
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-          disabled={submitting}
-        >
-          {submitting ? `${t('common.loading')}...` : t('common.save')}
-        </button>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? t('common.loading') : t('common.save')}
+        </Button>
       </div>
     </form>
   );
