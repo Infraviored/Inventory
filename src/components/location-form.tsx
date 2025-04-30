@@ -73,9 +73,11 @@ function FixedSizeRegionMapper({
       .region-mapper .dark\\:text-emerald-400 {
         color: #34d399 !important;
       }
+      /* REMOVED unnecessary forced background
       .region-mapper .bg-background {
         background-color: var(--background) !important;
       }
+      */
       .region-mapper .text-foreground {
         color: var(--foreground) !important;
       }
@@ -398,9 +400,25 @@ export function LocationForm({
         </div>
         
         <div className="space-y-2 flex-grow min-h-0">
-          <Label htmlFor="image">{`${t('common.fields.image')} (${t('common.optional')})`}</Label>
+          <div className="flex items-center gap-2 mb-1">
+            <Label htmlFor="image">{t('common.fields.image')}
+                {!imagePreview && <span className="text-xs text-muted-foreground ml-1">({t('common.optional')})</span>}
+            </Label>
+            {imagePreview && (
+                 <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 text-muted-foreground hover:text-destructive dark:hover:text-destructive-foreground"
+                    onClick={() => handleImageChange(null, undefined)} 
+                    aria-label={t('common.clearImage') || "Clear image"}
+                  >
+                    <XIcon className="h-4 w-4" />
+                  </Button>
+            )}
+          </div>
             
-            {!imagePreview ? (
+          {!imagePreview ? (
               <div className="flex flex-col items-center justify-center border border-dashed border-border rounded-md bg-muted/50 dark:bg-muted/20 dark:border-border p-6 text-center h-full">
                 <div className="mb-4">
                   <div className="text-lg font-medium mb-2 text-foreground">{t('locations.uploadImage')}</div>
@@ -415,32 +433,13 @@ export function LocationForm({
             ) : (
               <div className="relative rounded border border-border overflow-hidden h-full flex flex-col">
                 
-                <div className="bg-background dark:bg-background relative flex-grow min-h-0 flex items-center justify-center">
+                <div className="relative flex-grow min-h-0 flex items-center justify-center">
                   <FixedSizeRegionMapper
                     imageSrc={imagePreview || placeholderImage} 
                     initialRegions={regions}
                     onComplete={handleRegionsChange}
                     autoStartDrawing={!isEditing && !regions.length} 
                   />
-                  
-                  <Button
-                    type="button"
-                    className={`absolute bottom-4 right-4 z-50 ${isDrawingActive ? 'bg-secondary text-secondary-foreground hover:bg-secondary/90' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
-                    onClick={startDrawingNewRegion}
-                    disabled={!imagePreview || isDrawingActive} 
-                  >
-                    <PlusIcon className="w-4 h-4 mr-1" /> {isDrawingActive ? t('regions.drawing') : t('regions.addRegion')}
-                  </Button>
-                  
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    className="absolute top-4 left-4 z-50"
-                    onClick={() => handleImageChange(null, undefined)} 
-                  >
-                    <XIcon className="w-4 h-4 mr-1" /> {t('common.clearImage')}
-                  </Button>
                   
                   {(!imagePreview) && (
                     <div className="absolute top-12 left-4 bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded z-50">

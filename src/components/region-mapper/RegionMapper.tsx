@@ -7,7 +7,7 @@ import { RegionList } from './RegionList';
 import { RegionDisplay } from './RegionDisplay';
 import { useLanguage } from '@/lib/language';
 import { Button } from '@/components/ui/button';
-import { SettingsIcon } from 'lucide-react';
+import { SettingsIcon, PlusIcon, XIcon } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -220,12 +220,12 @@ export function RegionMapper({
     setSnapGuides({ horizontal: null, vertical: null }); // Clear guides on interaction end
 
   }, [activeRegions, displayToNaturalRect, onComplete]); // Add dependencies
-
+  
   // --- useEffects ---
   // Effect to load image dimensions (mostly unchanged)
   useEffect(() => {
     console.log('Image Load Effect: Running. imageSrc:', imageSrc);
-    setImageSize({ width: 0, height: 0 });
+    setImageSize({ width: 0, height: 0 }); 
     setError(null);
     setActiveRegions([]); // Clear regions when image changes
     setSelectedRegionId(null);
@@ -237,7 +237,7 @@ export function RegionMapper({
 
     if (!imageSrc) {
       console.log('Image Load Effect: No imageSrc provided.');
-      return;
+      return; 
     }
 
     let isCancelled = false;
@@ -414,7 +414,7 @@ export function RegionMapper({
       ) {
         console.log("Resize handle clicked (display coords)");
         setResizingRegionId(selectedRegion.id);
-        setDraggingRegionId(null);
+       setDraggingRegionId(null);
         // Store initial mouse position and region display dimensions
         setResizeStartPoint({ x: mouseX, y: mouseY });
         setResizeStartDims({ displayWidth: selectedRegion.displayWidth, displayHeight: selectedRegion.displayHeight });
@@ -429,7 +429,7 @@ export function RegionMapper({
       setStartPoint({ x: mouseX, y: mouseY });
       setCurrentPoint({ x: mouseX, y: mouseY });
       setSelectedRegionId(null);
-      setDraggingRegionId(null);
+      setDraggingRegionId(null); 
       setResizingRegionId(null);
       setShowForm(false);
       return;
@@ -454,7 +454,7 @@ export function RegionMapper({
       // Region selected
       setSelectedRegionId(clickedRegion.id);
       setDraggingRegionId(null); // Will be set in mouseMove if dragged
-      setResizingRegionId(null);
+      setResizingRegionId(null); 
       // Store the offset of the click relative to the region's top-left (display coords)
       setDragStartOffset({ x: mouseX - clickedRegion.displayX, y: mouseY - clickedRegion.displayY });
       setRegionName(clickedRegion.name || '');
@@ -493,8 +493,8 @@ export function RegionMapper({
           const initialMouseY = selected.displayY + dragStartOffset.y;
           const movementThreshold = 5; // Display pixels threshold
           if (Math.abs(mouseX - initialMouseX) > movementThreshold || Math.abs(mouseY - initialMouseY) > movementThreshold) {
-              console.log('Movement detected, starting drag state for region:', selectedRegionId);
-              setDraggingRegionId(selectedRegionId);
+          console.log('Movement detected, starting drag state for region:', selectedRegionId);
+          setDraggingRegionId(selectedRegionId);
               // Don't return, allow first drag update immediately
           }
       }
@@ -502,8 +502,8 @@ export function RegionMapper({
 
     // --- Active Dragging ---
     if (draggingRegionId && dragStartOffset) {
-      const region = findRegionById(draggingRegionId);
-      if (!region) return;
+        const region = findRegionById(draggingRegionId);
+        if (!region) return; 
 
       // Calculate new top-left based on current mouse and initial offset (display coords)
       let targetX = mouseX - dragStartOffset.x;
@@ -533,7 +533,7 @@ export function RegionMapper({
               // UNSAFE CAST: Assuming applySnapping only uses coordinate/name properties from ActiveRegion
               otherRegionsNatural as ActiveRegion[],
               null, // No specific element needed usually
-              imageSize,
+            imageSize, 
               magnetismConfig,
               false // isResizing
           );
@@ -546,7 +546,7 @@ export function RegionMapper({
           guideHorizontal = (snappedNatural.y !== tentativeNatural.y) ? [snappedNatural.y, snappedNatural.y + snappedNatural.height] : null;
           guideVertical = (snappedNatural.x !== tentativeNatural.x) ? [snappedNatural.x, snappedNatural.x + snappedNatural.width] : null;
       }
-      setSnapGuides({ horizontal: guideHorizontal, vertical: guideVertical });
+        setSnapGuides({ horizontal: guideHorizontal, vertical: guideVertical });
       // --- End Snapping ---
 
       // Bounds check (Display Coordinates relative to container) - Use snapped coords
@@ -554,7 +554,7 @@ export function RegionMapper({
       snappedDisplayX = Math.max(0, Math.min(snappedDisplayX, rect.width - region.displayWidth));
       snappedDisplayY = Math.max(0, Math.min(snappedDisplayY, rect.height - region.displayHeight));
 
-      setActiveRegions(currentRegions => currentRegions.map(r =>
+        setActiveRegions(currentRegions => currentRegions.map(r => 
           r.id === draggingRegionId ? { ...r, displayX: snappedDisplayX, displayY: snappedDisplayY } : r
       ));
 
@@ -574,8 +574,8 @@ export function RegionMapper({
 
     // --- Active Resizing ---
     if (resizingRegionId && resizeStartPoint && resizeStartDims) {
-      const region = findRegionById(resizingRegionId);
-      if (!region) return;
+        const region = findRegionById(resizingRegionId);
+        if (!region) return;
 
       // Calculate new dimensions based on mouse delta (display coords)
       let newWidth = resizeStartDims.displayWidth + (mouseX - resizeStartPoint.x);
@@ -617,9 +617,9 @@ export function RegionMapper({
               tentativeNatural.x, tentativeNatural.y, // Use the derived natural x/y
               tentativeNatural.width, tentativeNatural.height, // Pass the derived natural w/h
               otherRegionsNatural as ActiveRegion[], // Unsafe Cast
-              null, 
-              imageSize,
-              magnetismConfig,
+            null, 
+            imageSize, 
+            magnetismConfig, 
               true // isResizing = true
           );
           // 4. Convert snapped natural W/H back to display W/H
@@ -632,11 +632,11 @@ export function RegionMapper({
           guideHorizontal = (snappedNatural.height !== tentativeNatural.height) ? [region.displayY + snappedNatural.height] : null;
           guideVertical = (snappedNatural.width !== tentativeNatural.width) ? [region.displayX + snappedNatural.width] : null;
       }
-      setSnapGuides({ horizontal: guideHorizontal, vertical: guideVertical });
+        setSnapGuides({ horizontal: guideHorizontal, vertical: guideVertical });
       // --- End Snapping ---
 
       // Update state with snapped display dimensions
-       setActiveRegions(currentRegions => currentRegions.map(r =>
+        setActiveRegions(currentRegions => currentRegions.map(r =>
         r.id === resizingRegionId ? { ...r, displayWidth: snappedDisplayWidth, displayHeight: snappedDisplayHeight } : r
       ));
 
@@ -661,7 +661,7 @@ export function RegionMapper({
   const handleMouseUp = (e: React.MouseEvent | React.TouchEvent) => {
     // setSnapGuides({ horizontal: null, vertical: null }); // No snapping
     if (formInteractionRef.current) {
-      formInteractionRef.current = false;
+      formInteractionRef.current = false; 
       return;
     }
     if (!containerRef.current) return;
@@ -744,14 +744,14 @@ export function RegionMapper({
             };
 
             const nextRegions = [...activeRegions, newActiveRegion];
-            setActiveRegions(nextRegions);
+            setActiveRegions(nextRegions); 
             setSelectedRegionId(newActiveRegion.id);
             setRegionName(newActiveRegion.name);
             setMenuPosition(calculatePopoverPosition(newActiveRegion));
             setShowForm(true);
-            handleInteractionEnd(nextRegions);
-
-        } else {
+            handleInteractionEnd(nextRegions); 
+            
+            } else {
           console.log("Drawing too small, cancelled.");
           // Call onComplete with current regions if drawing is cancelled
            const finalNaturalRegions = activeRegions.map(ar => {
@@ -762,7 +762,7 @@ export function RegionMapper({
         }
 
         // Reset drawing state
-        setIsCreating(false);
+            setIsCreating(false);
         setStartPoint(null);
         setCurrentPoint(null);
         document.dispatchEvent(new CustomEvent('drawingComplete', { bubbles: true }));
@@ -796,8 +796,8 @@ export function RegionMapper({
     // If simply clicking, selection state is already handled in mouseDown
   };
 
-  // --- Other Handlers ---
-  const handleRemoveRegion = (idToRemove: string) => {
+  // --- Other Handlers --- 
+   const handleRemoveRegion = (idToRemove: string) => {
     const nextRegions = activeRegions.filter(r => r.id !== idToRemove);
     if (selectedRegionId === idToRemove) {
         setSelectedRegionId(null);
@@ -826,8 +826,8 @@ export function RegionMapper({
       naturalCoords.y,
       naturalCoords.width,
       naturalCoords.height,
-      undefined,
-      `${regionToDuplicate.name || 'Region'} Copy`
+        undefined, 
+        `${regionToDuplicate.name || 'Region'} Copy`
     );
     const newActiveRegion: ActiveRegion = {
       ...newRegion,
@@ -861,11 +861,11 @@ export function RegionMapper({
 
   const handleNameRegion = (newName: string) => {
     if (selectedRegionId) {
-        const nextRegions = activeRegions.map(r =>
+        const nextRegions = activeRegions.map(r => 
             r.id === selectedRegionId ? { ...r, name: newName } : r
         );
         setActiveRegions(nextRegions);
-        setShowForm(false);
+        setShowForm(false); 
         handleInteractionEnd(nextRegions); // Update parent with new name
     }
   };
@@ -892,7 +892,7 @@ export function RegionMapper({
         const displayWidth = Math.abs(startPoint.x - currentPoint.x);
         const displayHeight = Math.abs(startPoint.y - currentPoint.y);
         return (
-          <div
+          <div 
             className="absolute border-2 border-primary bg-primary/30 z-10 dark:bg-primary/20 pointer-events-none"
             style={{
               left: `${displayX}px`,
@@ -905,30 +905,30 @@ export function RegionMapper({
       }
       return null;
   }, [isCreating, startPoint, currentPoint]);
-
+  
   const selectedRegionForForm = findRegionById(selectedRegionId);
 
   return (
     <div className="flex flex-col gap-4 w-full">
       {/* Container - Styles controlled by parent/injected CSS */}
-      <div
+      <div 
         ref={containerRef}
-        className="relative overflow-visible border border-gray-300 bg-gray-100 touch-none w-full flex items-center justify-center" // Changed overflow-hidden to overflow-visible
+        className="relative overflow-visible border border-gray-300 touch-none w-full flex items-center justify-center" // REMOVED bg-gray-100
         style={{ // Keep min size
           minWidth: 200,
-          minHeight: 200,
+          minHeight: 200, 
           cursor: getCursorStyle(isCreating, resizingRegionId !== null, draggingRegionId !== null),
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleMouseDown}
-        onTouchMove={handleMouseMove}
-        onTouchEnd={handleMouseUp}
+        onMouseLeave={handleMouseUp} 
+        onTouchStart={handleMouseDown} 
+        onTouchMove={handleMouseMove}   
+        onTouchEnd={handleMouseUp}     
       >
         {/* Loading/Error/Image Structure */}
-        {(() => {
+        {(() => { 
           if (!imageSize.width || !imageSize.height) {
               return (
                   <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
@@ -942,20 +942,20 @@ export function RegionMapper({
                       {/* Image Tag - Let object-cover and container handle size/pos */}
                       <img
                         ref={imageRef}
-                        key={imageSrc}
-                        src={imageSrc}
+                        key={imageSrc} 
+                        src={imageSrc} 
                         alt={t('regions.locationImage') || "Location image"}
                         className="block object-cover select-none pointer-events-none"
                         draggable={false}
                       />
-
+                      
                       {/* Drawing overlay - Uses display coords */}
                       {currentDrawingRegion}
-
+                      
                       {/* Existing regions - Use RegionDisplay with display coords */}
                       {activeRegions.map((region) => (
                          <RegionDisplay
-                            key={region.id}
+                            key={region.id} 
                             // Pass display coords directly
                             displayX={region.displayX}
                             displayY={region.displayY}
@@ -965,8 +965,8 @@ export function RegionMapper({
                             isSelected={region.id === selectedRegionId}
                             isResizing={region.id === resizingRegionId}
                             // Pass handlers - they operate on IDs
-                            onDuplicate={() => handleDuplicateRegion(region.id)}
-                            onRemove={() => handleRemoveRegion(region.id)}
+                            onDuplicate={() => handleDuplicateRegion(region.id)} 
+                            onRemove={() => handleRemoveRegion(region.id)} 
                             // Pass style config props
                             defaultBorderColor={defaultBorderColor}
                             selectedBorderColor={selectedBorderColor}
@@ -976,29 +976,29 @@ export function RegionMapper({
 
                       {/* Region Form Popover - Positioned with display coords */}
                       {showForm && selectedRegionForForm && (
-                           <div
+                           <div 
                              style={{
                                position: 'absolute',
                                left: `${menuPosition.x}px`, // Use state variable
                                top: `${menuPosition.y}px`,
-                               zIndex: 20,
-                               pointerEvents: 'all'
+                               zIndex: 20, 
+                               pointerEvents: 'all' 
                              }}
                              onClick={(e) => e.stopPropagation()}
                              onMouseDown={(e) => { formInteractionRef.current = true; e.stopPropagation(); }}
                              onMouseUp={(e) => { formInteractionRef.current = false; e.stopPropagation(); }}
                            >
                              {/* Form content unchanged... */}
-                             <div
+                             <div 
                                className="bg-background/80 backdrop-blur-sm border border-border rounded-md shadow-lg p-3 dark:border-border dark:bg-background/70 w-60"
                                data-region-form="true"
                              >
                                <div className="flex flex-col gap-2">
                                  <Label htmlFor="region-name" className="text-sm font-medium">Region Name</Label>
                                  <Input
-                                   id="region-name"
+                                   id="region-name" 
                                    value={regionName}
-                                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRegionName(e.target.value)}
+                                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRegionName(e.target.value)} 
                                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                                      if (e.key === 'Enter') {
                                        e.preventDefault();
@@ -1009,8 +1009,8 @@ export function RegionMapper({
                                    autoFocus
                                  />
                                  <div className="flex justify-end gap-2 mt-2">
-                                   <Button
-                                     variant="outline"
+                                   <Button 
+                                     variant="outline" 
                                      size="sm"
                                      onClick={(e) => {
                                        e.stopPropagation();
@@ -1020,7 +1020,7 @@ export function RegionMapper({
                                    >
                                      {t('common.cancel') || 'Cancel'}
                                    </Button>
-                                   <Button
+                                   <Button 
                                      size="sm"
                                      onClick={(e) => {
                                        e.stopPropagation();
@@ -1033,7 +1033,7 @@ export function RegionMapper({
                                </div>
                              </div>
                            </div>
-                      )}
+                        )}
 
                       {/* Snap Guides Removed for simplicity */}
                       {/* --- Snap Guides Visualization (Using Natural Coords + Scaling) --- */}
@@ -1067,12 +1067,27 @@ export function RegionMapper({
                               width: `${renderedWidth}px`, 
                               zIndex: 5 
                             }}
-                          />
+                          /> 
                         )}
                       )}
                       {/* --- End Snap Guides --- */}
 
-                      {/* Settings Icon & Popover Removed for simplicity */}
+                      {/* --- Add Region Button (Top Left) --- */}
+                      <Button
+                        type="button"
+                        variant={isCreating ? "secondary" : "default"}
+                        size="sm"
+                        className="absolute top-4 left-4 z-50 shadow" // Position top-left
+                        onClick={handleToggleDrawing}
+                        disabled={!imageSize.width}
+                      >
+                        {isCreating 
+                            ? <><XIcon className="w-4 h-4 mr-1" />{t('common.cancel') || "Cancel"}</>
+                            : <><PlusIcon className="w-4 h-4 mr-1" />{t('regions.addRegion') || "Add Region"}</>
+                        }
+                      </Button>
+                      {/* --- End Add Region Button --- */}
+
                       {/* --- Settings Icon & Popover --- */}
                       <Popover open={Boolean(settingsAnchorEl)} onOpenChange={(open) => !open && setSettingsAnchorEl(null)}>
                         <PopoverTrigger asChild>
@@ -1090,10 +1105,11 @@ export function RegionMapper({
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent 
-                           className="w-60 z-50" // Increased z-index to z-50
+                           className="w-60 z-50" // Use high z-index
                            align="end"
                            onInteractOutside={() => setSettingsAnchorEl(null)}
                         >
+                           {/* Content with Magnetism and Border Styles... */}
                            <div className="grid gap-4">
                             <div className="space-y-2">
                               <h4 className="font-medium leading-none">Magnetism Settings</h4>
@@ -1116,12 +1132,6 @@ export function RegionMapper({
                                   <RadioGroupItem value="edges" id="m-edges" />
                                   <Label htmlFor="m-edges">Edges</Label>
                                 </div>
-                                 {/* Remove Distance option for now
-                                 <div className="flex items-center space-x-2">
-                                  <RadioGroupItem value="distance" id="m-distance" />
-                                  <Label htmlFor="m-distance">Distance</Label>
-                                </div>
-                                 */}
                               </RadioGroup>
                             </div>
                             <div className="grid gap-2">
@@ -1147,7 +1157,6 @@ export function RegionMapper({
                                         value={defaultBorderColor}
                                         onChange={setDefaultBorderColor}
                                     />
-                                    
                                     {/* Selected Border */}
                                     <Label htmlFor="selected-border-color" className="text-sm">Selected Color</Label>
                                     <ColorPickerPopover 
@@ -1155,7 +1164,6 @@ export function RegionMapper({
                                         value={selectedBorderColor}
                                         onChange={setSelectedBorderColor}
                                     />
-                                    
                                     {/* Single Width Setting */}
                                     <Label htmlFor="border-width" className="text-sm">Border Width (px)</Label>
                                     <Input 
@@ -1169,11 +1177,10 @@ export function RegionMapper({
                                 </div>
                             </div>
                             {/* --- End Border Style Settings --- */}
-                         </div>
+                          </div>
                         </PopoverContent>
                       </Popover>
-                      {/* --- End Settings Icon & Popover --- */}
-
+                       {/* --- End Settings Icon & Popover --- */}
                   </>
               );
           }
@@ -1182,8 +1189,8 @@ export function RegionMapper({
 
       {/* Right side: Controls and Region List */}
       <div className="flex flex-col gap-4 w-full sm:w-auto flex-shrink-0">
-        {/* Controls */}
-        <div className="flex gap-2">
+        {/* Controls - REMOVED Add Region button */}
+        {/* <div className="flex gap-2">
            <Button
               variant={isCreating ? "secondary" : "outline"}
               size="sm"
@@ -1191,33 +1198,31 @@ export function RegionMapper({
             >
               {isCreating ? t('common.done') || "Done" : t('regions.addRegion') || "Add Region"}
             </Button>
-        </div>
+        </div> */}
 
-        {/* Region list - Needs modification if it shows coords */}
-        {/* Pass activeRegions, but might need to display natural coords? */}
-        {/* For simplicity, assume RegionList just shows name and handles selection/removal */}
+        {/* Region list */}
         <RegionList
           regions={activeRegions} // Pass full ActiveRegion for now
-          selectedRegionId={selectedRegionId}
+          selectedRegionId={selectedRegionId} 
           onSelectRegion={(id: string) => {
               setSelectedRegionId(id);
               const region = findRegionById(id);
               if (region) {
-                  setDraggingRegionId(null);
-                  setResizingRegionId(null);
-                  setRegionName(region.name || '');
+                  setDraggingRegionId(null); 
+                  setResizingRegionId(null); 
+                  setRegionName(region.name || ''); 
                   // Position popover based on display coords
                   setMenuPosition({ x: region.displayX + region.displayWidth + 10, y: region.displayY });
-                  setShowForm(true);
+                  setShowForm(true); 
               }
-          }}
+          }} 
           onRemoveRegion={handleRemoveRegion}
           onEditRegion={handleEditRegion}
         />
 
         {/* Success/Error Messages */}
         {success && <p className="text-sm text-green-600 mt-2">{success}</p>}
-        {error && !imageSize.width && <p className="text-sm text-red-600 mt-2">{error}</p>}
+        {error && !imageSize.width && <p className="text-sm text-red-600 mt-2">{error}</p>} 
 
       </div>
     </div>
@@ -1230,6 +1235,6 @@ function getCursorStyle(isCreating: boolean, isResizing: boolean, isDragging: bo
   if (isResizing) return 'se-resize'; // Use standard resize cursor for bottom-right
   if (isDragging) return 'grabbing';
   // Maybe add 'grab' on hover over region? Requires more state.
-  return 'default';
+  return 'default'; 
 }
 
