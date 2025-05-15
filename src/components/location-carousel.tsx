@@ -21,11 +21,11 @@ export default function LocationCarousel({ locations, onSelectLocation, selected
       setCurrentIndex(0);
     } else {
       setCurrentIndex(0);
-    }
+      }
   }, [locations, selectedLocationId]);
 
   const goToPrevious = () => {
-    const newIndex = currentIndex === 0 ? locations.length - 1 : currentIndex - 1;
+      const newIndex = currentIndex === 0 ? locations.length - 1 : currentIndex - 1;
     if (locations.length > 0 && locations[newIndex]) {
       setCurrentIndex(newIndex);
       onSelectLocation(locations[newIndex].id);
@@ -48,9 +48,9 @@ export default function LocationCarousel({ locations, onSelectLocation, selected
 
   const handleSelect = (index: number) => {
     if (index >= 0 && index < locations.length) {
-      setCurrentIndex(index);
+    setCurrentIndex(index);
       if (locations[index].id !== selectedLocationId) {
-        onSelectLocation(locations[index].id);
+    onSelectLocation(locations[index].id);
       }
     }
   };

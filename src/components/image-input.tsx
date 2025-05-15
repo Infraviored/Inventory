@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
@@ -13,14 +13,27 @@ interface ImageInputProps {
   initialPreview?: string | null;
   hideLabel?: boolean;
   showUploadSuccessMessage?: boolean;
+  initialImageUrl?: string | null;
 }
 
-export function ImageInput({ onImageChange, label, initialPreview = null, hideLabel = false, showUploadSuccessMessage = true }: ImageInputProps) {
+export function ImageInput({ onImageChange, label, initialPreview = null, hideLabel = false, showUploadSuccessMessage = true, initialImageUrl = null }: ImageInputProps) {
   const { t } = useLanguage();
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(initialPreview);
   const [imageError, setImageError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!preview && initialImageUrl) {
+      setPreview(initialImageUrl);
+    }
+    if (!image && preview !== initialImageUrl && initialImageUrl) {
+      setPreview(initialImageUrl);
+    }
+    if (!image && !initialImageUrl && preview?.startsWith('/')) {
+      setPreview(null);
+    }
+  }, [initialImageUrl, preview, image]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -139,10 +152,10 @@ export function ImageInput({ onImageChange, label, initialPreview = null, hideLa
             </div>
             
             {showUploadSuccessMessage && (
-              <div className="p-3 border border-blue-200 rounded-md bg-blue-50 text-blue-800 text-sm">
-                <p className="font-medium">{t('images.uploadSuccess') || 'Image uploaded successfully!'}</p>
-                <p>{t('images.defineRegions') || 'You can now define regions on this image.'}</p>
-              </div>
+            <div className="p-3 border border-blue-200 rounded-md bg-blue-50 text-blue-800 text-sm">
+              <p className="font-medium">{t('images.uploadSuccess') || 'Image uploaded successfully!'}</p>
+              <p>{t('images.defineRegions') || 'You can now define regions on this image.'}</p>
+            </div>
             )}
           </div>
         )}

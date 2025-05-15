@@ -45,7 +45,8 @@
       "name": "Name",
       "description": "Beschreibung",
       "image": "Bild"
-    }
+    },
+    "close": "Schließen"
   },
   "form": {
     "steps": {
@@ -76,7 +77,11 @@
       "box": "Box",
       "other": "Sonstiges",
       "selectType": "Bitte wählen..."
-    }
+    },
+    "noneFound": "Keine Orte gefunden. Bitte fügen Sie zuerst einen Ort hinzu.",
+    "select": "Ort auswählen",
+    "deselect": "Ort abwählen",
+    "searchNotFound": "Keine Orte entsprechen Ihrer Suche."
   },
   "regions": {
     "title": "Region Mapper",
@@ -142,7 +147,8 @@
     "showing": "Zeige",
     "of": "von",
     "listView": "Listenansicht",
-    "gridView": "Rasteransicht"
+    "gridView": "Rasteransicht",
+    "addSuccess": "Artikel erfolgreich hinzugefügt"
   },
   "items": {
     "title": "Objekte",
@@ -184,7 +190,8 @@
     "enterQuery": "Geben Sie einen Suchbegriff ein, um Objekte in Ihrem Inventar zu finden",
     "withLocation": "Mit Lagerort",
     "withoutLocation": "Ohne Lagerort",
-    "searchTip": "Versuchen Sie nach Objektnamen, Beschreibung oder Lagerort zu suchen"
+    "searchTip": "Versuchen Sie nach Objektnamen, Beschreibung oder Lagerort zu suchen",
+    "searchPlaceholder": "Inventar nach Name, Beschreibung, Ort durchsuchen..."
   },
   "images": {
     "selectImage": "Bild auswählen",

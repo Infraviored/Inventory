@@ -52,6 +52,7 @@ import {
 } from '@/lib/api';
 import { useLanguage } from '@/lib/language';
 import Link from 'next/link';
+import InventoryItemForm from '@/components/inventory-item-form';
 
 interface ItemParams {
   params: {
@@ -67,18 +68,13 @@ export default function ItemPage({ params }: ItemParams) {
   const [item, setItem] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [locations, setLocations] = useState<any[]>([]);
-  const [regions, setRegions] = useState<any[]>([]);
-  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
-  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
-  const [itemName, setItemName] = useState('');
-  const [itemDescription, setItemDescription] = useState('');
-  const [itemQuantity, setItemQuantity] = useState(1);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showLocateDialog, setShowLocateDialog] = useState(false);
-  const [locationImage, setLocationImage] = useState<string | null>(null);
   const [blinkingRegion, setBlinkingRegion] = useState<boolean>(false);
+  const [locateDialogLocationImage, setLocateDialogLocationImage] = useState<string | null>(null);
+  const [locateDialogRegions, setLocateDialogRegions] = useState<any[]>([]);
+  const [locateError, setLocateError] = useState<string | null>(null);
   
   // Fetch item data
   useEffect(() => {
@@ -90,27 +86,6 @@ export default function ItemPage({ params }: ItemParams) {
         // Fetch item details
         const itemData = await getInventoryItemById(parseInt(id));
         setItem(itemData);
-        
-        // Set form values
-        setItemName(itemData.name || '');
-        setItemDescription(itemData.description || '');
-        setItemQuantity(itemData.quantity || 1);
-        setSelectedLocationId(itemData.locationId ? itemData.locationId.toString() : null);
-        setSelectedRegionId(itemData.regionId ? itemData.regionId.toString() : null);
-        
-        // Fetch all locations for the dropdown
-        const locationsData = await getLocations();
-        setLocations(locationsData);
-        
-        // If item has a location, fetch its regions
-        if (itemData.locationId) {
-          const regionsData = await getLocationRegions(itemData.locationId);
-          setRegions(regionsData);
-          
-          // Also fetch location details to get the image
-          const locationData = await getLocationById(itemData.locationId);
-          setLocationImage(locationData.imagePath);
-        }
       } catch (err) {
         console.error('Error fetching item data:', err);
         setError(t('common.error'));
@@ -122,60 +97,22 @@ export default function ItemPage({ params }: ItemParams) {
     fetchItemData();
   }, [id, t]);
   
-  // Handle location change
-  const handleLocationChange = async (locationId: string) => {
-    setSelectedLocationId(locationId);
-    setSelectedRegionId(null); // Reset region when location changes
-    
-    if (locationId) {
-      try {
-        // Fetch regions for the selected location
-        const regionsData = await getLocationRegions(parseInt(locationId));
-        setRegions(regionsData);
-        
-        // Fetch location details to get the image
-        const locationData = await getLocationById(parseInt(locationId));
-        setLocationImage(locationData.imagePath);
-      } catch (err) {
-        console.error('Error fetching location regions:', err);
-      }
-    } else {
-      setRegions([]);
-      setLocationImage(null);
-    }
-  };
-  
-  // Handle save
-  const handleSave = async () => {
-    if (!itemName.trim()) {
-      setError(t('items.nameRequired'));
-      return;
-    }
-    
+  // NEW: Handle update submission from InventoryItemForm
+  const handleUpdate = async (formData: FormData) => {
     try {
       setSaving(true);
       setError(null);
       
-      const formData = new FormData();
-      formData.append('name', itemName);
-      formData.append('description', itemDescription || '');
-      formData.append('quantity', itemQuantity.toString());
-      
-      if (selectedLocationId) {
-        formData.append('locationId', selectedLocationId);
-      }
-      
-      if (selectedRegionId) {
-        formData.append('regionId', selectedRegionId);
-      }
-      
+      // Call the update API
       await updateInventoryItem(parseInt(id), formData);
       
-      // Show success message and redirect
-      router.push('/inventory');
-    } catch (err) {
+      // Show success message or redirect
+      router.push('/inventory'); // Redirect back to inventory list
+    } catch (err: any) { // Add type annotation for err
       console.error('Error updating item:', err);
-      setError(t('common.error'));
+      // Set error state to display in the form or globally
+      setError(err.message || t('common.error'));
+      // Consider passing setError down to InventoryItemForm if it has error display logic
     } finally {
       setSaving(false);
     }
@@ -195,18 +132,39 @@ export default function ItemPage({ params }: ItemParams) {
     }
   };
   
-  // Handle locate
-  const handleLocate = () => {
+  // Adjust Handle locate to fetch data
+  const handleLocate = async () => { 
+    if (!item?.locationId) { 
+        setLocateError('Item has no location assigned.'); 
+        setShowLocateDialog(true); // Still show dialog to display error
+        return;
+    }
+
     setShowLocateDialog(true);
+    setLocateError(null);
+    setBlinkingRegion(false); // Reset blink
+    setLocateDialogLocationImage(null); // Reset image
+    setLocateDialogRegions([]); // Reset regions
     
-    // Start blinking effect for the region
-    if (selectedRegionId) {
+    try {
+        // Fetch location details (including image)
+        const locationData = await getLocationById(item.locationId);
+        setLocateDialogLocationImage(locationData.imagePath); // Use the correct path from API response
+
+        // Fetch regions for the location
+        if (item.regionId) { // Only fetch regions if the item has one assigned
+            const regionsData = await getLocationRegions(item.locationId);
+            setLocateDialogRegions(regionsData); 
+
+            // Start blinking effect for the specific region
       setBlinkingRegion(true);
-      
-      // Stop blinking after 5 seconds
-      setTimeout(() => {
-        setBlinkingRegion(false);
-      }, 5000);
+            setTimeout(() => setBlinkingRegion(false), 5000); // Stop after 5s
+        }
+        
+    } catch (err) {
+        console.error('Error fetching data for locate dialog:', err);
+        setLocateError(t('common.error') + ': Failed to load location/region details.');
+        // Keep dialog open to show error
     }
   };
   
@@ -256,7 +214,6 @@ export default function ItemPage({ params }: ItemParams) {
           <Button 
             variant="outline" 
             onClick={handleLocate}
-            disabled={!selectedLocationId}
           >
             <MapPin className="mr-2 h-4 w-4" />
             {t('items.locate')}
@@ -304,160 +261,22 @@ export default function ItemPage({ params }: ItemParams) {
         </div>
       )}
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('items.details')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">{t('items.name')}</Label>
-                <Input
-                  id="name"
-                  value={itemName}
-                  onChange={(e) => setItemName(e.target.value)}
-                  placeholder={t('items.namePlaceholder')}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="description">{t('items.description')}</Label>
-                <Textarea
-                  id="description"
-                  value={itemDescription}
-                  onChange={(e) => setItemDescription(e.target.value)}
-                  placeholder={t('items.descriptionPlaceholder')}
-                  rows={4}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="quantity">{t('items.quantity')}</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  min="1"
-                  value={itemQuantity}
-                  onChange={(e) => setItemQuantity(parseInt(e.target.value) || 1)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('items.location')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="location">{t('items.selectLocation')}</Label>
-                <Select 
-                  value={selectedLocationId || ''} 
-                  onValueChange={handleLocationChange}
-                >
-                  <SelectTrigger id="location">
-                    <SelectValue placeholder={t('items.selectLocationPlaceholder')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">{t('items.noLocation')}</SelectItem>
-                    {locations.map((location) => (
-                      <SelectItem key={location.id} value={location.id.toString()}>
-                        {location.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {selectedLocationId && regions.length > 0 && (
-                <div className="space-y-2">
-                  <Label htmlFor="region">{t('items.selectRegion')}</Label>
-                  <Select 
-                    value={selectedRegionId || ''} 
-                    onValueChange={setSelectedRegionId}
-                  >
-                    <SelectTrigger id="region">
-                      <SelectValue placeholder={t('items.selectRegionPlaceholder')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">{t('items.noRegion')}</SelectItem>
-                      {regions.map((region) => (
-                        <SelectItem key={region.id} value={region.id.toString()}>
-                          {region.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+      {item && !loading && (
+        <InventoryItemForm
+          initialData={{
+            name: item.name ?? '',
+            description: item.description ?? '',
+            quantity: item.quantity ?? 1,
+            locationId: item.locationId,
+            regionId: item.regionId,
+            imagePath: item.imagePath
+          }}
+          onSubmit={handleUpdate}
+          error={error}
+          setError={setError}
+        />
               )}
               
-              {selectedLocationId && regions.length === 0 && (
-                <div className="text-sm text-muted-foreground">
-                  {t('regions.noRegions')}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-          <div className="flex justify-end space-x-2">
-            <Link href="/inventory">
-              <Button variant="outline">
-                {t('common.cancel')}
-              </Button>
-            </Link>
-            <Button 
-              onClick={handleSave}
-              disabled={saving}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('common.saving')}
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  {t('common.save')}
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-        
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('items.image')}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center">
-              {item?.imagePath ? (
-                <div className="w-full aspect-square rounded-md overflow-hidden">
-                  <img 
-                    src={item.imagePath} 
-                    alt={item.name} 
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="w-full aspect-square rounded-md bg-muted flex flex-col items-center justify-center">
-                  <Camera className="h-12 w-12 text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">
-                    {t('common.noImage')}
-                  </p>
-                </div>
-              )}
-              
-              <Button className="mt-4" variant="outline">
-                <Camera className="mr-2 h-4 w-4" />
-                {t('items.uploadImage')}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-      
-      {/* Locate Dialog */}
       <Dialog open={showLocateDialog} onOpenChange={setShowLocateDialog}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
@@ -472,18 +291,21 @@ export default function ItemPage({ params }: ItemParams) {
             </DialogDescription>
           </DialogHeader>
           
+          {locateError && (
+            <div className="p-3 bg-red-100 text-red-700 rounded mb-4">{locateError}</div>
+          )}
+          
           <div className="relative">
-            {locationImage ? (
+            {locateDialogLocationImage ? (
               <div className="border rounded-md overflow-hidden">
                 <img 
-                  src={locationImage} 
-                  alt={item?.locationName} 
+                  src={locateDialogLocationImage} 
+                  alt={item?.locationName ?? 'Location Image'} 
                   className="max-w-full h-auto"
                 />
                 
-                {/* Overlay regions */}
-                {selectedRegionId && regions.map((region) => {
-                  if (region.id.toString() === selectedRegionId) {
+                {item?.regionId && locateDialogRegions.map((region) => {
+                  if (region.id.toString() === item.regionId.toString()) {
                     const blinkClass = blinkingRegion ? 'animate-pulse bg-yellow-500/50' : 'bg-primary/30';
                     
                     return (
@@ -491,10 +313,10 @@ export default function ItemPage({ params }: ItemParams) {
                         key={region.id}
                         className={`absolute border-2 border-yellow-500 ${blinkClass}`}
                         style={{
-                          left: `${region.x}px`,
-                          top: `${region.y}px`,
-                          width: `${region.width}px`,
-                          height: `${region.height}px`,
+                          left: `${region.x ?? region.x_coord ?? 0}px`,
+                          top: `${region.y ?? region.y_coord ?? 0}px`,
+                          width: `${region.width ?? 0}px`,
+                          height: `${region.height ?? 0}px`,
                         }}
                       >
                         <div className="absolute top-0 left-0 bg-yellow-500 text-white px-2 py-1 text-xs">
@@ -508,9 +330,11 @@ export default function ItemPage({ params }: ItemParams) {
               </div>
             ) : (
               <div className="border rounded-md p-8 text-center">
+                {!locateError && (
                 <p className="text-muted-foreground">
-                  {t('locations.noImage')}
+                    {item?.locationId ? t('common.loading') : t('locations.noImage')}
                 </p>
+                )}
               </div>
             )}
           </div>

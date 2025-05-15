@@ -300,17 +300,17 @@ export default function InventoryPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-2">
-                        <Link href={`/items/${item.id}/locate`}>
+                        <Link href={`/items/${item.id}`}>
                           <Button variant="ghost" size="icon" title={t('items.locate')}>
                             <MapPin className="h-4 w-4" />
                           </Button>
                         </Link>
-                        <Link href={`/items/${item.id}/edit`}>
+                        <Link href={`/items/${item.id}`}>
                           <Button variant="ghost" size="icon" title={t('common.edit')}>
                             <Edit className="h-4 w-4" />
                           </Button>
                         </Link>
-                        <Link href={`/items/${item.id}/delete`}>
+                        <Link href={`/items/${item.id}`}>
                           <Button variant="ghost" size="icon" title={t('common.delete')}>
                             <Trash className="h-4 w-4" />
                           </Button>

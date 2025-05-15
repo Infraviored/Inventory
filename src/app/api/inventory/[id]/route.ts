@@ -103,30 +103,38 @@ export async function PUT(
         const imageFile = formData.get('image') as File | null;
         const clearImage = formData.get('clearImage') === 'true';
 
-        // Validate required fields (still need name and locationId)
-        if (!name || !locationIdStr) {
-            return NextResponse.json({ error: 'Missing required fields: name, locationId' }, { status: 400 });
+        // Validation: Only name is truly required for an update
+        if (!name) {
+            return NextResponse.json({ error: 'Missing required field: name' }, { status: 400 });
         }
 
-        // Parse optional fields (provide defaults or null)
-        const quantity = quantityStr ? parseInt(quantityStr) : undefined; // Keep undefined if not provided
-        const locationId = parseInt(locationIdStr); // Already validated as required
-        const regionId = regionIdStr === "null" || regionIdStr === "" || regionIdStr === null ? null : (regionIdStr ? parseInt(regionIdStr) : undefined); // Handle explicit null/empty or parse
+        // Parse optional fields (provide defaults or null/undefined)
+        const quantity = quantityStr ? parseInt(quantityStr) : undefined;
+        // Location ID can be null/undefined if not provided or explicitly cleared
+        const locationId = locationIdStr === null || locationIdStr === '' || locationIdStr === 'null'
+                           ? null
+                           : (locationIdStr ? parseInt(locationIdStr) : undefined);
+        const regionId = regionIdStr === "null" || regionIdStr === "" || regionIdStr === null
+                         ? null
+                         : (regionIdStr ? parseInt(regionIdStr) : undefined);
 
-        // Validate parsed numbers
-        if (isNaN(locationId) || (quantityStr && quantity === undefined)) {
-            return NextResponse.json({ error: 'Invalid number format for location ID or quantity' }, { status: 400 });
+        // Validate parsed numbers if they were provided
+        if (locationIdStr && locationId === undefined && !(locationIdStr === 'null' || locationIdStr === '')) {
+            return NextResponse.json({ error: 'Invalid number format for location ID' }, { status: 400 });
         }
-        if (regionIdStr && regionId === undefined && !(regionIdStr === "null" || regionIdStr === "")) { // Check if parsing failed for non-null regionId
+        if (quantityStr && quantity === undefined) {
+            return NextResponse.json({ error: 'Invalid number format for quantity' }, { status: 400 });
+        }
+        if (regionIdStr && regionId === undefined && !(regionIdStr === "null" || regionIdStr === "")) {
              return NextResponse.json({ error: 'Invalid number format for region ID' }, { status: 400 });
         }
 
         // Start transaction
-        const updateTx = db.transaction((data) => { // Pass data object
-            // 1. Get current item data (including current quantity/region if not provided)
+        const updateTx = db.transaction((data) => {
+            // 1. Get current item data (including current values if not provided in request)
             const currentItem = db.prepare(
-                'SELECT image_path, quantity, region_id FROM items WHERE id = ?'
-            ).get(data.itemId) as { image_path: string | null, quantity: number, region_id: number | null } | undefined;
+                'SELECT image_path, quantity, region_id, location_id FROM items WHERE id = ?'
+            ).get(data.itemId) as { image_path: string | null, quantity: number, region_id: number | null, location_id: number | null } | undefined;
 
             if (!currentItem) {
                 throw new Error('ItemNotFound');
@@ -136,13 +144,34 @@ export async function PUT(
             let imagePathToUpdate: string | null = oldImagePath;
 
             // Determine final values, using current if not provided in request
-            const finalName = data.name; // Name is required, use directly
-            const finalDescription = data.description; // Use provided or null
+            const finalName = data.name; // Name is required
+            const finalDescription = data.description; // Use provided (could be null)
             const finalQuantity = data.quantity !== undefined ? data.quantity : currentItem.quantity;
-            const finalLocationId = data.locationId; // LocationId is required
-            const finalRegionId = data.regionId !== undefined ? data.regionId : currentItem.region_id;
+            const finalLocationId = data.locationId !== undefined ? data.locationId : currentItem.location_id; // Use provided or current
+            const finalRegionId = data.regionId !== undefined ? data.regionId : currentItem.region_id; // Use provided or current
 
-            // 2. Handle image upload/clearing
+            // --- Constraint Checks ---
+            // Check if target location exists (only if location is being set/changed to non-null)
+            if (finalLocationId !== null) {
+                const locationCheck = db.prepare('SELECT id FROM locations WHERE id = ?').get(finalLocationId);
+                if (!locationCheck) {
+                    throw new Error('LocationNotFound');
+                }
+            } else if (finalRegionId !== null) {
+                // Cannot have a region without a location
+                throw new Error('RegionWithoutLocation');
+            }
+            // Check if target region exists AND belongs to the target location (only if region is being set/changed to non-null)
+            if (finalRegionId !== null) {
+                // We already know finalLocationId is not null here
+                 const regionCheck = db.prepare('SELECT id FROM location_regions WHERE id = ? AND location_id = ?').get(finalRegionId, finalLocationId);
+                 if (!regionCheck) {
+                      throw new Error('RegionNotFound');
+                 }
+            }
+            // --- End Constraint Checks ---
+
+            // Handle image upload/clearing
             if (data.clearImage) {
                 console.log(`[PUT /inventory/${data.itemId}] Clearing image.`);
                 imagePathToUpdate = null;
@@ -151,19 +180,6 @@ export async function PUT(
                 console.log(`[PUT /inventory/${data.itemId}] New image file found.`);
                 newImageUploaded = true;
                 imagePathToUpdate = "TEMP_NEEDS_UPLOAD"; // Placeholder for post-transaction upload
-            }
-
-            // 3. Check if target location exists
-            const locationCheck = db.prepare('SELECT id FROM locations WHERE id = ?').get(finalLocationId);
-            if (!locationCheck) {
-                 throw new Error('LocationNotFound');
-            }
-            // 3b. Check if target region exists (if specified)
-            if (finalRegionId !== null) {
-                 const regionCheck = db.prepare('SELECT id FROM location_regions WHERE id = ? AND location_id = ?').get(finalRegionId, finalLocationId);
-                 if (!regionCheck) {
-                      throw new Error('RegionNotFound');
-                 }
             }
 
             // 4. Update database record
@@ -206,93 +222,101 @@ export async function PUT(
             }
             console.log(`Updated ${tags.size} tags for item ID ${data.itemId}`);
 
-            // Return necessary info for post-transaction steps
-            return {
-                 changes: info.changes,
-                 shouldUpload: imagePathToUpdate === "TEMP_NEEDS_UPLOAD",
-                 shouldDeleteOld: newImageUploaded && oldImagePath && oldImagePath !== imagePathToUpdate
-            };
+            // Return details needed for post-transaction file handling
+            return { oldImagePath, newImageUploaded };
         });
 
-        // Data to pass into the transaction
-        const txData = {
+        // Execute Transaction, passing potentially undefined values
+        const fileHandlingInfo = updateTx({
              itemId,
              name,
              description,
              quantity,
-             locationId,
-             regionId,
+            locationId, // Pass parsed value (could be null or undefined)
+            regionId, // Pass parsed value (could be null or undefined)
              imageFile,
              clearImage
-        };
+        });
 
-        // Execute transaction
-        const txResult = updateTx(txData);
-
-        // Handle image upload *after* successful transaction if needed
-        let finalImagePath = oldImagePath;
-        if (txResult.shouldUpload && imageFile) {
+        // --- Post-Transaction File Handling ---
+        let finalImagePath: string | null = savedImagePath; // Initialize with path *before* potential new upload
+        if (fileHandlingInfo.newImageUploaded && imageFile && imageFile.size > 0) {
              try {
-                  const uploadedPath = await saveUpload(imageFile);
-                  finalImagePath = uploadedPath as any; // Use type assertion to any
-                  // Update the DB again with the actual path
+                savedImagePath = await saveUpload(imageFile); // Save the new file
+                finalImagePath = savedImagePath; // This is the path we need to update in DB
+                // Update the DB with the *actual* saved path
                   db.prepare('UPDATE items SET image_path = ? WHERE id = ?').run(finalImagePath, itemId);
-                  console.log(`[PUT /inventory/${itemId}] DB updated with final image path: ${finalImagePath}`);
-             } catch (uploadError: any) {
+                console.log(`[PUT /inventory/${itemId}] Updated DB with new image path: ${finalImagePath}`);
+            } catch (uploadError) {
                   console.error(`[PUT /inventory/${itemId}] Post-transaction image upload failed:`, uploadError);
-                  // Transaction succeeded, but upload failed. Item state might be inconsistent.
-                  // Consider how to handle this - maybe log prominently or attempt cleanup?
-                  return NextResponse.json({ error: 'Database updated, but image upload failed' }, { status: 500 });
+                // Note: Item metadata was updated, but image wasn't. Maybe log inconsistency?
+                return NextResponse.json({ warning: 'Item updated but failed to save new image', error: (uploadError as Error).message }, { status: 500 });
              }
-        }
-        // Handle clearing image (if upload didn't happen)
-        else if (clearImage) {
-             finalImagePath = null;
-             // Update the DB (might have been set to null already if !txResult.shouldUpload)
-             db.prepare('UPDATE items SET image_path = ? WHERE id = ?').run(
-                 finalImagePath === null ? null : finalImagePath, // Explicitly pass null
-                 itemId
-             );
+        } else if (fileHandlingInfo.newImageUploaded && clearImage) {
+            finalImagePath = null; // Image path was set to null in transaction
         }
 
-        // Handle old image deletion *after* successful transaction and potential new upload
-        if (txResult.shouldDeleteOld && oldImagePath && oldImagePath !== finalImagePath) {
-             deleteUpload(oldImagePath)
-                .then(() => console.log(`[PUT /inventory/${itemId}] Old image ${oldImagePath} deleted successfully.`))
-                .catch((err: any) => console.error(`[PUT /inventory/${itemId}] Failed to delete old image ${oldImagePath}:`, err));
+        // Delete old image AFTER new one is saved and DB record updated (if applicable)
+        if (fileHandlingInfo.newImageUploaded && fileHandlingInfo.oldImagePath) {
+            try {
+                await deleteUpload(fileHandlingInfo.oldImagePath);
+                console.log(`[PUT /inventory/${itemId}] Deleted old image: ${fileHandlingInfo.oldImagePath}`);
+            } catch (deleteError) {
+                console.error(`[PUT /inventory/${itemId}] Failed to delete old image ${fileHandlingInfo.oldImagePath}:`, deleteError);
+                // Non-critical error, log it but don't fail the request
+            }
         }
+        // --- End File Handling ---
 
-        // Fetch and return updated item (including joined names)
+        // Fetch the updated item data (including joined names) to return
         const updatedItemResult = db.prepare(`
              SELECT i.*, l.name as location_name, r.name as region_name
              FROM items i
              LEFT JOIN locations l ON i.location_id = l.id
              LEFT JOIN location_regions r ON i.region_id = r.id
              WHERE i.id = ?
-        `).get(itemId);
+        `).get(itemId) as ItemQueryResult | undefined;
 
-        return NextResponse.json(formatItem(updatedItemResult as ItemQueryResult)); // Cast and format
+        if (!updatedItemResult) {
+            console.error(`[PUT /inventory/${itemId}] Failed to fetch updated item after successful update.`);
+            // Return success but indicate data fetch failed, or maybe error?
+
+            // For now, return a generic success, but log the issue.
+            return NextResponse.json({ message: 'Item updated, but failed to fetch confirmation data.' });
+        }
+
+        return NextResponse.json(formatItem(updatedItemResult));
 
     } catch (error: any) {
         console.error(`[PUT /inventory/${itemId}] Error updating item:`, error);
-
         // Handle specific transaction errors
-        if (error.message === 'ItemNotFound' || error.message === 'ItemNotFoundDuringUpdate') {
+        if (error.message === 'ItemNotFound') {
             return NextResponse.json({ error: 'Item not found' }, { status: 404 });
         }
         if (error.message === 'LocationNotFound') {
-            return NextResponse.json({ error: 'Target location not found' }, { status: 400 });
+            return NextResponse.json({ error: 'Specified location does not exist' }, { status: 400 });
         }
         if (error.message === 'RegionNotFound') {
-             return NextResponse.json({ error: 'Target region not found or does not belong to location' }, { status: 400 });
+            return NextResponse.json({ error: 'Specified region does not exist or does not belong to the location' }, { status: 400 });
         }
-
-        // Clean up newly uploaded file ONLY if transaction failed *before* the upload attempt
-        // If upload happened post-transaction and failed, it's handled above.
-        // This cleanup might be less relevant with the deferred upload approach.
-        // if (newImageUploaded && savedImagePath && savedImagePath !== oldImagePath) { ... }
-
-        return NextResponse.json({ error: `Failed to update item: ${error.message || 'Unknown error'}` }, { status: 500 });
+        if (error.message === 'RegionWithoutLocation') {
+            return NextResponse.json({ error: 'Cannot assign a region without assigning a location' }, { status: 400 });
+        }
+        if (error.message === 'ItemNotFoundDuringUpdate') {
+            return NextResponse.json({ error: 'Item was deleted during the update process' }, { status: 409 }); // Conflict
+        }
+        // Handle generic database errors
+        if (error instanceof Database.SqliteError) {
+            // Log the specific code for debugging
+            console.error(`[PUT /inventory/${itemId}] SQLite Error Code: ${error.code}`);
+            // Check for Foreign Key constraint specifically if needed
+            if (error.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
+                return NextResponse.json({ error: `Database constraint failed: ${error.message}` }, { status: 400 });
+            }
+            return NextResponse.json({ error: `Database error: ${error.message}` }, { status: 500 });
+        }
+        // Fallback for other errors
+        return NextResponse.json({ error: `Failed to update item: ${error.message}` }, { status: 500 });
     }
 }
 

@@ -46,7 +46,8 @@
       "description": "Description",
       "image": "Image"
     },
-    "clearImage": "Clear Image"
+    "clearImage": "Clear Image",
+    "close": "Close"
   },
   "form": {
     "steps": {
@@ -77,7 +78,11 @@
       "box": "Box",
       "other": "Other",
       "selectType": "Select type..."
-    }
+    },
+    "noneFound": "No locations found. Please add one first.",
+    "select": "Select Location",
+    "deselect": "Deselect Location",
+    "searchNotFound": "No locations match your search."
   },
   "regions": {
     "title": "Region Mapper",
@@ -143,7 +148,8 @@
     "showing": "Showing",
     "of": "of",
     "listView": "List View",
-    "gridView": "Grid View"
+    "gridView": "Grid View",
+    "addSuccess": "Item added successfully"
   },
   "items": {
     "title": "Items",
@@ -185,7 +191,8 @@
     "enterQuery": "Enter a search term to find items in your inventory",
     "withLocation": "With Location",
     "withoutLocation": "Without Location",
-    "searchTip": "Try searching by item name, description, or location"
+    "searchTip": "Try searching by item name, description, or location",
+    "searchPlaceholder": "Search by name or description..."
   },
   "images": {
     "selectImage": "Select Image",

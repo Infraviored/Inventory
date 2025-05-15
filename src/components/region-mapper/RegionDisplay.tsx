@@ -37,7 +37,7 @@ export function RegionDisplay({
   isSelectMode = false
 }: RegionDisplayProps) {
   const { t } = useLanguage();
-  
+
   const baseClasses = "absolute";
   const zIndex = isSelected ? 20 : 10;
 

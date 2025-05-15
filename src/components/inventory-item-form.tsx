@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { getLocations, getLocationRegions, addInventoryItem, Location, Region } from '@/lib/api';
+import React, { useState, useEffect } from 'react';
+import { getLocations, getLocationRegions, addInventoryItem, getLocationById, Location, Region } from '@/lib/api';
 import { ImageInput } from './image-input';
 import LocationCarousel from './location-carousel';
 import { useRouter } from 'next/navigation';
@@ -21,10 +21,13 @@ interface InventoryItemFormProps {
     quantity: number;
     locationId?: number;
     regionId?: number;
+    imagePath?: string | null;
   };
+  error?: string | null;
+  setError?: (error: string | null) => void;
 }
 
-export default function InventoryItemForm({ onSubmit, initialData }: InventoryItemFormProps) {
+export default function InventoryItemForm({ onSubmit, initialData, error, setError }: InventoryItemFormProps) {
   const router = useRouter();
   const { t } = useLanguage();
   const [name, setName] = useState(initialData?.name || '');
@@ -38,11 +41,11 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
   const [regions, setRegions] = useState<Region[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [locationSearch, setLocationSearch] = useState('');
 
   // Fetch locations
   useEffect(() => {
+    if (!initialData?.locationId) {
     const fetchLocations = async () => {
       try {
         setLoading(true);
@@ -50,14 +53,30 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
         setLocations(data);
       } catch (err) {
         console.error('Error fetching locations:', err);
-        setError(t('common.error') + ': ' + t('locations.title'));
+          setError?.(t('common.error') + ': ' + t('locations.title'));
       } finally {
         setLoading(false);
       }
     };
-    
     fetchLocations();
-  }, [t]);
+    } else {
+      const fetchInitialLocationDetails = async () => {
+        if (initialData?.locationId) {
+          try {
+            setLoading(true);
+            const locData = await getLocationById(initialData.locationId);
+            setLocations([locData]);
+          } catch (locErr) {
+            console.error('Error fetching initial location details:', locErr);
+            setError?.(t('common.error') + ': ' + t('locations.title'));
+          } finally {
+            setLoading(false);
+          }
+        }
+      };
+      fetchInitialLocationDetails();
+    }
+  }, [initialData?.locationId, t, setError]);
 
   // Fetch regions when location changes
   useEffect(() => {
@@ -79,26 +98,27 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
         }
       } catch (err) {
         console.error('Error fetching regions:', err);
-        setError(t('common.error') + ': ' + t('regions.title'));
+        setError?.(t('common.error') + ': ' + t('regions.title'));
       } finally {
         setLoading(false);
       }
     };
     
     fetchRegions();
-  }, [locationId, regionId, t]);
+  }, [locationId, regionId, t, setError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    setError?.(null);
+    
     if (!name.trim()) {
-      alert(t('common.fields.name') + ' ' + t('common.required'));
+      setError?.(t('common.fields.name') + ' ' + t('common.required'));
       return;
     }
     
     try {
       setSubmitting(true);
-      setError(null);
       
       const formData = new FormData();
       formData.append('name', name);
@@ -131,7 +151,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
           router.push('/inventory');
         } catch (apiError: any) {
           console.error('API Error:', apiError);
-          setError(`${t('common.error')}: ${apiError.message || t('common.error')}`);
+          setError?.(`${t('common.error')}: ${apiError.message || t('common.error')}`);
           return;
         }
       }
@@ -145,7 +165,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
       setImage(null);
     } catch (err) {
       console.error('Error submitting form:', err);
-      setError(`${t('common.error')}: ${err instanceof Error ? err.message : t('common.error')}`);
+      setError?.(`${t('common.error')}: ${err instanceof Error ? err.message : t('common.error')}`);
     } finally {
       setSubmitting(false);
     }
@@ -200,7 +220,7 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
         <Label className="block text-sm font-medium mb-1">
           {t('common.fields.image')} ({t('common.optional')})
         </Label>
-        <ImageInput onImageChange={(file) => setImage(file)} showUploadSuccessMessage={false} />
+        <ImageInput onImageChange={(file) => setImage(file)} showUploadSuccessMessage={false} initialImageUrl={initialData?.imagePath} />
       </div>
       
       {/* === Location Selection Section (Conditional) === */}
@@ -217,8 +237,8 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
               onChange={(e) => setLocationSearch(e.target.value)}
               className="w-full"
             />
-          </div>
-
+        </div>
+        
           <div className="space-y-2">
             <Label className="block text-sm font-medium">
               {t('inventory.selectLocation') || 'Select Location'} ({t('common.optional')})
@@ -233,15 +253,15 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
               </div>
             )}
             {!loading && !error && filteredLocations.length > 0 && (
-              <div className="mb-4">
-                <LocationCarousel
+          <div className="mb-4">
+            <LocationCarousel 
                   locations={filteredLocations}
-                  onSelectLocation={handleLocationSelect}
-                  selectedLocationId={locationId}
-                />
-              </div>
-            )}
+              onSelectLocation={handleLocationSelect}
+              selectedLocationId={locationId}
+            />
           </div>
+        )}
+      </div>
         </div>
       )}
 
@@ -281,10 +301,10 @@ export default function InventoryItemForm({ onSubmit, initialData }: InventoryIt
           )}
         </div>
       )}
-
+      
       <div className="pt-4">
-        <Button type="submit" disabled={submitting}>
-          {submitting ? t('common.loading') : t('common.save')}
+        <Button type="submit" disabled={submitting || loading}>
+          {submitting ? t('common.loading') : (initialData ? t('common.update') : t('common.save'))}
         </Button>
       </div>
     </form>

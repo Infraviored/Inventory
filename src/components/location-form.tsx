@@ -418,7 +418,7 @@ export function LocationForm({
             )}
           </div>
             
-          {!imagePreview ? (
+            {!imagePreview ? (
               <div className="flex flex-col items-center justify-center border border-dashed border-border rounded-md bg-muted/50 dark:bg-muted/20 dark:border-border p-6 text-center h-full">
                 <div className="mb-4">
                   <div className="text-lg font-medium mb-2 text-foreground">{t('locations.uploadImage')}</div>

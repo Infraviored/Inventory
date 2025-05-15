@@ -71,18 +71,18 @@ export function RegionList({
                       <PencilIcon className="h-4 w-4" />
                     </Button>
                     {/* Delete Button */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
+            <Button
+              variant="ghost"
+              size="icon"
                       className="h-6 w-6 text-muted-foreground hover:text-destructive dark:hover:text-destructive-foreground hover:bg-destructive/10 dark:hover:bg-destructive/50"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRemoveRegion(region.id);
-                      }}
-                      aria-label={t('common.delete') || "Delete region"}
-                    >
-                      <XIcon className="h-4 w-4" />
-                    </Button>
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemoveRegion(region.id);
+              }}
+              aria-label={t('common.delete') || "Delete region"}
+            >
+              <XIcon className="h-4 w-4" />
+            </Button>
                 </div>
             )}
           </li>
