@@ -1,22 +1,25 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
+import { NextResponse } from 'next/server';
 
-const UPLOADS_DIR = path.resolve(process.cwd(), 'public/uploads');
+const UPLOADS_DIR_RELATIVE_TO_PUBLIC = 'uploads';
+const UPLOADS_DIR_ABSOLUTE = path.resolve(process.cwd(), 'public', UPLOADS_DIR_RELATIVE_TO_PUBLIC);
 
-// Ensure uploads directory exists on server start (or lazily)
-async function ensureUploadsDir(): Promise<void> {
+// Ensure uploads directory exists
+async function ensureUploadsDirExists() {
     try {
-        await fs.access(UPLOADS_DIR);
+        await fs.mkdir(UPLOADS_DIR_ABSOLUTE, { recursive: true });
+        // console.log(`[FileHandler] Uploads directory ensured: ${UPLOADS_DIR_ABSOLUTE}`);
     } catch (error) {
-        console.log(`Uploads directory not found at ${UPLOADS_DIR}. Creating...`);
-        await fs.mkdir(UPLOADS_DIR, { recursive: true });
-        console.log(`Uploads directory created.`);
+        console.error('[FileHandler] Error creating uploads directory:', error);
+        // Depending on the application's needs, you might want to throw this error
+        // or handle it in a way that doesn't prevent the app from starting.
     }
 }
 
-// Call it once, potentially during initialization
-ensureUploadsDir().catch(err => console.error("Failed to ensure uploads directory:", err));
+// Call it once when the module loads
+ensureUploadsDirExists();
 
 // Generates a unique filename while preserving the extension
 function generateUniqueFilename(originalFilename: string): string {
@@ -28,67 +31,67 @@ function generateUniqueFilename(originalFilename: string): string {
 }
 
 /**
- * Saves an uploaded file to the public/uploads directory.
- * @param file The File object received from FormData.
- * @returns The unique filename under which the file was saved.
- * @throws If saving fails.
+ * Saves an uploaded file to the server.
+ * @param file The File object to save.
+ * @returns The public path to the saved file (e.g., /uploads/filename.ext).
+ * @throws Will throw an error if saving fails.
  */
 export async function saveUpload(file: File): Promise<string> {
-    if (!file) {
-        throw new Error('No file provided to saveUpload.');
+    if (!file || typeof file.arrayBuffer !== 'function') {
+        throw new Error('Invalid file object provided to saveUpload.');
     }
-    
-    await ensureUploadsDir();
 
-    const uniqueFilename = generateUniqueFilename(file.name);
-    const savePath = path.join(UPLOADS_DIR, uniqueFilename);
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
 
-    console.log(`Attempting to save uploaded file to: ${savePath}`);
+    // Create a unique filename to avoid overwrites, or use the original if preferred and handle collisions.
+    // For simplicity, using original name prefixed with timestamp if desired, or just original name.
+    // Consider a more robust unique naming strategy for production (e.g., UUID + original extension).
+    const filename = generateUniqueFilename(file.name);
+    const filePath = path.join(UPLOADS_DIR_ABSOLUTE, filename);
 
     try {
-        // Get the file content as an ArrayBuffer
-        const arrayBuffer = await file.arrayBuffer();
-        // Convert the ArrayBuffer directly to a Uint8Array, which fs.writeFile accepts
-        const uint8Array = new Uint8Array(arrayBuffer);
-        
-        // Write the Uint8Array to the file system
-        await fs.writeFile(savePath, uint8Array);
-        
-        console.log(`File saved successfully: ${uniqueFilename}`);
-        return uniqueFilename; 
+        // Create a Uint8Array view from the ArrayBuffer of the Node.js Buffer
+        await fs.writeFile(filePath, new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.length));
+        console.log(`[FileHandler] File saved successfully: ${filePath}`);
+        // Return the public path relative to the public folder
+        return `/${UPLOADS_DIR_RELATIVE_TO_PUBLIC}/${filename}`;
     } catch (error) {
-        console.error(`Failed to save file ${uniqueFilename}:`, error);
-        throw new Error(`Failed to save uploaded file: ${error instanceof Error ? error.message : String(error)}`);
+        console.error('[FileHandler] Error saving file:', error);
+        throw new Error(`Failed to save file: ${(error as Error).message}`);
     }
 }
 
 /**
- * Deletes a file from the public/uploads directory.
- * @param filename The name of the file to delete.
- * @returns Promise resolving when deletion is attempted.
+ * Deletes an uploaded file from the server.
+ * @param publicPath The public path of the file to delete (e.g., /uploads/filename.ext).
+ * @throws Will throw an error if deletion fails (e.g., file not found), but logs it.
  */
-export async function deleteUpload(filename: string | null | undefined): Promise<void> {
-    if (!filename) {
-        console.log('deleteUpload called with no filename, skipping.');
-        return; // Nothing to delete
+export async function deleteUpload(publicPath: string): Promise<void> {
+    if (!publicPath) {
+        console.warn('[FileHandler] deleteUpload called with no publicPath.');
+        return;
     }
 
-    const filePath = path.join(UPLOADS_DIR, filename);
-    console.log(`Attempting to delete file: ${filePath}`);
+    // Convert public path to absolute file system path
+    // Example: /uploads/image.png -> /path/to/project/public/uploads/image.png
+    const filename = path.basename(publicPath);
+    const filePath = path.join(UPLOADS_DIR_ABSOLUTE, filename);
 
     try {
-        await fs.access(filePath); // Check if file exists
         await fs.unlink(filePath);
-        console.log(`File deleted successfully: ${filename}`);
+        console.log(`[FileHandler] File deleted successfully: ${filePath}`);
     } catch (error: any) {
-        // If the error is ENOENT (file not found), it's not really an error in this context
+        // Log error but don't necessarily throw, as it might be a non-critical cleanup step
+        // (e.g., trying to delete a file that was already deleted or never existed).
         if (error.code === 'ENOENT') {
-            console.log(`File not found, skipping deletion: ${filename}`);
+            console.warn(`[FileHandler] File not found for deletion (may have already been deleted): ${filePath}`);
         } else {
-            // Log other errors (e.g., permissions)
-            console.error(`Failed to delete file ${filename}:`, error);
-            // Decide if you want to throw an error here or just log it
+            console.error(`[FileHandler] Error deleting file ${filePath}:`, error);
+            // Optionally re-throw if this should be a critical failure:
             // throw new Error(`Failed to delete file: ${error.message}`);
         }
     }
-} 
+}
+
+console.log('[FileHandler] File Handler initialized. Uploads to:', UPLOADS_DIR_ABSOLUTE); 

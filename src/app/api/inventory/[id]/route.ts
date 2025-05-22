@@ -1,400 +1,193 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@lib/db';
-import { saveUpload, deleteUpload } from '@lib/file-handler'; // CORRECT ALIAS
-// import { saveUpload, deleteUpload } from '../../../../lib/file-handler'; // Use relative path for now
-import Database from 'better-sqlite3'; // Import Database for SqliteError check
+import {
+    getItemById as getItemByIdFromDb,
+    updateItem as updateItemInDb,
+    deleteItem as deleteItemInDb,
+    getLocationById as getLocationByIdFromDb, // For validation during update
+    Item, // Import type from new db lib
+    Location // For location name resolution
+} from '@lib/db';
+// import { saveUpload, deleteUpload } from '@lib/file-handler'; // Temporarily remove for simplification
 
-// Interface for the item data including joined names (needed for fetch after update)
-interface ItemQueryResult {
-    id: number;
-    name: string;
-    description: string | null;
-    quantity: number;
-    location_id: number;
-    region_id: number | null;
-    image_path: string | null;
-    created_at: string;
-    updated_at: string;
-    location_name: string | null; // Joined from locations
-    region_name: string | null;   // Joined from location_regions
-}
-
-// Helper to format item data (consistent with inventory/route.ts)
-// Takes the full query result but formats for API response
-function formatItem(item: ItemQueryResult | any): any { // Allow broader input for GET simplicity
+// Helper to format item data for API response
+function formatApiResponseItem(item: Item, location?: Location): any { 
     if (!item) return null;
     return {
         id: item.id,
         name: item.name,
         description: item.description,
-        quantity: item.quantity, // Add quantity
+        quantity: item.quantity,
         locationId: item.location_id,
-        regionId: item.region_id, // Add regionId
-        imagePath: item.image_path ? `/uploads/${item.image_path}` : null,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
-        // Include names if available from query
-        locationName: item.location_name,
-        regionName: item.region_name
+        regionId: item.region_id,
+        imagePath: item.imagePath, // JSON DB stores the direct path or name
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        tags: item.tags || [],
+        locationName: location ? location.name : null,
+        // TODO: regionName: if needed, fetch region from location.regions using item.region_id
     };
 }
 
 // GET /api/inventory/:id - Fetches a specific item
-export async function GET(
-    request: NextRequest,
-    { params }: { params: { id: string } }
-) {
-    const { id } = params;
-    const itemId = parseInt(id);
-    const db = getDb();
-
-    if (isNaN(itemId)) {
-        return NextResponse.json({ error: 'Invalid item ID' }, { status: 400 });
-    }
-
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
     try {
-        // Join tables to get location/region names
-        const stmt = db.prepare(`
-            SELECT i.*, l.name as location_name, r.name as region_name
-            FROM items i
-            LEFT JOIN locations l ON i.location_id = l.id
-            LEFT JOIN location_regions r ON i.region_id = r.id
-            WHERE i.id = ?
-        `);
-        const item = stmt.get(itemId) as ItemQueryResult | undefined;
+        const itemId = parseInt(params.id);
+        if (isNaN(itemId)) {
+            return NextResponse.json({ error: 'Invalid item ID' }, { status: 400 });
+        }
+
+        const item = getItemByIdFromDb(itemId);
 
         if (!item) {
             return NextResponse.json({ error: 'Item not found' }, { status: 404 });
         }
 
-        return NextResponse.json(formatItem(item)); // Use updated formatter
-    } catch (error) {
-        console.error(`Error fetching item ${itemId}:`, error);
-        return NextResponse.json({ error: 'Failed to fetch item' }, { status: 500 });
+        // Fetch location to include locationName in the response
+        let itemLocation: Location | undefined;
+        if (item.location_id) {
+            itemLocation = getLocationByIdFromDb(item.location_id);
+        }
+        
+        console.log(`[JSON_DB_API] Fetched item ${itemId}`);
+        return NextResponse.json(formatApiResponseItem(item, itemLocation));
+    } catch (error: any) {
+        console.error(`[JSON_DB_API] Error fetching item ${params.id}:`, error);
+        return NextResponse.json({ error: `Failed to fetch item: ${error.message}` }, { status: 500 });
     }
 }
 
 // PUT /api/inventory/:id - Updates a specific item
-export async function PUT(
-    request: NextRequest,
-    { params }: { params: { id: string } }
-) {
-    const { id } = params;
-    const itemId = parseInt(id);
-    const db = getDb();
-    let savedImagePath: string | null = null;
-    let oldImagePath: string | null = null;
-    let newImageUploaded = false;
-
-    if (isNaN(itemId)) {
-        return NextResponse.json({ error: 'Invalid item ID' }, { status: 400 });
-    }
-
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
     try {
-        const formData = await request.formData();
-        console.log(`[PUT /inventory/${itemId}] Received FormData keys:`, Array.from(formData.keys()));
+        const itemId = parseInt(params.id);
+        if (isNaN(itemId)) {
+            return NextResponse.json({ error: 'Invalid item ID' }, { status: 400 });
+        }
 
-        // Extract fields
+        const formData = await request.formData();
+        console.log(`[JSON_DB_API] PUT /inventory/${itemId} FormData keys:`, Array.from(formData.keys()));
+
         const name = formData.get('name') as string | null;
         const description = formData.get('description') as string | null;
-        const quantityStr = formData.get('quantity') as string | null; // Get quantity
+        const quantityStr = formData.get('quantity') as string | null;
         const locationIdStr = formData.get('locationId') as string | null;
-        const regionIdStr = formData.get('regionId') as string | null; // Get regionId
+        const regionIdStr = formData.get('regionId') as string | null;
         const imageFile = formData.get('image') as File | null;
         const clearImage = formData.get('clearImage') === 'true';
+        const tagsJson = formData.get('tags') as string | null;
 
-        // Validation: Only name is truly required for an update
-        if (!name) {
-            return NextResponse.json({ error: 'Missing required field: name' }, { status: 400 });
+        const updateData: Partial<Omit<Item, 'id' | 'createdAt' | 'updatedAt'>> = {};
+
+        if (name !== null) updateData.name = name;
+        if (description !== undefined) updateData.description = description; // Allow setting to null or empty string
+        if (quantityStr !== null) {
+            const quantity = parseInt(quantityStr);
+            if (isNaN(quantity)) return NextResponse.json({ error: 'Invalid quantity format' }, { status: 400 });
+            updateData.quantity = quantity;
+        }
+        if (locationIdStr !== null) {
+            const locationId = parseInt(locationIdStr);
+            if (isNaN(locationId)) return NextResponse.json({ error: 'Invalid locationId format' }, { status: 400 });
+            updateData.location_id = locationId;
+        }
+        if (regionIdStr !== undefined) { // Allow regionId to be explicitly set to null
+            if (regionIdStr === null || regionIdStr.toLowerCase() === 'null' || regionIdStr === '') {
+                 updateData.region_id = null;
+            } else {
+                const regionId = parseInt(regionIdStr);
+                if (isNaN(regionId)) return NextResponse.json({ error: 'Invalid regionId format' }, { status: 400 });
+                updateData.region_id = regionId;
+            }
         }
 
-        // Parse optional fields (provide defaults or null/undefined)
-        const quantity = quantityStr ? parseInt(quantityStr) : undefined;
-        // Location ID can be null/undefined if not provided or explicitly cleared
-        const locationId = locationIdStr === null || locationIdStr === '' || locationIdStr === 'null'
-                           ? null
-                           : (locationIdStr ? parseInt(locationIdStr) : undefined);
-        const regionId = regionIdStr === "null" || regionIdStr === "" || regionIdStr === null
-                         ? null
-                         : (regionIdStr ? parseInt(regionIdStr) : undefined);
-
-        // Validate parsed numbers if they were provided
-        if (locationIdStr && locationId === undefined && !(locationIdStr === 'null' || locationIdStr === '')) {
-            return NextResponse.json({ error: 'Invalid number format for location ID' }, { status: 400 });
+        let imagePathToStore: string | null | undefined = undefined; // undefined means no change
+        if (clearImage) {
+            imagePathToStore = null; 
+        } else if (imageFile && imageFile.size > 0) {
+            imagePathToStore = imageFile.name; // Store file name
         }
-        if (quantityStr && quantity === undefined) {
-            return NextResponse.json({ error: 'Invalid number format for quantity' }, { status: 400 });
+        if (imagePathToStore !== undefined) {
+            updateData.imagePath = imagePathToStore;
         }
-        if (regionIdStr && regionId === undefined && !(regionIdStr === "null" || regionIdStr === "")) {
-             return NextResponse.json({ error: 'Invalid number format for region ID' }, { status: 400 });
-        }
-
-        // Start transaction
-        const updateTx = db.transaction((data) => {
-            // 1. Get current item data (including current values if not provided in request)
-            const currentItem = db.prepare(
-                'SELECT image_path, quantity, region_id, location_id FROM items WHERE id = ?'
-            ).get(data.itemId) as { image_path: string | null, quantity: number, region_id: number | null, location_id: number | null } | undefined;
-
-            if (!currentItem) {
-                throw new Error('ItemNotFound');
-            }
-            oldImagePath = currentItem.image_path;
-            savedImagePath = oldImagePath;
-            let imagePathToUpdate: string | null = oldImagePath;
-
-            // Determine final values, using current if not provided in request
-            const finalName = data.name; // Name is required
-            const finalDescription = data.description; // Use provided (could be null)
-            const finalQuantity = data.quantity !== undefined ? data.quantity : currentItem.quantity;
-            const finalLocationId = data.locationId !== undefined ? data.locationId : currentItem.location_id; // Use provided or current
-            const finalRegionId = data.regionId !== undefined ? data.regionId : currentItem.region_id; // Use provided or current
-
-            // --- Constraint Checks ---
-            // Check if target location exists (only if location is being set/changed to non-null)
-            if (finalLocationId !== null) {
-                const locationCheck = db.prepare('SELECT id FROM locations WHERE id = ?').get(finalLocationId);
-                if (!locationCheck) {
-                    throw new Error('LocationNotFound');
-                }
-            } else if (finalRegionId !== null) {
-                // Cannot have a region without a location
-                throw new Error('RegionWithoutLocation');
-            }
-            // Check if target region exists AND belongs to the target location (only if region is being set/changed to non-null)
-            if (finalRegionId !== null) {
-                // We already know finalLocationId is not null here
-                 const regionCheck = db.prepare('SELECT id FROM location_regions WHERE id = ? AND location_id = ?').get(finalRegionId, finalLocationId);
-                 if (!regionCheck) {
-                      throw new Error('RegionNotFound');
-                 }
-            }
-            // --- End Constraint Checks ---
-
-            // Handle image upload/clearing
-            if (data.clearImage) {
-                console.log(`[PUT /inventory/${data.itemId}] Clearing image.`);
-                imagePathToUpdate = null;
-                newImageUploaded = true;
-            } else if (data.imageFile && data.imageFile.size > 0) {
-                console.log(`[PUT /inventory/${data.itemId}] New image file found.`);
-                newImageUploaded = true;
-                imagePathToUpdate = "TEMP_NEEDS_UPLOAD"; // Placeholder for post-transaction upload
-            }
-
-            // 4. Update database record
-            const itemUpdateStmt = db.prepare(
-                'UPDATE items SET name = ?, location_id = ?, description = ?, quantity = ?, region_id = ?, image_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-            );
-            const info = itemUpdateStmt.run(
-                finalName,
-                finalLocationId,
-                finalDescription,
-                finalQuantity,
-                finalRegionId,
-                imagePathToUpdate === "TEMP_NEEDS_UPLOAD" ? oldImagePath : imagePathToUpdate,
-                data.itemId
-            );
-
-            if (info.changes === 0) {
-                 throw new Error('ItemNotFoundDuringUpdate');
-            }
-
-            // 5. Update Tags
-            const deleteTagsStmt = db.prepare('DELETE FROM item_tags WHERE item_id = ?');
-            const insertTagStmt = db.prepare('INSERT INTO item_tags (item_id, tag) VALUES (?, ?)');
-
-            deleteTagsStmt.run(data.itemId);
-            const tags = new Set<string>();
-            if (finalName) {
-                 tags.add(finalName.toLowerCase());
-            }
-            if (finalDescription) {
-                 finalDescription.toLowerCase().split(/\s+/).forEach((word: any) => {
-                      const cleanWord = word.replace(/[^a-z0-9]/gi, '');
-                      if (cleanWord.length > 3) {
-                          tags.add(cleanWord);
-                      }
-                 });
-            }
-            for (const tag of tags) {
-                 insertTagStmt.run(data.itemId, tag);
-            }
-            console.log(`Updated ${tags.size} tags for item ID ${data.itemId}`);
-
-            // Return details needed for post-transaction file handling
-            return { oldImagePath, newImageUploaded };
-        });
-
-        // Execute Transaction, passing potentially undefined values
-        const fileHandlingInfo = updateTx({
-             itemId,
-             name,
-             description,
-             quantity,
-            locationId, // Pass parsed value (could be null or undefined)
-            regionId, // Pass parsed value (could be null or undefined)
-             imageFile,
-             clearImage
-        });
-
-        // --- Post-Transaction File Handling ---
-        let finalImagePath: string | null = savedImagePath; // Initialize with path *before* potential new upload
-        if (fileHandlingInfo.newImageUploaded && imageFile && imageFile.size > 0) {
-             try {
-                savedImagePath = await saveUpload(imageFile); // Save the new file
-                finalImagePath = savedImagePath; // This is the path we need to update in DB
-                // Update the DB with the *actual* saved path
-                  db.prepare('UPDATE items SET image_path = ? WHERE id = ?').run(finalImagePath, itemId);
-                console.log(`[PUT /inventory/${itemId}] Updated DB with new image path: ${finalImagePath}`);
-            } catch (uploadError) {
-                  console.error(`[PUT /inventory/${itemId}] Post-transaction image upload failed:`, uploadError);
-                // Note: Item metadata was updated, but image wasn't. Maybe log inconsistency?
-                return NextResponse.json({ warning: 'Item updated but failed to save new image', error: (uploadError as Error).message }, { status: 500 });
-             }
-        } else if (fileHandlingInfo.newImageUploaded && clearImage) {
-            finalImagePath = null; // Image path was set to null in transaction
-        }
-
-        // Delete old image AFTER new one is saved and DB record updated (if applicable)
-        if (fileHandlingInfo.newImageUploaded && fileHandlingInfo.oldImagePath) {
+        
+        if (tagsJson) {
             try {
-                await deleteUpload(fileHandlingInfo.oldImagePath);
-                console.log(`[PUT /inventory/${itemId}] Deleted old image: ${fileHandlingInfo.oldImagePath}`);
-            } catch (deleteError) {
-                console.error(`[PUT /inventory/${itemId}] Failed to delete old image ${fileHandlingInfo.oldImagePath}:`, deleteError);
-                // Non-critical error, log it but don't fail the request
+                const parsedTags = JSON.parse(tagsJson);
+                if (!Array.isArray(parsedTags) || !parsedTags.every(t => typeof t === 'string')) {
+                    throw new Error('Tags must be an array of strings.');
+                }
+                updateData.tags = parsedTags;
+            } catch (e) {
+                if (typeof tagsJson === 'string') {
+                    updateData.tags = tagsJson.split(',').map(tag => tag.trim()).filter(Boolean);
+                } else {
+                     console.warn('[JSON_DB_API] Invalid tags format for update, expected JSON array or comma-separated string.');
+                }
             }
         }
-        // --- End File Handling ---
+        // Auto-update tags if name or description changes and tags are not explicitly provided
+        const existingItem = getItemByIdFromDb(itemId);
+        if (!existingItem) {
+            return NextResponse.json({ error: 'Item not found for auto-tag update check' }, { status: 404 });
+        }
+        
+        const finalName = updateData.name ?? existingItem.name;
+        const finalDescription = updateData.description ?? existingItem.description;
+        const currentTags = new Set<string>((updateData.tags ?? existingItem.tags ?? []).map(t=>t.toLowerCase()));
 
-        // Fetch the updated item data (including joined names) to return
-        const updatedItemResult = db.prepare(`
-             SELECT i.*, l.name as location_name, r.name as region_name
-             FROM items i
-             LEFT JOIN locations l ON i.location_id = l.id
-             LEFT JOIN location_regions r ON i.region_id = r.id
-             WHERE i.id = ?
-        `).get(itemId) as ItemQueryResult | undefined;
-
-        if (!updatedItemResult) {
-            console.error(`[PUT /inventory/${itemId}] Failed to fetch updated item after successful update.`);
-            // Return success but indicate data fetch failed, or maybe error?
-
-            // For now, return a generic success, but log the issue.
-            return NextResponse.json({ message: 'Item updated, but failed to fetch confirmation data.' });
+        if (updateData.name || updateData.description !== undefined) { // If name or desc is changing
+            if (finalName) currentTags.add(finalName.toLowerCase());
+            if (finalDescription) {
+                finalDescription.toLowerCase().split(/\s+/).forEach(word => {
+                    const cleanWord = word.replace(/[^a-z0-9]/gi, '');
+                    if (cleanWord.length > 2) currentTags.add(cleanWord);
+                });
+            }
+            updateData.tags = Array.from(currentTags);
         }
 
-        return NextResponse.json(formatItem(updatedItemResult));
+        const updatedItem = updateItemInDb(itemId, updateData);
+
+        if (!updatedItem) {
+            return NextResponse.json({ error: 'Item not found or update failed' }, { status: 404 });
+        }
+
+        let itemLocation: Location | undefined;
+        if (updatedItem.location_id) {
+            itemLocation = getLocationByIdFromDb(updatedItem.location_id);
+        }
+
+        console.log(`[JSON_DB_API] Successfully updated item ID ${itemId}.`);
+        return NextResponse.json(formatApiResponseItem(updatedItem, itemLocation));
 
     } catch (error: any) {
-        console.error(`[PUT /inventory/${itemId}] Error updating item:`, error);
-        // Handle specific transaction errors
-        if (error.message === 'ItemNotFound') {
-            return NextResponse.json({ error: 'Item not found' }, { status: 404 });
-        }
-        if (error.message === 'LocationNotFound') {
-            return NextResponse.json({ error: 'Specified location does not exist' }, { status: 400 });
-        }
-        if (error.message === 'RegionNotFound') {
-            return NextResponse.json({ error: 'Specified region does not exist or does not belong to the location' }, { status: 400 });
-        }
-        if (error.message === 'RegionWithoutLocation') {
-            return NextResponse.json({ error: 'Cannot assign a region without assigning a location' }, { status: 400 });
-        }
-        if (error.message === 'ItemNotFoundDuringUpdate') {
-            return NextResponse.json({ error: 'Item was deleted during the update process' }, { status: 409 }); // Conflict
-        }
-        // Handle generic database errors
-        if (error instanceof Database.SqliteError) {
-            // Log the specific code for debugging
-            console.error(`[PUT /inventory/${itemId}] SQLite Error Code: ${error.code}`);
-            // Check for Foreign Key constraint specifically if needed
-            if (error.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
-                return NextResponse.json({ error: `Database constraint failed: ${error.message}` }, { status: 400 });
-            }
-            return NextResponse.json({ error: `Database error: ${error.message}` }, { status: 500 });
-        }
-        // Fallback for other errors
+        console.error(`[JSON_DB_API] Error updating item ${params.id}:`, error);
         return NextResponse.json({ error: `Failed to update item: ${error.message}` }, { status: 500 });
     }
 }
 
 // DELETE /api/inventory/:id - Deletes a specific item
-export async function DELETE(
-    request: NextRequest,
-    { params }: { params: { id: string } }
-) {
-    const { id } = params;
-    const itemId = parseInt(id);
-    const db = getDb();
-
-    if (isNaN(itemId)) {
-        return NextResponse.json({ error: 'Invalid item ID' }, { status: 400 });
-    }
-
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
     try {
-         // Use transaction for consistency
-        const deleteTx = db.transaction(() => {
-            // 1. Get current item to find image path
-            const item: { image_path: string | null } | undefined = db.prepare(
-                 'SELECT image_path FROM items WHERE id = ?'
-                 ).get(itemId) as { image_path: string | null } | undefined;
-
-             if (!item) {
-                return { success: false, status: 404, error: 'Item not found' };
-            }
-            const imagePathToDelete = item.image_path;
-
-            // 2. Delete associated tags FIRST (or ensure FK cascade delete)
-            const deleteTagsStmt = db.prepare('DELETE FROM item_tags WHERE item_id = ?');
-            const tagInfo = deleteTagsStmt.run(itemId);
-            console.log(`[DELETE /inventory/${itemId}] Deleted ${tagInfo.changes} tags.`);
-
-            // 3. Delete item from database
-            const itemDeleteInfo = db.prepare('DELETE FROM items WHERE id = ?').run(itemId);
-
-            if (itemDeleteInfo.changes === 0) {
-                 // Item disappeared between check and delete, or tags deleted but item failed?
-                 // Throw an error to rollback the tag deletion
-                 throw new Error('ItemNotFoundDuringDelete');
-            }
-
-            // 4. Delete associated image file AFTER successful DB deletion
-            if (imagePathToDelete) {
-                 // Defer the async operation until after transaction commits
-                 // deleteUpload(imagePathToDelete).catch(...) // Handled outside transaction
-            }
-
-            // Return info needed for post-transaction steps
-            return { success: true, status: 200, imagePathToDelete };
-        });
-
-        const result = deleteTx();
-
-        // Post-transaction image deletion
-        if (result.success && result.imagePathToDelete) {
-            deleteUpload(result.imagePathToDelete)
-                .then(() => console.log(`[DELETE /inventory/${itemId}] Image ${result.imagePathToDelete} deleted.`))
-                .catch((err: any) => console.error(`[DELETE /inventory/${itemId}] Failed to delete image ${result.imagePathToDelete}:`, err));
+        const itemId = parseInt(params.id);
+        if (isNaN(itemId)) {
+            return NextResponse.json({ error: 'Invalid item ID' }, { status: 400 });
         }
 
-        if (!result.success) {
-             // Error already contains status and message from transaction return
-             return NextResponse.json({ error: result.error }, { status: result.status });
+        // TODO: If images were stored, delete associated image file from disk here.
+        // const itemToDelete = getItemByIdFromDb(itemId);
+        // if (itemToDelete && itemToDelete.imagePath) { ... delete file ... }
+
+        const success = deleteItemInDb(itemId);
+
+        if (!success) {
+            return NextResponse.json({ error: 'Item not found or delete failed' }, { status: 404 });
         }
 
+        console.log(`[JSON_DB_API] Successfully deleted item ID ${itemId}.`);
         return NextResponse.json({ message: 'Item deleted successfully' });
-
     } catch (error: any) {
-        console.error(`[DELETE /inventory/${itemId}] Error deleting item:`, error);
-        // Handle specific transaction errors like ItemNotFoundDuringDelete
-        if (error.message === 'ItemNotFoundDuringDelete') {
-             return NextResponse.json({ error: 'Item not found during delete process' }, { status: 404 });
-        }
-        if (error instanceof Database.SqliteError) {
-             return NextResponse.json({ error: `Database error: ${error.message}` }, { status: 500 });
-        }
-        return NextResponse.json({ error: 'Failed to delete item' }, { status: 500 });
+        console.error(`[JSON_DB_API] Error deleting item ${params.id}:`, error);
+        return NextResponse.json({ error: `Failed to delete item: ${error.message}` }, { status: 500 });
     }
 }

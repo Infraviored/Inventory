@@ -1,0 +1,92 @@
+{
+  "locations": [
+    {
+      "name": "test",
+      "description": null,
+      "parentId": null,
+      "imagePath": "/uploads/Blank_3d96fc94-e7a0-470a-8b9f-6620180e5dc4.jpg",
+      "locationType": null,
+      "createdAt": "2025-05-22T08:36:41.141Z",
+      "updatedAt": "2025-05-22T08:36:41.141Z",
+      "id": 4,
+      "regions": []
+    },
+    {
+      "name": "schrank1",
+      "description": "",
+      "parentId": null,
+      "imagePath": "/uploads/customized-wardrobe-svelte-series-sliding-door-wardrobe-ssldw2-picket-and-rail-32247152410694_1200x_36159c4a-e141-4f64-8261-49a44dbb1b46.webp",
+      "locationType": "cabinet",
+      "createdAt": "2025-05-22T08:37:13.735Z",
+      "updatedAt": "2025-05-22T08:37:54.376Z",
+      "id": 5,
+      "regions": [
+        {
+          "name": "Fach1",
+          "x": 437.9052369077307,
+          "y": 196.35910833268392,
+          "width": 188.5286783042394,
+          "height": 83.79052369077307,
+          "id": 6,
+          "location_id": 5,
+          "createdAt": "2025-05-22T08:37:54.376Z",
+          "updatedAt": "2025-05-22T08:37:54.376Z"
+        },
+        {
+          "name": "Fach2",
+          "x": 437.9052369077307,
+          "y": 288.1296818987687,
+          "width": 188.5286783042394,
+          "height": 83.79052369077307,
+          "id": 7,
+          "location_id": 5,
+          "createdAt": "2025-05-22T08:37:54.376Z",
+          "updatedAt": "2025-05-22T08:37:54.376Z"
+        }
+      ]
+    }
+  ],
+  "location_regions": [
+    {
+      "name": "Fach1",
+      "x": 437.9052369077307,
+      "y": 196.35910833268392,
+      "width": 188.5286783042394,
+      "height": 83.79052369077307,
+      "id": 6,
+      "location_id": 5,
+      "createdAt": "2025-05-22T08:37:54.376Z",
+      "updatedAt": "2025-05-22T08:37:54.376Z"
+    },
+    {
+      "name": "Fach2",
+      "x": 437.9052369077307,
+      "y": 288.1296818987687,
+      "width": 188.5286783042394,
+      "height": 83.79052369077307,
+      "id": 7,
+      "location_id": 5,
+      "createdAt": "2025-05-22T08:37:54.376Z",
+      "updatedAt": "2025-05-22T08:37:54.376Z"
+    }
+  ],
+  "items": [
+    {
+      "name": "testobj",
+      "description": null,
+      "quantity": 1,
+      "imagePath": null,
+      "location_id": 5,
+      "region_id": 6,
+      "id": 1,
+      "createdAt": "2025-05-22T08:38:32.300Z",
+      "updatedAt": "2025-05-22T08:38:32.300Z",
+      "tags": [
+        "testobj"
+      ]
+    }
+  ],
+  "nextLocationId": 6,
+  "nextRegionId": 8,
+  "nextItemId": 2
+}

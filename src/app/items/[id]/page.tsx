@@ -53,6 +53,7 @@ import {
 import { useLanguage } from '@/lib/language';
 import Link from 'next/link';
 import InventoryItemForm from '@/components/inventory-item-form';
+import { LocationViewer } from '@/components/location-viewer';
 
 interface ItemParams {
   params: {
@@ -152,13 +153,18 @@ export default function ItemPage({ params }: ItemParams) {
         setLocateDialogLocationImage(locationData.imagePath); // Use the correct path from API response
 
         // Fetch regions for the location
-        if (item.regionId) { // Only fetch regions if the item has one assigned
-            const regionsData = await getLocationRegions(item.locationId);
-            setLocateDialogRegions(regionsData); 
+        let fetchedRegions: any[] = [];
+        if (locationData.id) { // Ensure locationData has an id to fetch regions for
+            fetchedRegions = await getLocationRegions(locationData.id);
+            setLocateDialogRegions(fetchedRegions); 
+        }
 
-            // Start blinking effect for the specific region
-      setBlinkingRegion(true);
+        // Start blinking effect for the specific region if item has a regionId and it is found in fetchedRegions
+        if (item.regionId && fetchedRegions.some(r => r.id === item.regionId)) {
+            setBlinkingRegion(true);
             setTimeout(() => setBlinkingRegion(false), 5000); // Stop after 5s
+        } else if (item.regionId) {
+            console.warn(`Item's regionId ${item.regionId} not found in fetched regions for location ${locationData.id}`);
         }
         
     } catch (err) {
@@ -280,65 +286,30 @@ export default function ItemPage({ params }: ItemParams) {
       <Dialog open={showLocateDialog} onOpenChange={setShowLocateDialog}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{t('items.locateItem')}: {item?.name}</DialogTitle>
+            <DialogTitle>{t('items.locateTitle')}</DialogTitle>
             <DialogDescription>
-              {item?.locationName && (
-                <span>
-                  {t('items.location')}: {item.locationName}
-                  {item.regionName && ` / ${item.regionName}`}
-                </span>
-              )}
+              {t('items.locateDescription')}
             </DialogDescription>
           </DialogHeader>
-          
-          {locateError && (
-            <div className="p-3 bg-red-100 text-red-700 rounded mb-4">{locateError}</div>
-          )}
-          
-          <div className="relative">
-            {locateDialogLocationImage ? (
-              <div className="border rounded-md overflow-hidden">
-                <img 
-                  src={locateDialogLocationImage} 
-                  alt={item?.locationName ?? 'Location Image'} 
-                  className="max-w-full h-auto"
-                />
-                
-                {item?.regionId && locateDialogRegions.map((region) => {
-                  if (region.id.toString() === item.regionId.toString()) {
-                    const blinkClass = blinkingRegion ? 'animate-pulse bg-yellow-500/50' : 'bg-primary/30';
-                    
-                    return (
-                      <div 
-                        key={region.id}
-                        className={`absolute border-2 border-yellow-500 ${blinkClass}`}
-                        style={{
-                          left: `${region.x ?? region.x_coord ?? 0}px`,
-                          top: `${region.y ?? region.y_coord ?? 0}px`,
-                          width: `${region.width ?? 0}px`,
-                          height: `${region.height ?? 0}px`,
-                        }}
-                      >
-                        <div className="absolute top-0 left-0 bg-yellow-500 text-white px-2 py-1 text-xs">
-                          {region.name}
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                })}
-              </div>
+          <div className="mt-4 min-h-[300px] flex flex-col items-center justify-center">
+            {locateError ? (
+              <p className="text-red-500">{locateError}</p>
+            ) : locateDialogLocationImage ? (
+              <LocationViewer 
+                imageSrc={locateDialogLocationImage}
+                regions={locateDialogRegions}
+                highlightedRegionId={blinkingRegion ? item?.regionId : null}
+                className="w-full h-auto max-h-[70vh] aspect-[4/3]"
+                defaultRegionBorderColor="#60a5fa"
+                selectedRegionBorderColor="#ef4444"
+              />
             ) : (
-              <div className="border rounded-md p-8 text-center">
-                {!locateError && (
-                <p className="text-muted-foreground">
-                    {item?.locationId ? t('common.loading') : t('locations.noImage')}
-                </p>
-                )}
+              <div className="flex flex-col items-center">
+                <Loader2 className="h-8 w-8 animate-spin mb-2" />
+                <p>{t('common.loading')}</p>
               </div>
             )}
           </div>
-          
           <DialogFooter>
             <Button onClick={() => setShowLocateDialog(false)}>
               {t('common.close')}

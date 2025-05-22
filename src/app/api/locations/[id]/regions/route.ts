@@ -1,64 +1,69 @@
 // Updated API route to use the storage provider instead of Flask backend
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@lib/db';
+import {
+    getLocationById as getLocationByIdFromDb,
+    // We might need a specific function to add a region if POST is kept
+    LocationRegion // Import type from new db lib
+} from '@lib/db';
 
 // Force dynamic rendering/evaluation for this route
 export const dynamic = 'force-dynamic';
 
 // Helper to format region data (consistent format)
-function formatRegion(region: any): any {
+function formatApiResponseRegion(region: LocationRegion): any {
     if (!region) return null;
     return {
         id: region.id,
         locationId: region.location_id,
         name: region.name,
-        x: region.x_coord,
-        y: region.y_coord,
+        x: region.x,
+        y: region.y,
         width: region.width,
         height: region.height,
-        createdAt: region.created_at,
-        updatedAt: region.updated_at
+        createdAt: region.createdAt,
+        updatedAt: region.updatedAt
     };
 }
 
 // GET /api/locations/:id/regions - Fetches regions for a specific location
-export async function GET(request: NextRequest) {
-    // Extract ID from pathname
-    const pathname = request.nextUrl.pathname;
-    const segments = pathname.split('/'); // e.g., ['', 'api', 'locations', '11', 'regions']
-    const id = segments[segments.length - 2]; // ID is the second to last segment
+export async function GET(request: NextRequest, context: { params: { id: string } }) {
+    // The { params } object is directly available in dynamic routes
+    const locationIdStr = context.params.id;
+    console.log(`[JSON_DB_API GET /locations/${locationIdStr}/regions] Received request.`);
 
-    console.log(`[GET /locations/.../regions] Parsed ID from pathname (${pathname}): ${id}`);
-
-    const locationId = parseInt(id);
-    const db = getDb();
+    const locationId = parseInt(locationIdStr);
 
     if (isNaN(locationId)) {
         return NextResponse.json({ error: 'Invalid location ID format in URL' }, { status: 400 });
     }
 
     try {
-        // Check if location exists (optional, but good practice)
-        const locationCheck = db.prepare('SELECT id FROM locations WHERE id = ?').get(locationId);
-        if (!locationCheck) {
+        const location = getLocationByIdFromDb(locationId);
+        
+        if (!location) {
             return NextResponse.json({ error: `Location with ID ${locationId} not found` }, { status: 404 });
         }
 
-        const stmt = db.prepare('SELECT * FROM location_regions WHERE location_id = ?');
-        const regions = stmt.all(locationId);
+        const regions = location.regions || [];
+        console.log(`[JSON_DB_API GET /locations/${locationIdStr}/regions] Found ${regions.length} regions.`);
+        return NextResponse.json(regions.map(formatApiResponseRegion));
 
-        return NextResponse.json(regions.map(formatRegion));
-    } catch (error) {
-        console.error(`Error fetching regions for location ${locationId}:`, error);
-        return NextResponse.json({ error: 'Failed to fetch regions' }, { status: 500 });
+    } catch (error: any) {
+        console.error(`[JSON_DB_API GET /locations/${locationIdStr}/regions] Error fetching regions:`, error);
+        return NextResponse.json({ error: `Failed to fetch regions: ${error.message}` }, { status: 500 });
     }
 }
 
+/* 
 // POST /api/locations/:id/regions - Creates a new region for a location
+// Commenting out for now, as region creation is handled by POST /api/locations and PUT /api/locations/:id
+// If a separate endpoint to add a region to an EXISTING location is needed, this can be implemented
+// with a new db function like `addRegionToLocation(locationId, regionData)`.
+
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
     const { id } = params;
     const locationId = parseInt(id);
-    const db = getDb();
+    // const db = getDb(); // Old DB call
 
     if (isNaN(locationId)) {
         return NextResponse.json({ error: 'Invalid location ID' }, { status: 400 });
@@ -76,33 +81,35 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             return NextResponse.json({ error: 'Missing required fields (name, x, y, width, height)' }, { status: 400 });
         }
 
-        // Check if parent location exists
-        const locationCheck = db.prepare('SELECT id FROM locations WHERE id = ?').get(locationId);
-        if (!locationCheck) {
-            return NextResponse.json({ error: `Location with ID ${locationId} not found` }, { status: 404 });
-        }
+        // TODO: Implement with new DB logic if needed
+        // 1. Check if parent location exists using getLocationByIdFromDb(locationId)
+        // 2. Create a new function in lib/db.ts: addRegionToLocation(locationId, newRegionData)
+        //    This function would:
+        //      - Load the DB
+        //      - Find the location
+        //      - Generate a new region ID
+        //      - Create the new region object
+        //      - Add it to the global `location_regions` array
+        //      - Add it (or its copy) to the `regions` array of the found location object
+        //      - Save the DB
+        //      - Return the new region
+        // 3. Call that function here.
 
-        // Insert the new region
-        const stmt = db.prepare(
-            'INSERT INTO location_regions (location_id, name, x_coord, y_coord, width, height) VALUES (?, ?, ?, ?, ?, ?)'
-        );
-        const info = stmt.run(locationId, name, x, y, width, height);
-        const newRegionId = info.lastInsertRowid;
+        // Placeholder for the new logic:
+        // const newRegion = await addRegionToLocation(locationId, { name, x, y, width, height });
+        // if (!newRegion) {
+        //     return NextResponse.json({ error: 'Failed to create region or location not found' }, { status: 500 });
+        // }
+        // return NextResponse.json(formatApiResponseRegion(newRegion), { status: 201 });
 
-        // Fetch and return the newly created region
-        const newRegion = db.prepare('SELECT * FROM location_regions WHERE id = ?').get(newRegionId);
+        return NextResponse.json({ message: 'POST to /locations/:id/regions not yet implemented with JSON DB' }, { status: 501 });
 
-        if (!newRegion) {
-             return NextResponse.json({ error: 'Failed to retrieve region after creation' }, { status: 500 });
-        }
-
-        return NextResponse.json(formatRegion(newRegion), { status: 201 });
     } catch (error: any) {
         console.error(`Error creating region for location ${locationId}:`, error);
-        // Handle potential JSON parsing errors explicitly
         if (error instanceof SyntaxError) {
              return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
         }
         return NextResponse.json({ error: `Failed to create region: ${error.message || 'Unknown error'}` }, { status: 500 });
     }
 }
+*/

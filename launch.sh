@@ -10,23 +10,21 @@ echo "================================================="
 # Kill existing Next.js processes
 echo "Stopping any existing frontend services..."
 pkill -f "node.*next" || echo "No frontend processes running"
-sleep 1 # Shorter sleep as only one service to kill
+sleep 1
 
 # Start frontend (Next.js)
 echo "Starting frontend on port 3000..."
 cd "$(dirname "$0")"
-# Remove NEXT_PUBLIC_API_BASE_URL as it's no longer needed
-npm run dev &
-FRONTEND_PID=$!
-echo "Frontend started with PID: $FRONTEND_PID"
 
 echo "================================================="
-echo "Service started successfully!"
-echo "Frontend: http://localhost:3000"
-# Remove backend URL info
+echo "Starting Next.js development server in the foreground..."
+echo "Press Ctrl+C to stop the frontend service."
 echo "================================================="
-echo "Press Ctrl+C to stop the frontend service"
 
-# Wait for user to press Ctrl+C
-trap "echo 'Stopping frontend...'; kill $FRONTEND_PID; exit" INT
-wait
+# Run npm run dev in the foreground
+npm run dev
+
+# The script will end when npm run dev is stopped (e.g., by Ctrl+C)
+# No need for PID management or trap if run in foreground
+
+echo "Frontend service stopped."
