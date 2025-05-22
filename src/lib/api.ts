@@ -40,7 +40,7 @@ export interface InventoryItem {
   name: string;
   description: string | null;
   quantity: number;
-  imagePath: string | null;
+  imageFilename: string | null;
   locationId: number | null;
   locationName: string | null;
   regionId: number | null;

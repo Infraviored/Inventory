@@ -86,18 +86,18 @@ export default function LocationCarousel({
                       width={300} // Provide explicit width
                       height={300} // Provide explicit height
                       className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                    />
-                  ) : (
+            />
+          ) : (
                     <div className="w-full h-full bg-muted flex items-center justify-center">
                       <span className="text-muted-foreground text-sm">{t('common.noImage') || 'No Image'}</span>
-                    </div>
-                  )}
+            </div>
+          )}
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 text-white">
                     <h3 className="text-sm font-semibold truncate" title={location.name}>{location.name}</h3>
-                  </div>
+          </div>
                 </CardContent>
               </Card>
-            </div>
+        </div>
           </CarouselItem>
         ))}
       </CarouselContent>

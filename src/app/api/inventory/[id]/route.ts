@@ -39,15 +39,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             return NextResponse.json({ error: 'Invalid item ID' }, { status: 400 });
         }
         // console.log(`[JSON_DB_API] Attempting to fetch item ${itemId}`);
-        const item = getItemByIdFromDb(itemId); 
+        const item = getItemByIdFromDb(itemId);
         if (item) {
             // console.log(`[JSON_DB_API] Fetched item ${itemId}:`, item);
-            // Fetch location to include locationName in the response
-            let itemLocation: Location | undefined;
-            if (item.location_id) {
-                itemLocation = getLocationByIdFromDb(item.location_id);
-            }
-            return NextResponse.json(formatApiResponseItem(item, itemLocation));
+        // Fetch location to include locationName in the response
+        let itemLocation: Location | undefined;
+        if (item.location_id) {
+            itemLocation = getLocationByIdFromDb(item.location_id);
+        }
+        return NextResponse.json(formatApiResponseItem(item, itemLocation));
         } else {
             // console.log(`[JSON_DB_API] Item ${itemId} not found`);
             return NextResponse.json({ error: 'Item not found' }, { status: 404 });

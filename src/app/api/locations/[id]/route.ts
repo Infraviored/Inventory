@@ -130,7 +130,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
                 const parsedRegions = JSON.parse(regionsJson);
                 if (Array.isArray(parsedRegions)) {
                     // Optionally, add validation for each region object here
-                    updateData.regions = parsedRegions.map((r: any) => ({
+                updateData.regions = parsedRegions.map((r: any) => ({
                         name: r.name || '', // Ensure name is at least an empty string
                         x: parseFloat(r.x) || 0,
                         y: parseFloat(r.y) || 0,
@@ -138,7 +138,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
                         height: parseFloat(r.height) || 0,
                         // Preserve other properties if they exist and are needed by db schema
                         ...(r.id && { id: r.id }), // Keep ID if present (for updates of existing regions)
-                    }));
+                }));
                 } else {
                     console.warn("[JSON_DB_API PUT /locations/:id] Parsed regions is not an array:", parsedRegions);
                     updateData.regions = []; // Default to empty if not an array
@@ -203,7 +203,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
         const success = deleteLocationInDb(locationId);
         if (success) {
-            return NextResponse.json({ message: 'Location deleted successfully' });
+        return NextResponse.json({ message: 'Location deleted successfully' });
         } else {
             return NextResponse.json({ error: 'Location not found' }, { status: 404 });
         }

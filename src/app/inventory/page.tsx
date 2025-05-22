@@ -198,23 +198,12 @@ export default function InventoryPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12"></TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleSort('name')}>
+                  <TableHead className="w-20">{t('items.image')}</TableHead>
+                  <TableHead className="min-w-[200px] cursor-pointer" onClick={() => handleSort('name')}>
                     <div className="flex items-center">
                       {t('common.fields.name')}
                       <ArrowUpDown className="ml-2 h-4 w-4" />
                       {sortField === 'name' && (
-                        <span className="ml-1 text-xs">
-                          {sortDirection === 'asc' ? '↑' : '↓'}
-                        </span>
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleSort('quantity')}>
-                    <div className="flex items-center">
-                      {t('items.quantity')}
-                      <ArrowUpDown className="ml-2 h-4 w-4" />
-                      {sortField === 'quantity' && (
                         <span className="ml-1 text-xs">
                           {sortDirection === 'asc' ? '↑' : '↓'}
                         </span>
@@ -226,6 +215,17 @@ export default function InventoryPage() {
                       {t('items.location')}
                       <ArrowUpDown className="ml-2 h-4 w-4" />
                       {sortField === 'location' && (
+                        <span className="ml-1 text-xs">
+                          {sortDirection === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('quantity')}>
+                    <div className="flex items-center">
+                      {t('items.quantity')}
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                      {sortField === 'quantity' && (
                         <span className="ml-1 text-xs">
                           {sortDirection === 'asc' ? '↑' : '↓'}
                         </span>
@@ -250,71 +250,56 @@ export default function InventoryPage() {
                 {filteredAndSortedItems.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell>
-                      {item.imagePath ? (
-                        <div className="w-10 h-10 rounded-md overflow-hidden">
+                      <div className="w-16 h-16 rounded-md overflow-hidden bg-muted">
+                        {item.imageFilename ? (
                           <img 
-                            src={item.imagePath} 
                             alt={item.name} 
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover" 
+                            src={`/api/images/inventory/${item.imageFilename}`} 
                           />
-                        </div>
-                      ) : (
-                        <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center">
-                          <span className="text-xs text-muted-foreground">
-                            {t('common.noImage')}
-                          </span>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                            {t('items.noImage')}
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">{item.name}</div>
                       {item.description && (
-                        <div className="text-sm text-muted-foreground line-clamp-1">
+                        <p className="text-xs text-muted-foreground truncate max-w-xs">
                           {item.description}
-                        </div>
+                        </p>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {item.locationName ? (
+                        <span className="text-sm">{item.locationName}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">{t('locations.none')}</span>
                       )}
                     </TableCell>
                     <TableCell>{item.quantity}</TableCell>
                     <TableCell>
-                      {item.locationName ? (
-                        <div>
-                          <div>{item.locationName}</div>
-                          {item.regionName && (
-                            <div className="text-xs text-muted-foreground">
-                              {item.regionName}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">
-                          {t('locations.none')}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {item.updatedAt ? (
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(item.updatedAt).toLocaleDateString()}
-                        </span>
-                      ) : '-'}
+                      <span className="text-sm text-muted-foreground">
+                        {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : 'N/A'}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-2">
-                        <Link href={`/items/${item.id}`}>
-                          <Button variant="ghost" size="icon" title={t('items.locate')}>
+                        <Link href={`/items/${item.id}/locate`}>
+                          <Button variant="outline" size="icon" title={t('items.locateAction')}>
                             <MapPin className="h-4 w-4" />
                           </Button>
                         </Link>
                         <Link href={`/items/${item.id}`}>
-                          <Button variant="ghost" size="icon" title={t('common.edit')}>
+                          <Button variant="outline" size="icon" title={t('items.editAction')}>
                             <Edit className="h-4 w-4" />
                           </Button>
                         </Link>
-                        <Link href={`/items/${item.id}`}>
-                          <Button variant="ghost" size="icon" title={t('common.delete')}>
-                            <Trash className="h-4 w-4" />
-                          </Button>
-                        </Link>
+                        <Button variant="outline" size="icon" title={t('items.deleteAction')} onClick={() => console.log('Delete item:', item.id)} className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90">
+                          <Trash className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>

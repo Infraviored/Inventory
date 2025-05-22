@@ -10,16 +10,10 @@ const BASE_IMAGES_PATH = path.resolve(process.cwd(), 'data', 'images');
 // Define allowed categories for security
 const ALLOWED_CATEGORIES = ['locations', 'inventory', 'items']; // 'items' as an alias for 'inventory' if needed
 
-interface RouteContext {
-  params: {
-    category: string;
-    filename: string;
-  };
-}
-
-export async function GET(request: NextRequest, context: RouteContext) {
-  // Explicitly access params from the context object, which might satisfy Next.js
-  const params = context.params;
+export async function GET(
+  request: NextRequest, 
+  { params }: { params: { category: string; filename: string } }
+) {
   const { category, filename } = params;
 
   // --- Security Validations ---

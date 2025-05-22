@@ -15,15 +15,6 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { 
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -35,25 +26,18 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { 
-  MapPin, 
-  Save, 
   Trash, 
   ArrowLeft, 
-  Camera, 
   Loader2 
 } from 'lucide-react';
 import { 
   getInventoryItemById, 
-  getLocationById, 
-  getLocationRegions, 
-  getLocations,
   updateInventoryItem,
   deleteInventoryItem
 } from '@/lib/api';
 import { useLanguage } from '@/lib/language';
 import Link from 'next/link';
 import InventoryItemForm from '@/components/inventory-item-form';
-import { LocationViewer } from '@/components/location-viewer';
 
 export default function ItemPage() {
   const { t } = useLanguage();
@@ -66,11 +50,6 @@ export default function ItemPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [showLocateDialog, setShowLocateDialog] = useState(false);
-  const [blinkingRegion, setBlinkingRegion] = useState<boolean>(false);
-  const [locateDialogLocationImage, setLocateDialogLocationImage] = useState<string | null>(null);
-  const [locateDialogRegions, setLocateDialogRegions] = useState<any[]>([]);
-  const [locateError, setLocateError] = useState<string | null>(null);
   
   // Fetch item data
   useEffect(() => {
@@ -128,47 +107,6 @@ export default function ItemPage() {
     }
   };
   
-  // Adjust Handle locate to fetch data
-  const handleLocate = async () => { 
-    if (!item?.locationId) { 
-        setLocateError('Item has no location assigned.'); 
-        setShowLocateDialog(true); // Still show dialog to display error
-        return;
-    }
-
-    setShowLocateDialog(true);
-    setLocateError(null);
-    setBlinkingRegion(false); // Reset blink
-    setLocateDialogLocationImage(null); // Reset image
-    setLocateDialogRegions([]); // Reset regions
-    
-    try {
-        // Fetch location details (including image)
-        const locationData = await getLocationById(item.locationId);
-        setLocateDialogLocationImage(locationData.imagePath); // Use the correct path from API response
-
-        // Fetch regions for the location
-        let fetchedRegions: any[] = [];
-        if (locationData.id) { // Ensure locationData has an id to fetch regions for
-            fetchedRegions = await getLocationRegions(locationData.id);
-            setLocateDialogRegions(fetchedRegions); 
-        }
-
-        // Start blinking effect for the specific region if item has a regionId and it is found in fetchedRegions
-        if (item.regionId && fetchedRegions.some(r => r.id === item.regionId)) {
-            setBlinkingRegion(true);
-            setTimeout(() => setBlinkingRegion(false), 5000); // Stop after 5s
-        } else if (item.regionId) {
-            console.warn(`Item's regionId ${item.regionId} not found in fetched regions for location ${locationData.id}`);
-        }
-        
-    } catch (err) {
-        console.error('Error fetching data for locate dialog:', err);
-        setLocateError(t('common.error') + ': Failed to load location/region details.');
-        // Keep dialog open to show error
-    }
-  };
-  
   // Render loading state
   if (loading) {
     return (
@@ -205,21 +143,15 @@ export default function ItemPage() {
       <div className="flex justify-between items-center">
         <div className="flex items-center space-x-4">
           <Link href="/inventory">
-            <Button variant="outline" size="icon">
+            <Button variant="outline" size="icon" aria-label={t('common.back')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold">{item?.name}</h1>
+          <h1 className="text-3xl font-bold">
+            {item ? `${t('items.editTitle')}: ${item.name}` : t('items.editTitle')}
+          </h1>
         </div>
         <div className="flex space-x-2">
-          <Button 
-            variant="outline" 
-            onClick={handleLocate}
-          >
-            <MapPin className="mr-2 h-4 w-4" />
-            {t('items.locate')}
-          </Button>
-          
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive">
@@ -256,55 +188,26 @@ export default function ItemPage() {
         </div>
       </div>
       
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded my-4">
+      {error && !saving && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
           <p>{error}</p>
         </div>
       )}
       
-      <div className="max-w-3xl mx-auto">
+      {item && (
         <InventoryItemForm 
+          onSubmit={handleUpdate} 
           initialData={item} 
-          onSubmit={handleUpdate}
-          error={error}
-          setError={setError}
+          error={error}      // Pass general error state to form
+          setError={setError}  // Allow form to set/clear general error state
         />
-      </div>
-      
-      <Dialog open={showLocateDialog} onOpenChange={setShowLocateDialog}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{t('items.locateTitle')}</DialogTitle>
-            <DialogDescription>
-              {t('items.locateDescription')}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="mt-4 min-h-[300px] flex flex-col items-center justify-center">
-            {locateError ? (
-              <p className="text-red-500">{locateError}</p>
-            ) : locateDialogLocationImage ? (
-              <LocationViewer 
-                imageSrc={locateDialogLocationImage}
-                regions={locateDialogRegions}
-                highlightedRegionId={blinkingRegion ? item?.regionId : null}
-                className="w-full h-auto max-h-[70vh] aspect-[4/3]"
-                defaultRegionBorderColor="#60a5fa"
-                selectedRegionBorderColor="#ef4444"
-              />
-            ) : (
-              <div className="flex flex-col items-center">
-                <Loader2 className="h-8 w-8 animate-spin mb-2" />
-                <p>{t('common.loading')}</p>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setShowLocateDialog(false)}>
-              {t('common.close')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      )}
+      {saving && (
+        <div className="fixed inset-0 bg-white/50 flex items-center justify-center z-50">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="ml-2">{t('common.saving')}</p>
+        </div>
+      )}
     </div>
   );
 }

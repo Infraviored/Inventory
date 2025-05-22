@@ -47,7 +47,8 @@
       "image": "Image"
     },
     "clearImage": "Clear Image",
-    "close": "Close"
+    "close": "Close",
+    "searchPlaceholder": "Search..."
   },
   "form": {
     "steps": {
@@ -138,8 +139,8 @@
     "region": "Region",
     "noItems": "No items found. Add a new item to get started.",
     "deleteConfirm": "Are you sure you want to delete this item?",
-    "selectLocation": "-- Select Location --",
-    "selectRegion": "-- Select Region --",
+    "selectLocation": "Select Location",
+    "selectRegion": "Select Region",
     "noRegionsDefined": "No regions defined for this location. Add regions first.",
     "switchToCarousel": "Switch to Carousel",
     "switchToDropdown": "Switch to Dropdown",
@@ -149,7 +150,8 @@
     "of": "of",
     "listView": "List View",
     "gridView": "Grid View",
-    "addSuccess": "Item added successfully"
+    "addSuccess": "Item added successfully",
+    "searchLocation": "Search for a location"
   },
   "items": {
     "title": "Items",
@@ -176,7 +178,9 @@
     "deleteConfirmTitle": "Delete Item",
     "deleteConfirmDescription": "Are you sure you want to delete this item? This action cannot be undone.",
     "items": "items",
-    "recentItems": "Recent Items"
+    "recentItems": "Recent Items",
+    "locateTitle": "Locate Item",
+    "editTitle": "Edit Item"
   },
   "search": {
     "title": "Search",

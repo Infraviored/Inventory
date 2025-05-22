@@ -31,7 +31,7 @@ function formatApiResponseRegion(region: LocationRegion): any {
 interface RouteContext {
   params: {
     id: string;
-  };
+    };
 }
 
 // GET /api/locations/:id/regions - Fetches regions for a specific location

@@ -136,10 +136,10 @@ export function RegionSelector({
     return (
         <div className="flex flex-col gap-4 w-full">
             {/* Image Container */}
-            <div
+            <div 
                 ref={containerRef}
                 className="relative overflow-hidden border border-border w-full bg-muted/20 dark:bg-muted/10"
-                style={{
+                style={{ 
                     minHeight: 150, // Smaller min height for selector?
                     aspectRatio: imageSize.width && imageSize.height ? `${imageSize.width} / ${imageSize.height}` : '16 / 9',
                 }}
@@ -152,8 +152,8 @@ export function RegionSelector({
                 {!error && imageSize.width > 0 && renderedWidth > 0 && renderedHeight > 0 && (
                     <>
                         <img
-                            key={imageSrc}
-                            src={imageSrc}
+                            key={imageSrc} 
+                            src={imageSrc} 
                             alt={t('regions.locationImage') || "Location image"}
                             className="select-none pointer-events-none" // Removed: block, object-contain, max-w-full, max-h-full
                             style={{

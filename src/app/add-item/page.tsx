@@ -11,8 +11,8 @@ export default function AddItemPage() {
       </div>
       
       <div className="max-w-3xl mx-auto">
-        <div className="bg-card rounded-lg shadow-sm p-6">
-          <InventoryItemForm />
+      <div className="bg-card rounded-lg shadow-sm p-6">
+        <InventoryItemForm />
         </div>
       </div>
     </div>

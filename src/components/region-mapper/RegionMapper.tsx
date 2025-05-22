@@ -930,7 +930,7 @@ export function RegionMapper({
     <div className="flex flex-col gap-4 w-full">
       {/* Container - Styles controlled by parent/injected CSS */}
       <div 
-        ref={containerRef} 
+        ref={containerRef}
         className={`relative border border-border rounded-md overflow-hidden dark:border-border ${isCreating ? 'cursor-crosshair' : getCursorStyle(false, !!resizingRegionId, !!draggingRegionId)}`}
         style={{
           width: '100%', // Container takes full width
@@ -943,14 +943,14 @@ export function RegionMapper({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onTouchStart={handleMouseDown} // Use same handler for touch
-        onTouchMove={handleMouseMove}
-        onTouchEnd={handleMouseUp}
+        onTouchMove={handleMouseMove}   
+        onTouchEnd={handleMouseUp}     
       >
         {/* Conditional rendering based on image loading state */}
         {(!finalImageSrc || (finalImageSrc && imageSize.width === 0 && imageSize.height === 0 && !error)) && (
-            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
                 {error ? `Error: ${error}` : (finalImageSrc ? 'Loading image dimensions...' : 'No image provided')}
-            </div>
+                  </div>
         )}
         {error && (
             <div className="absolute inset-0 flex items-center justify-center text-destructive">
@@ -958,11 +958,11 @@ export function RegionMapper({
             </div>
         )}
         {finalImageSrc && imageSize.width > 0 && imageSize.height > 0 && renderedWidth > 0 && renderedHeight > 0 && (
-            <img
-                ref={imageRef}
+                      <img
+                        ref={imageRef}
                 key={finalImageSrc} 
                 src={finalImageSrc}
-                alt={t('regions.locationImage') || "Location image"}
+                        alt={t('regions.locationImage') || "Location image"}
                 className="block select-none pointer-events-none" // Removed object-cover
                 style={{
                   position: 'absolute', // Added for precise positioning
@@ -972,241 +972,241 @@ export function RegionMapper({
                   height: `${renderedHeight}px`, // Use renderedHeight
                   objectFit: 'contain', // Ensure the whole image is visible within these dimensions
                 }}
-            />
-        )}
-
-        {/* Drawing overlay - Uses display coords */}
-        {currentDrawingRegion}
-        
-        {/* Existing regions - Use RegionDisplay with display coords */}
-        {activeRegions.map((region) => (
-           <RegionDisplay
-              key={region.id} 
-              // Pass display coords directly
-              displayX={region.displayX}
-              displayY={region.displayY}
-              displayWidth={region.displayWidth}
-              displayHeight={region.displayHeight}
-              name={region.name}
-              isSelected={region.id === selectedRegionId}
-              isResizing={region.id === resizingRegionId}
-              // Pass handlers - they operate on IDs
-              onDuplicate={() => handleDuplicateRegion(region.id)} 
-              onRemove={() => handleRemoveRegion(region.id)} 
-              // Pass style config props
-              defaultBorderColor={defaultBorderColor}
-              selectedBorderColor={selectedBorderColor}
-              borderWidth={borderWidth}
-            />
-        ))}
-
-        {/* Region Form Popover - Positioned with display coords */}
-        {showForm && selectedRegionForForm && (
-             <div 
-               style={{
-                 position: 'absolute',
-                 left: `${menuPosition.x}px`, // Use state variable
-                 top: `${menuPosition.y}px`,
-                 zIndex: 20, 
-                 pointerEvents: 'all' 
-               }}
-               onClick={(e) => e.stopPropagation()}
-               onMouseDown={(e) => { formInteractionRef.current = true; e.stopPropagation(); }}
-               onMouseUp={(e) => { formInteractionRef.current = false; e.stopPropagation(); }}
-             >
-               {/* Form content unchanged... */}
-               <div 
-                 className="bg-background/80 backdrop-blur-sm border border-border rounded-md shadow-lg p-3 dark:border-border dark:bg-background/70 w-60"
-                 data-region-form="true"
-               >
-                 <div className="flex flex-col gap-2">
-                   <Label htmlFor="region-name" className="text-sm font-medium">Region Name</Label>
-                   <Input
-                     id="region-name" 
-                     value={regionName}
-                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRegionName(e.target.value)} 
-                     onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                       if (e.key === 'Enter') {
-                         e.preventDefault();
-                         handleNameRegion(regionName.trim());
-                       }
-                     }}
-                     placeholder={t('regions.namePlaceholder') || "Enter region name"}
-                     autoFocus
-                   />
-                   <div className="flex justify-end gap-2 mt-2">
-                     <Button 
-                       variant="outline" 
-                       size="sm"
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         setShowForm(false);
-                         setError(null);
-                       }}
-                     >
-                       {t('common.cancel') || 'Cancel'}
-                     </Button>
-                     <Button 
-                       size="sm"
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         handleNameRegion(regionName.trim());
-                       }}
-                     >
-                       {t('common.save') || 'Save'}
-                     </Button>
-                   </div>
-                 </div>
-               </div>
-             </div>
-          )}
-
-        {/* Snap Guides Removed for simplicity */}
-        {/* --- Snap Guides Visualization (Using Natural Coords + Scaling) --- */}
-        {snapGuides.vertical?.map((line, i) => {
-          // Need scale/offset info here
-          const { scaleX, offsetX, renderedHeight, offsetY } = getScaleOffset(); 
-          if (!scaleX) return null;
-          return (
-            <div 
-              key={`v-${i}`} 
-              className="absolute bg-red-500 w-px pointer-events-none" 
-              style={{ 
-                left: `${(line / scaleX) + offsetX}px`, // Convert natural line coord to display
-                top: `${offsetY}px`, 
-                height: `${renderedHeight}px`, 
-                zIndex: 5 
-              }}
-             />
-          )}
-        )}
-        {snapGuides.horizontal?.map((line, i) => {
-          const { scaleY, offsetY, renderedWidth, offsetX } = getScaleOffset();
-           if (!scaleY) return null;
-          return (
-            <div 
-              key={`h-${i}`} 
-              className="absolute bg-red-500 h-px pointer-events-none" 
-              style={{ 
-                top: `${(line / scaleY) + offsetY}px`, // Convert natural line coord to display
-                left: `${offsetX}px`,
-                width: `${renderedWidth}px`, 
-                zIndex: 5 
-              }}
-            /> 
-          )}
-        )}
-        {/* --- End Snap Guides --- */}
-
-        {/* --- Add Region Button (Top Left) --- */}
-        <Button
-          type="button"
-          variant={isCreating ? "secondary" : "default"}
-          size="sm"
-          className="absolute top-4 left-4 z-50 shadow" // Position top-left
-          onClick={handleToggleDrawing}
-          disabled={!imageSize.width}
-        >
-          {isCreating 
-              ? <><XIcon className="w-4 h-4 mr-1" />{t('common.cancel') || "Cancel"}</>
-              : <><PlusIcon className="w-4 h-4 mr-1" />{t('regions.addRegion') || "Add Region"}</>
-          }
-        </Button>
-        {/* --- End Add Region Button --- */}
-
-        {/* --- Settings Icon & Popover --- */}
-        <Popover open={Boolean(settingsAnchorEl)} onOpenChange={(open) => !open && setSettingsAnchorEl(null)}>
-          <PopoverTrigger asChild>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="absolute top-2 right-2 z-30 bg-white bg-opacity-75 hover:bg-opacity-100 rounded-full p-1"
-              onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
-                  // console.log('Settings button clicked, setting anchor:', event.currentTarget);
-                  setSettingsAnchorEl(event.currentTarget);
-              }} 
-              aria-label="Magnetism Settings"
-            >
-              <SettingsIcon className="h-5 w-5" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent 
-             className="w-60 z-50" // Use high z-index
-             align="end"
-             onInteractOutside={() => setSettingsAnchorEl(null)}
-          >
-             {/* Content with Magnetism and Border Styles... */}
-             <div className="grid gap-4">
-              <div className="space-y-2">
-                <h4 className="font-medium leading-none">Magnetism Settings</h4>
-                <p className="text-sm text-muted-foreground">
-                  Configure snapping behavior.
-                </p>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="magnetism-type">Type</Label>
-                <RadioGroup 
-                  id="magnetism-type"
-                  value={magnetismType} 
-                  onValueChange={(value: string) => setMagnetismType(value as MagnetismType)} 
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="none" id="m-none" />
-                    <Label htmlFor="m-none">None</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="edges" id="m-edges" />
-                    <Label htmlFor="m-edges">Edges</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="magnetism-distance">Distance (px)</Label>
-                <Input 
-                  id="magnetism-distance" 
-                  type="number" 
-                  value={magnetismDistance}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMagnetismDistance(Math.max(1, parseInt(e.target.value) || 1))} 
-                  min="1"
-                  className="col-span-2 h-8"
-                  disabled={magnetismType === 'none'}
-                />
-              </div>
-              {/* --- Border Style Settings --- */}
-              <div className="border-t border-border pt-4 mt-4"> 
-                  <h4 className="font-medium leading-none mb-2">Border Styles</h4>
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-3 items-center"> 
-                      {/* Default Border */}
-                      <Label htmlFor="default-border-color" className="text-sm">Default Color</Label>
-                      <ColorPickerPopover 
-                          id="default-border-color" 
-                          value={defaultBorderColor}
-                          onChange={setDefaultBorderColor}
                       />
-                      {/* Selected Border */}
-                      <Label htmlFor="selected-border-color" className="text-sm">Selected Color</Label>
-                      <ColorPickerPopover 
-                          id="selected-border-color" 
-                          value={selectedBorderColor}
-                          onChange={setSelectedBorderColor}
-                      />
-                      {/* Single Width Setting */}
-                      <Label htmlFor="border-width" className="text-sm">Border Width (px)</Label>
-                      <Input 
-                          id="border-width" 
-                          type="number" 
-                          value={borderWidth}
-                          onChange={(e) => setBorderWidth(Math.max(0, parseInt(e.target.value) || 0))} 
-                          min="0"
-                          className="h-8"
-                      />
-                  </div>
-              </div>
-              {/* --- End Border Style Settings --- */}
-            </div>
-          </PopoverContent>
-        </Popover>
-         {/* --- End Settings Icon & Popover --- */}
+        )}
+                      
+                      {/* Drawing overlay - Uses display coords */}
+                      {currentDrawingRegion}
+                      
+                      {/* Existing regions - Use RegionDisplay with display coords */}
+                      {activeRegions.map((region) => (
+                         <RegionDisplay
+                            key={region.id} 
+                            // Pass display coords directly
+                            displayX={region.displayX}
+                            displayY={region.displayY}
+                            displayWidth={region.displayWidth}
+                            displayHeight={region.displayHeight}
+                            name={region.name}
+                            isSelected={region.id === selectedRegionId}
+                            isResizing={region.id === resizingRegionId}
+                            // Pass handlers - they operate on IDs
+                            onDuplicate={() => handleDuplicateRegion(region.id)} 
+                            onRemove={() => handleRemoveRegion(region.id)} 
+                            // Pass style config props
+                            defaultBorderColor={defaultBorderColor}
+                            selectedBorderColor={selectedBorderColor}
+                            borderWidth={borderWidth}
+                          />
+                      ))}
+
+                      {/* Region Form Popover - Positioned with display coords */}
+                      {showForm && selectedRegionForForm && (
+                           <div 
+                             style={{
+                               position: 'absolute',
+                               left: `${menuPosition.x}px`, // Use state variable
+                               top: `${menuPosition.y}px`,
+                               zIndex: 20, 
+                               pointerEvents: 'all' 
+                             }}
+                             onClick={(e) => e.stopPropagation()}
+                             onMouseDown={(e) => { formInteractionRef.current = true; e.stopPropagation(); }}
+                             onMouseUp={(e) => { formInteractionRef.current = false; e.stopPropagation(); }}
+                           >
+                             {/* Form content unchanged... */}
+                             <div 
+                               className="bg-background/80 backdrop-blur-sm border border-border rounded-md shadow-lg p-3 dark:border-border dark:bg-background/70 w-60"
+                               data-region-form="true"
+                             >
+                               <div className="flex flex-col gap-2">
+                                 <Label htmlFor="region-name" className="text-sm font-medium">Region Name</Label>
+                                 <Input
+                                   id="region-name" 
+                                   value={regionName}
+                                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRegionName(e.target.value)} 
+                                   onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                                     if (e.key === 'Enter') {
+                                       e.preventDefault();
+                                       handleNameRegion(regionName.trim());
+                                     }
+                                   }}
+                                   placeholder={t('regions.namePlaceholder') || "Enter region name"}
+                                   autoFocus
+                                 />
+                                 <div className="flex justify-end gap-2 mt-2">
+                                   <Button 
+                                     variant="outline" 
+                                     size="sm"
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       setShowForm(false);
+                                       setError(null);
+                                     }}
+                                   >
+                                     {t('common.cancel') || 'Cancel'}
+                                   </Button>
+                                   <Button 
+                                     size="sm"
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       handleNameRegion(regionName.trim());
+                                     }}
+                                   >
+                                     {t('common.save') || 'Save'}
+                                   </Button>
+                                 </div>
+                               </div>
+                             </div>
+                           </div>
+                        )}
+
+                      {/* Snap Guides Removed for simplicity */}
+                      {/* --- Snap Guides Visualization (Using Natural Coords + Scaling) --- */}
+                      {snapGuides.vertical?.map((line, i) => {
+                        // Need scale/offset info here
+                        const { scaleX, offsetX, renderedHeight, offsetY } = getScaleOffset(); 
+                        if (!scaleX) return null;
+                        return (
+                          <div 
+                            key={`v-${i}`} 
+                            className="absolute bg-red-500 w-px pointer-events-none" 
+                            style={{ 
+                              left: `${(line / scaleX) + offsetX}px`, // Convert natural line coord to display
+                              top: `${offsetY}px`, 
+                              height: `${renderedHeight}px`, 
+                              zIndex: 5 
+                            }}
+                           />
+                        )}
+                      )}
+                      {snapGuides.horizontal?.map((line, i) => {
+                        const { scaleY, offsetY, renderedWidth, offsetX } = getScaleOffset();
+                         if (!scaleY) return null;
+                        return (
+                          <div 
+                            key={`h-${i}`} 
+                            className="absolute bg-red-500 h-px pointer-events-none" 
+                            style={{ 
+                              top: `${(line / scaleY) + offsetY}px`, // Convert natural line coord to display
+                              left: `${offsetX}px`,
+                              width: `${renderedWidth}px`, 
+                              zIndex: 5 
+                            }}
+                          /> 
+                        )}
+                      )}
+                      {/* --- End Snap Guides --- */}
+
+                      {/* --- Add Region Button (Top Left) --- */}
+                      <Button
+                        type="button"
+                        variant={isCreating ? "secondary" : "default"}
+                        size="sm"
+                        className="absolute top-4 left-4 z-50 shadow" // Position top-left
+                        onClick={handleToggleDrawing}
+                        disabled={!imageSize.width}
+                      >
+                        {isCreating 
+                            ? <><XIcon className="w-4 h-4 mr-1" />{t('common.cancel') || "Cancel"}</>
+                            : <><PlusIcon className="w-4 h-4 mr-1" />{t('regions.addRegion') || "Add Region"}</>
+                        }
+                      </Button>
+                      {/* --- End Add Region Button --- */}
+
+                      {/* --- Settings Icon & Popover --- */}
+                      <Popover open={Boolean(settingsAnchorEl)} onOpenChange={(open) => !open && setSettingsAnchorEl(null)}>
+                        <PopoverTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="absolute top-2 right-2 z-30 bg-white bg-opacity-75 hover:bg-opacity-100 rounded-full p-1"
+                            onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
+                                // console.log('Settings button clicked, setting anchor:', event.currentTarget);
+                                setSettingsAnchorEl(event.currentTarget);
+                            }} 
+                            aria-label="Magnetism Settings"
+                          >
+                            <SettingsIcon className="h-5 w-5" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent 
+                           className="w-60 z-50" // Use high z-index
+                           align="end"
+                           onInteractOutside={() => setSettingsAnchorEl(null)}
+                        >
+                           {/* Content with Magnetism and Border Styles... */}
+                           <div className="grid gap-4">
+                            <div className="space-y-2">
+                              <h4 className="font-medium leading-none">Magnetism Settings</h4>
+                              <p className="text-sm text-muted-foreground">
+                                Configure snapping behavior.
+                              </p>
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="magnetism-type">Type</Label>
+                              <RadioGroup 
+                                id="magnetism-type"
+                                value={magnetismType} 
+                                onValueChange={(value: string) => setMagnetismType(value as MagnetismType)} 
+                              >
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="none" id="m-none" />
+                                  <Label htmlFor="m-none">None</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="edges" id="m-edges" />
+                                  <Label htmlFor="m-edges">Edges</Label>
+                                </div>
+                              </RadioGroup>
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="magnetism-distance">Distance (px)</Label>
+                              <Input 
+                                id="magnetism-distance" 
+                                type="number" 
+                                value={magnetismDistance}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMagnetismDistance(Math.max(1, parseInt(e.target.value) || 1))} 
+                                min="1"
+                                className="col-span-2 h-8"
+                                disabled={magnetismType === 'none'}
+                              />
+                            </div>
+                            {/* --- Border Style Settings --- */}
+                            <div className="border-t border-border pt-4 mt-4"> 
+                                <h4 className="font-medium leading-none mb-2">Border Styles</h4>
+                                <div className="grid grid-cols-2 gap-x-2 gap-y-3 items-center"> 
+                                    {/* Default Border */}
+                                    <Label htmlFor="default-border-color" className="text-sm">Default Color</Label>
+                                    <ColorPickerPopover 
+                                        id="default-border-color" 
+                                        value={defaultBorderColor}
+                                        onChange={setDefaultBorderColor}
+                                    />
+                                    {/* Selected Border */}
+                                    <Label htmlFor="selected-border-color" className="text-sm">Selected Color</Label>
+                                    <ColorPickerPopover 
+                                        id="selected-border-color" 
+                                        value={selectedBorderColor}
+                                        onChange={setSelectedBorderColor}
+                                    />
+                                    {/* Single Width Setting */}
+                                    <Label htmlFor="border-width" className="text-sm">Border Width (px)</Label>
+                                    <Input 
+                                        id="border-width" 
+                                        type="number" 
+                                        value={borderWidth}
+                                        onChange={(e) => setBorderWidth(Math.max(0, parseInt(e.target.value) || 0))} 
+                                        min="0"
+                                        className="h-8"
+                                    />
+                                </div>
+                            </div>
+                            {/* --- End Border Style Settings --- */}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                       {/* --- End Settings Icon & Popover --- */}
       </div>
 
       {/* Right side: Controls and Region List */}

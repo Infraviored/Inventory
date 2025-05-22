@@ -268,7 +268,7 @@ export default function InventoryItemForm({ onSubmit, initialData, error, setErr
       {/* === Region Selection / Location Image Preview Section === */}
       {locationId && selectedLocationDetails && (
         <div className="space-y-2 relative border rounded-md p-4 pt-10">
-          <Button 
+          <Button
             variant="ghost"
             size="icon"
             className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive"
@@ -283,21 +283,21 @@ export default function InventoryItemForm({ onSubmit, initialData, error, setErr
             <>
               {regions && regions.length > 0 ? (
                 <>
-                  <Label htmlFor="region" className="block text-sm font-medium mb-1">
+          <Label htmlFor="region" className="block text-sm font-medium mb-1">
                     {t('inventory.selectRegion')}
-                    <span className="text-muted-foreground"> ({selectedLocationDetails.name})</span>
-                  </Label>
-                  <div className="overflow-hidden">
-                    <RegionSelector
+            <span className="text-muted-foreground"> ({selectedLocationDetails.name})</span>
+          </Label>
+            <div className="overflow-hidden">
+              <RegionSelector
                       key={selectedLocationDetails.id} // Re-mount if location changes
                       imageSrc={`/api/images/${selectedLocationDetails.imagePath}`}
-                      regions={regions}
-                      selectedRegionId={regionId?.toString() ?? null}
-                      onSelectRegion={(id: string | null) => setRegionId(id ? parseInt(id) : undefined)}
-                    />
-                  </div>
+                regions={regions}
+                selectedRegionId={regionId?.toString() ?? null}
+                onSelectRegion={(id: string | null) => setRegionId(id ? parseInt(id) : undefined)}
+              />
+            </div>
                 </>
-              ) : (
+          ) : (
                 // Location has an image but NO regions
                 <>
                   <Label className="block text-sm font-medium mb-1">
@@ -325,15 +325,15 @@ export default function InventoryItemForm({ onSubmit, initialData, error, setErr
                 {t('inventory.locationSelected') || 'Location Selected'}
                 <span className="text-muted-foreground"> ({selectedLocationDetails.name})</span>
               </Label>
-              <div className="p-4 border rounded text-center text-muted-foreground">
+            <div className="p-4 border rounded text-center text-muted-foreground">
                 {t('inventory.locationNoImageNoRegions') || 'This location has no image and no regions defined.'}
-              </div>
+            </div>
             </>
           )}
         </div>
       )}
       {/* === End Region Selection / Location Image Preview Section === */}
-
+      
       <div className="pt-4">
         <Button type="submit" disabled={submitting || loading}>
           {submitting ? t('common.loading') : (initialData ? t('common.update') : t('common.save'))}
