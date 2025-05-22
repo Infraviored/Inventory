@@ -90,7 +90,7 @@ export function RegionSelector({
     const [error, setError] = useState<string | null>(null);
     const [displayRegions, setDisplayRegions] = useState<DisplayRegion[]>([]);
 
-    const { naturalToDisplayRect } = useImageDisplayCoordinates(containerRef, imageSize);
+    const { getScaleOffset, naturalToDisplayRect } = useImageDisplayCoordinates(containerRef, imageSize);
 
     // Effect to load image dimensions
     useEffect(() => {
@@ -131,13 +131,15 @@ export function RegionSelector({
         onSelectRegion(regionId === selectedRegionId ? null : regionId); // Toggle selection
     };
 
+    const { renderedWidth, renderedHeight, offsetX, offsetY } = getScaleOffset();
+
     return (
         <div className="flex flex-col gap-4 w-full">
             {/* Image Container */}
-            <div 
+            <div
                 ref={containerRef}
-                className="relative overflow-hidden border border-border w-full flex items-center justify-center bg-muted/20 dark:bg-muted/10" 
-                style={{ 
+                className="relative overflow-hidden border border-border w-full bg-muted/20 dark:bg-muted/10"
+                style={{
                     minHeight: 150, // Smaller min height for selector?
                     aspectRatio: imageSize.width && imageSize.height ? `${imageSize.width} / ${imageSize.height}` : '16 / 9',
                 }}
@@ -147,13 +149,21 @@ export function RegionSelector({
                         {error}
                     </div>
                 )}
-                {!error && imageSize.width > 0 && (
+                {!error && imageSize.width > 0 && renderedWidth > 0 && renderedHeight > 0 && (
                     <>
                         <img
-                            key={imageSrc} 
-                            src={imageSrc} 
+                            key={imageSrc}
+                            src={imageSrc}
                             alt={t('regions.locationImage') || "Location image"}
-                            className="block object-contain select-none pointer-events-none max-w-full max-h-full" // Use contain for selector view
+                            className="select-none pointer-events-none" // Removed: block, object-contain, max-w-full, max-h-full
+                            style={{
+                                position: 'absolute',
+                                left: `${offsetX}px`,
+                                top: `${offsetY}px`,
+                                width: `${renderedWidth}px`,
+                                height: `${renderedHeight}px`,
+                                objectFit: 'contain', // Keep contain for the image content
+                            }}
                             draggable={false}
                         />
                         {/* Render regions */}
@@ -190,7 +200,7 @@ export function RegionSelector({
                         ))}
                     </>
                 )}
-                {!error && !imageSize.width && (
+                {!error && !imageSize.width && !(renderedWidth > 0 && renderedHeight > 0) && ( // Adjusted condition for loading/no image
                      <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
                         {imageSrc ? 'Loading image...' : 'No image'}
                     </div>
