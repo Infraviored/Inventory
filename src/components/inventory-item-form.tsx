@@ -265,43 +265,75 @@ export default function InventoryItemForm({ onSubmit, initialData, error, setErr
         </div>
       )}
 
-      {/* === Region Selection Section (Conditional) === */}
+      {/* === Region Selection / Location Image Preview Section === */}
       {locationId && selectedLocationDetails && (
         <div className="space-y-2 relative border rounded-md p-4 pt-10">
-          {/* Deselect Button */}
-          <Button
+          <Button 
             variant="ghost"
             size="icon"
-            onClick={() => { setLocationId(undefined); setRegionId(undefined); }}
             className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive"
-            aria-label={t('locations.deselect') || 'Deselect Location'}
-            type="button"
+            onClick={() => handleLocationSelect(null)} 
+            aria-label={t('inventory.deselectLocation') || "Deselect Location"}
+            type="button" // Ensure it doesn't submit the form
           >
             <XIcon className="h-5 w-5" />
           </Button>
 
-          <Label htmlFor="region" className="block text-sm font-medium mb-1">
-            {regions.length > 0 ? t('inventory.selectRegion') : `${t('inventory.region')} (${t('regions.noRegions')})`}
-            <span className="text-muted-foreground"> ({selectedLocationDetails.name})</span>
-          </Label>
-          {selectedLocationDetails.imagePath && regions.length > 0 ? (
-            <div className="overflow-hidden">
-              <RegionSelector
-                key={selectedLocationDetails.id}
-                imageSrc={`/api/images/${selectedLocationDetails.imagePath}`}
-                regions={regions}
-                selectedRegionId={regionId?.toString() ?? null}
-                onSelectRegion={(id: string | null) => setRegionId(id ? parseInt(id) : undefined)}
-              />
-            </div>
+          {selectedLocationDetails.imagePath ? (
+            <>
+              {regions && regions.length > 0 ? (
+                <>
+                  <Label htmlFor="region" className="block text-sm font-medium mb-1">
+                    {t('inventory.selectRegion')}
+                    <span className="text-muted-foreground"> ({selectedLocationDetails.name})</span>
+                  </Label>
+                  <div className="overflow-hidden">
+                    <RegionSelector
+                      key={selectedLocationDetails.id} // Re-mount if location changes
+                      imageSrc={`/api/images/${selectedLocationDetails.imagePath}`}
+                      regions={regions}
+                      selectedRegionId={regionId?.toString() ?? null}
+                      onSelectRegion={(id: string | null) => setRegionId(id ? parseInt(id) : undefined)}
+                    />
+                  </div>
+                </>
+              ) : (
+                // Location has an image but NO regions
+                <>
+                  <Label className="block text-sm font-medium mb-1">
+                    {t('inventory.locationPreview') || 'Location Preview'}
+                    <span className="text-muted-foreground"> ({selectedLocationDetails.name})</span>
+                  </Label>
+                  <div className="aspect-video w-full relative overflow-hidden rounded-md border bg-muted">
+                    <img 
+                      src={`/api/images/${selectedLocationDetails.imagePath}`}
+                      alt={selectedLocationDetails.name}
+                      className="w-full h-full object-contain"
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground text-center mt-2">
+                    {t('inventory.noRegionsInLocation') || 'This location has no defined regions. Item will be associated with the location directly.'}
+                  </p>
+                </>
+              )}
+            </>
           ) : (
-            <div className="p-4 border rounded text-center text-muted-foreground">
-              {selectedLocationDetails.imagePath ? t('regions.noRegions') : t('locations.noImage')}
-            </div>
+            // Location has NO image
+            <>
+              <Label className="block text-sm font-medium mb-1">
+                {t('inventory.locationSelected') || 'Location Selected'}
+                <span className="text-muted-foreground"> ({selectedLocationDetails.name})</span>
+              </Label>
+              <div className="p-4 border rounded text-center text-muted-foreground">
+                {t('inventory.locationNoImageNoRegions') || 'This location has no image and no regions defined.'}
+              </div>
+            </>
           )}
         </div>
       )}
-      
+      {/* === End Region Selection / Location Image Preview Section === */}
+
       <div className="pt-4">
         <Button type="submit" disabled={submitting || loading}>
           {submitting ? t('common.loading') : (initialData ? t('common.update') : t('common.save'))}

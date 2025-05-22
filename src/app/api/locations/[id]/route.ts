@@ -124,21 +124,50 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         // If no image changes, updateData.imagePath will remain undefined, and db update logic should not change it.
 
         // Process regions from FormData
-        const regionEntries: { [key: string]: any } = {};
-        formData.forEach((value, key) => {
-            const regionMatch = key.match(/^regions\[(\d+)\]\.(.+)$/);
-            if (regionMatch) {
-                const index = parseInt(regionMatch[1]);
-                const prop = regionMatch[2];
-                if (!regionEntries[index]) regionEntries[index] = {};
-                if (prop === 'x' || prop === 'y' || prop === 'width' || prop === 'height') {
-                    regionEntries[index][prop] = parseFloat(value as string);
+        const regionsJson = formData.get('regions') as string | null;
+        if (regionsJson) {
+            try {
+                const parsedRegions = JSON.parse(regionsJson);
+                if (Array.isArray(parsedRegions)) {
+                    // Optionally, add validation for each region object here
+                    updateData.regions = parsedRegions.map((r: any) => ({
+                        name: r.name || '', // Ensure name is at least an empty string
+                        x: parseFloat(r.x) || 0,
+                        y: parseFloat(r.y) || 0,
+                        width: parseFloat(r.width) || 0,
+                        height: parseFloat(r.height) || 0,
+                        // Preserve other properties if they exist and are needed by db schema
+                        ...(r.id && { id: r.id }), // Keep ID if present (for updates of existing regions)
+                    }));
                 } else {
-                    regionEntries[index][prop] = value as string;
+                    console.warn("[JSON_DB_API PUT /locations/:id] Parsed regions is not an array:", parsedRegions);
+                    updateData.regions = []; // Default to empty if not an array
                 }
+            } catch (parseError) {
+                console.error("[JSON_DB_API PUT /locations/:id] Failed to parse regions JSON:", parseError);
+                // Decide error handling: return 400 or proceed with empty regions?
+                // For now, proceeding with empty, or could throw error:
+                // return NextResponse.json({ error: 'Invalid regions format' }, { status: 400 });
+                updateData.regions = []; // Default to empty if parsing fails
             }
-        });
-        updateData.regions = Object.values(regionEntries).filter(r => r.name && r.x != null && r.y != null && r.width != null && r.height != null);
+        } else {
+            // If 'regions' field is not present, decide behavior. 
+            // Current logic implies if it's not sent, regions are not updated (or cleared if that's the intent).
+            // If regions should be explicitly cleared if not sent, set updateData.regions = [] here.
+            // For now, we assume if not sent, no changes to regions unless db schema requires it.
+        }
+
+        // Ensure `updateData` doesn't have `regions: undefined` if `regionsJson` was null and we want to preserve existing regions
+        // However, our `updateLocationInDb` likely expects `regions` to be present if it's part of the update schema
+        // If `regionsJson` is null and we want to *not* touch regions, we might need to delete `updateData.regions`
+        // But the current `updateLocationInDb` probably replaces the whole regions array.
+        if (updateData.regions === undefined) {
+            // If regionsJson was null, and we intend to not update regions, then we should fetch existing and put them back
+            // OR ensure updateLocationInDb handles `regions: undefined` by not changing them.
+            // For simplicity now, if regions are not sent, they will likely be cleared by `updateLocationInDb` if it expects a full array.
+            // To be safe, let's ensure it's an empty array if not provided, to signal clearing them.
+            updateData.regions = [];
+        }
 
         const updatedLocation = updateLocationInDb(locationId, updateData);
         if (updatedLocation) {

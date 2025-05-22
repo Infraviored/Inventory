@@ -1,35 +1,81 @@
 {
   "locations": [
     {
-      "name": "noblia",
+      "name": "test",
       "description": "",
       "parentId": null,
-      "imagePath": "locations/nobilia-begehbarer-offener-Kleiderschrank-Ankleiderzimmer-240-cm-Touch-341-Steingrau-supermatt-DRSET02_583349c4-329d-4569-be3c-b4a337c3697e.webp",
+      "imagePath": "locations/Blank_38ba2196-3a9d-4e3d-badd-ccb46084bc30.jpg",
       "locationType": "",
-      "createdAt": "2025-05-22T14:58:27.503Z",
-      "updatedAt": "2025-05-22T14:58:44.620Z",
-      "id": 10,
-      "regions": []
-    }
-  ],
-  "location_regions": [],
-  "items": [
-    {
-      "name": "schraube",
-      "description": null,
-      "quantity": 1,
-      "imagePath": "inventory/screw_0824d3fb-b73d-4015-8cf3-06fa480686f8.jpeg",
-      "location_id": 10,
-      "region_id": null,
-      "id": 6,
-      "createdAt": "2025-05-22T15:08:38.812Z",
-      "updatedAt": "2025-05-22T15:08:38.812Z",
-      "tags": [
-        "schraube"
+      "createdAt": "2025-05-22T15:38:53.612Z",
+      "updatedAt": "2025-05-22T15:39:36.692Z",
+      "id": 11,
+      "regions": [
+        {
+          "name": "New",
+          "x": 60.22469065886814,
+          "y": 49.80222566077901,
+          "width": 97.28806873268454,
+          "height": 86.80338964620482,
+          "id": 20,
+          "location_id": 11,
+          "createdAt": "2025-05-22T15:39:36.692Z",
+          "updatedAt": "2025-05-22T15:39:36.692Z"
+        },
+        {
+          "name": "New_2",
+          "x": 97.1648972077446,
+          "y": 21.761804848100503,
+          "width": 23.407655634931622,
+          "height": 49.49743847803251,
+          "id": 21,
+          "location_id": 11,
+          "createdAt": "2025-05-22T15:39:36.692Z",
+          "updatedAt": "2025-05-22T15:39:36.692Z"
+        }
       ]
     }
   ],
-  "nextLocationId": 11,
-  "nextRegionId": 18,
-  "nextItemId": 7
+  "location_regions": [
+    {
+      "name": "New",
+      "x": 60.22469065886814,
+      "y": 49.80222566077901,
+      "width": 97.28806873268454,
+      "height": 86.80338964620482,
+      "id": 20,
+      "location_id": 11,
+      "createdAt": "2025-05-22T15:39:36.692Z",
+      "updatedAt": "2025-05-22T15:39:36.692Z"
+    },
+    {
+      "name": "New_2",
+      "x": 97.1648972077446,
+      "y": 21.761804848100503,
+      "width": 23.407655634931622,
+      "height": 49.49743847803251,
+      "id": 21,
+      "location_id": 11,
+      "createdAt": "2025-05-22T15:39:36.692Z",
+      "updatedAt": "2025-05-22T15:39:36.692Z"
+    }
+  ],
+  "items": [
+    {
+      "name": "screw",
+      "description": null,
+      "quantity": 1,
+      "imagePath": "inventory/screw_6f64b28d-7cfe-40a5-a99c-2b8c3e355f93.jpeg",
+      "location_id": 11,
+      "region_id": 21,
+      "id": 7,
+      "createdAt": "2025-05-22T15:40:06.829Z",
+      "updatedAt": "2025-05-22T15:40:06.829Z",
+      "tags": [
+        "screw"
+      ]
+    }
+  ],
+  "nextLocationId": 12,
+  "nextRegionId": 22,
+  "nextItemId": 8
 }
