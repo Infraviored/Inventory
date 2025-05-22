@@ -262,27 +262,20 @@ export default function ItemPage({ params }: ItemParams) {
       </div>
       
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded my-4">
           <p>{error}</p>
         </div>
       )}
       
-      {item && !loading && (
-        <InventoryItemForm
-          initialData={{
-            name: item.name ?? '',
-            description: item.description ?? '',
-            quantity: item.quantity ?? 1,
-            locationId: item.locationId,
-            regionId: item.regionId,
-            imagePath: item.imagePath
-          }}
+      <div className="max-w-3xl mx-auto">
+        <InventoryItemForm 
+          initialData={item} 
           onSubmit={handleUpdate}
           error={error}
           setError={setError}
         />
-              )}
-              
+      </div>
+      
       <Dialog open={showLocateDialog} onOpenChange={setShowLocateDialog}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>

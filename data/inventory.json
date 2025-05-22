@@ -18,7 +18,7 @@
       "imagePath": "/uploads/customized-wardrobe-svelte-series-sliding-door-wardrobe-ssldw2-picket-and-rail-32247152410694_1200x_36159c4a-e141-4f64-8261-49a44dbb1b46.webp",
       "locationType": "cabinet",
       "createdAt": "2025-05-22T08:37:13.735Z",
-      "updatedAt": "2025-05-22T08:37:54.376Z",
+      "updatedAt": "2025-05-22T12:51:09.836Z",
       "id": 5,
       "regions": [
         {
@@ -27,10 +27,10 @@
           "y": 196.35910833268392,
           "width": 188.5286783042394,
           "height": 83.79052369077307,
-          "id": 6,
+          "id": 8,
           "location_id": 5,
-          "createdAt": "2025-05-22T08:37:54.376Z",
-          "updatedAt": "2025-05-22T08:37:54.376Z"
+          "createdAt": "2025-05-22T12:51:09.836Z",
+          "updatedAt": "2025-05-22T12:51:09.836Z"
         },
         {
           "name": "Fach2",
@@ -38,12 +38,56 @@
           "y": 288.1296818987687,
           "width": 188.5286783042394,
           "height": 83.79052369077307,
-          "id": 7,
+          "id": 9,
           "location_id": 5,
-          "createdAt": "2025-05-22T08:37:54.376Z",
-          "updatedAt": "2025-05-22T08:37:54.376Z"
+          "createdAt": "2025-05-22T12:51:09.836Z",
+          "updatedAt": "2025-05-22T12:51:09.836Z"
+        },
+        {
+          "name": "Fach3",
+          "x": 437.9052369077307,
+          "y": 379.90025546485344,
+          "width": 188.5286783042394,
+          "height": 83.79052369077307,
+          "id": 10,
+          "location_id": 5,
+          "createdAt": "2025-05-22T12:51:09.836Z",
+          "updatedAt": "2025-05-22T12:51:09.836Z"
+        },
+        {
+          "name": "Fach4",
+          "x": 437.9052369077307,
+          "y": 470.6733227965243,
+          "width": 188.5286783042394,
+          "height": 83.79052369077307,
+          "id": 11,
+          "location_id": 5,
+          "createdAt": "2025-05-22T12:51:09.836Z",
+          "updatedAt": "2025-05-22T12:51:09.836Z"
         }
       ]
+    },
+    {
+      "name": "Gadarobe",
+      "description": null,
+      "parentId": null,
+      "imagePath": "/uploads/nobilia-begehbarer-offener-Kleiderschrank-Ankleiderzimmer-240-cm-Touch-341-Steingrau-supermatt-DRSET02_4682b6ef-0eeb-4112-94c1-afd2a74ea675.webp",
+      "locationType": "cabinet",
+      "createdAt": "2025-05-22T12:52:23.250Z",
+      "updatedAt": "2025-05-22T12:52:23.250Z",
+      "id": 6,
+      "regions": []
+    },
+    {
+      "name": "gui",
+      "description": null,
+      "parentId": null,
+      "imagePath": "/uploads/test_30064607-3f30-43d1-b194-14215a348f73.png",
+      "locationType": null,
+      "createdAt": "2025-05-22T12:52:35.393Z",
+      "updatedAt": "2025-05-22T12:52:35.393Z",
+      "id": 7,
+      "regions": []
     }
   ],
   "location_regions": [
@@ -53,10 +97,10 @@
       "y": 196.35910833268392,
       "width": 188.5286783042394,
       "height": 83.79052369077307,
-      "id": 6,
+      "id": 8,
       "location_id": 5,
-      "createdAt": "2025-05-22T08:37:54.376Z",
-      "updatedAt": "2025-05-22T08:37:54.376Z"
+      "createdAt": "2025-05-22T12:51:09.836Z",
+      "updatedAt": "2025-05-22T12:51:09.836Z"
     },
     {
       "name": "Fach2",
@@ -64,10 +108,65 @@
       "y": 288.1296818987687,
       "width": 188.5286783042394,
       "height": 83.79052369077307,
-      "id": 7,
+      "id": 9,
       "location_id": 5,
-      "createdAt": "2025-05-22T08:37:54.376Z",
-      "updatedAt": "2025-05-22T08:37:54.376Z"
+      "createdAt": "2025-05-22T12:51:09.836Z",
+      "updatedAt": "2025-05-22T12:51:09.836Z"
+    },
+    {
+      "name": "Fach3",
+      "x": 437.9052369077307,
+      "y": 379.90025546485344,
+      "width": 188.5286783042394,
+      "height": 83.79052369077307,
+      "id": 10,
+      "location_id": 5,
+      "createdAt": "2025-05-22T12:51:09.836Z",
+      "updatedAt": "2025-05-22T12:51:09.836Z"
+    },
+    {
+      "name": "Fach4",
+      "x": 437.9052369077307,
+      "y": 470.6733227965243,
+      "width": 188.5286783042394,
+      "height": 83.79052369077307,
+      "id": 11,
+      "location_id": 5,
+      "createdAt": "2025-05-22T12:51:09.836Z",
+      "updatedAt": "2025-05-22T12:51:09.836Z"
+    },
+    {
+      "name": "1",
+      "x": 759.2592592592592,
+      "y": 632.5936339578511,
+      "width": 447.53086419753083,
+      "height": 1003.0864197530865,
+      "id": 12,
+      "location_id": 6,
+      "createdAt": "2025-05-22T12:52:23.250Z",
+      "updatedAt": "2025-05-22T12:52:23.250Z"
+    },
+    {
+      "name": "2",
+      "x": 1212.962962962963,
+      "y": 632.5936339578511,
+      "width": 447.53086419753083,
+      "height": 1003.0864197530865,
+      "id": 13,
+      "location_id": 6,
+      "createdAt": "2025-05-22T12:52:23.250Z",
+      "updatedAt": "2025-05-22T12:52:23.250Z"
+    },
+    {
+      "name": "3",
+      "x": 1660.4938271604938,
+      "y": 632.5936339578511,
+      "width": 447.53086419753083,
+      "height": 1003.0864197530865,
+      "id": 14,
+      "location_id": 6,
+      "createdAt": "2025-05-22T12:52:23.250Z",
+      "updatedAt": "2025-05-22T12:52:23.250Z"
     }
   ],
   "items": [
@@ -84,9 +183,23 @@
       "tags": [
         "testobj"
       ]
+    },
+    {
+      "name": "test",
+      "description": "test",
+      "quantity": 1,
+      "imagePath": "Blank.jpg",
+      "location_id": 6,
+      "region_id": 12,
+      "id": 2,
+      "createdAt": "2025-05-22T12:53:37.839Z",
+      "updatedAt": "2025-05-22T12:56:16.043Z",
+      "tags": [
+        "test"
+      ]
     }
   ],
-  "nextLocationId": 6,
-  "nextRegionId": 8,
-  "nextItemId": 2
+  "nextLocationId": 8,
+  "nextRegionId": 15,
+  "nextItemId": 3
 }
