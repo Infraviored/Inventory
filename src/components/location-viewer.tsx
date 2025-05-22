@@ -94,10 +94,24 @@ export const LocationViewer: React.FC<LocationViewerProps> = ({
     const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
     const [error, setError] = useState<string | null>(null);
 
+    const finalImageSrc = useMemo(() => {
+        if (!imageSrc) return null;
+        if (imageSrc.startsWith('http') || imageSrc.startsWith('blob:') || imageSrc.startsWith('/')) {
+            return imageSrc; // Assume full URL, blob, or already correct API path
+        }
+        // Assume category/filename.ext format
+        const parts = imageSrc.split('/');
+        if (parts.length === 2 && parts[0] && parts[1]) {
+            return `/api/images/${imageSrc}`;
+        }
+        console.warn(`[LocationViewer] Unexpected imageSrc format: ${imageSrc}. May not load.`);
+        return imageSrc; // Fallback, might be incorrect
+    }, [imageSrc]);
+
     const { naturalToDisplayRect, getScaleOffset } = useImageDisplayCoordinates(containerRef, imageSize);
 
     useEffect(() => {
-        if (imageSrc && imageRef.current) {
+        if (finalImageSrc && imageRef.current) {
             const img = imageRef.current;
             const handleLoad = () => {
                 setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
@@ -118,11 +132,16 @@ export const LocationViewer: React.FC<LocationViewerProps> = ({
                 // This can happen if src is set but image is broken or not found
                 handleError();
             }
-        } else if (!imageSrc) {
+
+            // Adding hidden class until loaded to prevent broken image icon flash could be done with state.
+            // Important: set src *after* onload/onerror are attached if imageRef.current.src is used for loading
+            // However, since we key the img by finalImageSrc, React should handle new img element creation
+            img.src = finalImageSrc; // Set src after handlers if not relying on React key change for new Image()
+        } else if (!finalImageSrc) {
              setImageSize({ width: 0, height: 0 }); // Reset if no imageSrc
              setError(null);
         }
-    }, [imageSrc]);
+    }, [finalImageSrc]);
 
     const displayRegions = useMemo((): DisplayRegion[] => {
         if (!imageSize.width || !imageSize.height) return [];
@@ -147,7 +166,7 @@ export const LocationViewer: React.FC<LocationViewerProps> = ({
     }, [naturalToDisplayRect]);
 
 
-    if (!imageSrc) {
+    if (!finalImageSrc) {
         return (
             <div className={`flex items-center justify-center bg-muted/50 text-muted-foreground p-4 ${className}`} style={{aspectRatio: '16/9'}}>
                 No image provided.
@@ -173,7 +192,8 @@ export const LocationViewer: React.FC<LocationViewerProps> = ({
         >
             <img
                 ref={imageRef}
-                src={imageSrc}
+                key={finalImageSrc} // Add key to ensure re-render and re-trigger of load if src changes
+                src={finalImageSrc} // Use finalImageSrc
                 alt="Location"
                 className={`block ${imageClassName}`}
                 style={{

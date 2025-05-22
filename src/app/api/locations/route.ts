@@ -7,7 +7,7 @@ import {
     Location, // Import type from new db lib
     LocationRegion // Import type from new db lib
 } from '@lib/db';
-import { saveUpload, deleteUpload } from '@lib/file-handler';
+import { saveUpload } from '@/../lib/file-handler';
 
 // Helper to format location data for the API response
 function formatApiResponseLocation(location: Location): any {
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
             // In a real scenario, you'd call a saveUpload function here that works with your chosen storage.
             // For now, we are not saving the actual file to disk via this API route.
             try {
-                imagePathToStore = await saveUpload(imageFile);
+                imagePathToStore = await saveUpload(imageFile, 'locations');
                 console.log(`[JSON_DB_API] Image saved, path to store: ${imagePathToStore}`);
             } catch (uploadError: any) {
                 console.error("[JSON_DB_API] Error saving uploaded image:", uploadError);

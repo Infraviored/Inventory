@@ -171,9 +171,9 @@ export default function InventoryItemForm({ onSubmit, initialData, error, setErr
     }
   };
 
-  const handleLocationSelect = (id: number) => {
-    setLocationId(id);
-    // Reset region when location changes
+  const handleLocationSelect = (id: number | null) => {
+    setLocationId(id ?? undefined); // If id is null, setLocationId to undefined
+    // Reset region when location changes or is deselected
     setRegionId(undefined);
   };
 
@@ -288,7 +288,7 @@ export default function InventoryItemForm({ onSubmit, initialData, error, setErr
             <div className="overflow-hidden">
               <RegionSelector
                 key={selectedLocationDetails.id}
-                imageSrc={selectedLocationDetails.imagePath}
+                imageSrc={`/api/images/${selectedLocationDetails.imagePath}`}
                 regions={regions}
                 selectedRegionId={regionId?.toString() ?? null}
                 onSelectRegion={(id: string | null) => setRegionId(id ? parseInt(id) : undefined)}

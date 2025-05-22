@@ -7,7 +7,7 @@ import {
     Location, // Import type from new db lib
     LocationRegion // Import type from new db lib
 } from '@lib/db';
-import { saveUpload, deleteUpload } from '@lib/file-handler';
+import { saveUpload, deleteUpload } from '@/../lib/file-handler';
 
 // Force dynamic rendering/evaluation for this route
 export const dynamic = 'force-dynamic';
@@ -37,173 +37,149 @@ function formatApiResponseLocation(location: Location): any {
 }
 
 // GET /api/locations/:id - Fetches a specific location
-export async function GET(request: NextRequest, context: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const locationId = parseInt(context.params.id);
+        const resolvedParams = await params;
+        const locationId = parseInt(resolvedParams.id);
         if (isNaN(locationId)) {
             return NextResponse.json({ error: 'Invalid location ID' }, { status: 400 });
         }
-
         const location = getLocationByIdFromDb(locationId);
-
-        if (!location) {
+        if (location) {
+            return NextResponse.json(formatApiResponseLocation(location));
+        } else {
             return NextResponse.json({ error: 'Location not found' }, { status: 404 });
         }
-        console.log(`[JSON_DB_API] Fetched location ${locationId}`);
-        return NextResponse.json(formatApiResponseLocation(location));
     } catch (error: any) {
-        console.error(`[JSON_DB_API] Error fetching location by ID:`, error);
+        console.error('[JSON_DB_API] Error fetching location by ID:', error);
         return NextResponse.json({ error: `Failed to fetch location: ${error.message}` }, { status: 500 });
     }
 }
 
 // PUT /api/locations/:id - Updates a specific location
-export async function PUT(request: NextRequest, context: { params: { id: string } }) {
-    let locationId: number | undefined = undefined;
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        locationId = parseInt(context.params.id);
+        const resolvedParams = await params;
+        const locationId = parseInt(resolvedParams.id);
         if (isNaN(locationId)) {
             return NextResponse.json({ error: 'Invalid location ID' }, { status: 400 });
         }
 
-        const existingLocation = getLocationByIdFromDb(locationId);
-        if (!existingLocation) {
-            return NextResponse.json({ error: 'Location not found' }, { status: 404 });
-        }
-
         const formData = await request.formData();
-        console.log(`[JSON_DB_API] PUT /locations/${locationId} FormData keys:`, Array.from(formData.keys()));
+        const updateData: any = { regions: [] }; // Initialize regions array
+        const existingLocation = getLocationByIdFromDb(locationId);
 
-        const name = formData.get('name') as string | null;
-        const description = formData.get('description') as string | null;
-        const parentIdStr = formData.get('parentId') as string | null;
-        const locationType = formData.get('locationType') as string | null;
+        if (!existingLocation) {
+            return NextResponse.json({ error: 'Location not found for update' }, { status: 404 });
+        }
+
+        formData.forEach((value, key) => {
+            if (key === 'image') return; // Handled separately
+            if (key.startsWith('regions[')) return; // Handled separately
+            
+            if (key === 'type') { // Assuming type is a direct string property
+                updateData[key] = value as string;
+            } else if (key === 'id') { // ID should not be changed from form data for the location itself
+                // updateData[key] = parseInt(value as string);
+            } else if (typeof value === 'string') {
+                updateData[key] = value;
+            }
+        });
+
+        // Handle image upload
         const imageFile = formData.get('image') as File | null;
-        const clearImage = formData.get('clearImage') === 'true';
-        const regionsJson = formData.get('regions') as string | null;
+        let newImagePath: string | null | undefined = undefined; // undefined means no change to imagePath
 
-        if (!name) {
-            // For PUT, name is not strictly required if other fields are being updated.
-            // However, our current updateLocationInDb might require it or handle partial updates.
-            // For now, let's assume some fields can be updated without name, but the DB function must support it.
-        }
-
-        const parentId = parentIdStr ? parseInt(parentIdStr) : null;
-        if (parentIdStr && (isNaN(parentId as number) || parentId === null) && parentIdStr !== 'null' && parentIdStr !== '') { 
-            return NextResponse.json({ error: 'Invalid number format for parentId' }, { status: 400 });
-        }
-        
-        const updateData: Partial<Omit<Location, 'id' | 'createdAt' | 'updatedAt' | 'regions'>> & { regions?: (Omit<LocationRegion, 'id' | 'location_id' | 'createdAt' | 'updatedAt'> & {id?: number})[] } = {};
-
-        if (name !== null) updateData.name = name;
-        if (description !== null) updateData.description = description; // Allow setting description to empty string
-        if (locationType !== null) updateData.locationType = locationType;
-        if (parentIdStr === 'null' || parentIdStr === '') { // Explicitly setting parent to null
-            updateData.parentId = null;
-        } else if (parentId !== null) {
-            updateData.parentId = parentId;
-        }
-
-        let imagePathToStore: string | null | undefined = undefined; // undefined means no change to image
-        const currentImagePath = existingLocation.imagePath;
-
-        if (clearImage) {
-            if (currentImagePath) {
-                try {
-                    await deleteUpload(currentImagePath);
-                    console.log(`[JSON_DB_API] Deleted old image ${currentImagePath} for location ${locationId}`);
-                } catch (e: any) {
-                    console.warn(`[JSON_DB_API] Failed to delete old image ${currentImagePath}: ${e.message}`);
-                    // Non-critical, continue with update
-                }
-            }
-            imagePathToStore = null; // Set to null to remove image
-            console.log(`[JSON_DB_API] Clearing image for location ${locationId}`);
-        } else if (imageFile && imageFile.size > 0) {
-            if (currentImagePath) {
-                try {
-                    await deleteUpload(currentImagePath);
-                    console.log(`[JSON_DB_API] Deleted old image ${currentImagePath} before uploading new one for location ${locationId}`);
-                } catch (e: any) {
-                    console.warn(`[JSON_DB_API] Failed to delete old image ${currentImagePath} before upload: ${e.message}`);
-                    // Non-critical, continue with update
-                }
-            }
+        if (imageFile) {
             try {
-                imagePathToStore = await saveUpload(imageFile);
-                console.log(`[JSON_DB_API] Storing new image path: ${imagePathToStore} for location ${locationId}`);
+                // If there was an old image, delete it first
+                if (existingLocation.imagePath) {
+                    try {
+                        // Pass the full imagePath (e.g., "locations/old_image.jpg") to deleteUpload
+                        await deleteUpload(existingLocation.imagePath);
+                    } catch (delError) {
+                        console.warn(`[JSON_DB_API] Failed to delete old image ${existingLocation.imagePath}:`, delError);
+                        // Non-fatal, continue with uploading new image
+                    }
+                }
+                newImagePath = await saveUpload(imageFile, 'locations'); // Pass 'locations' category
+                updateData.imagePath = newImagePath;
             } catch (uploadError: any) {
-                console.error("[JSON_DB_API] Error saving uploaded image during update:", uploadError);
-                return NextResponse.json({ error: `Failed to save image: ${uploadError.message}` }, { status: 500 });
+                return NextResponse.json({ error: `Image upload failed: ${uploadError.message}` }, { status: 400 });
             }
-        }
-        if (imagePathToStore !== undefined) {
-            updateData.imagePath = imagePathToStore;
-        }
+        } else if (formData.get('imagePath') === 'null') { // Check if imagePath is explicitly set to null (image removed)
+            if (existingLocation.imagePath) {
+                 try {
+                    // Pass the full imagePath (e.g., "locations/image.jpg") to deleteUpload
+                    await deleteUpload(existingLocation.imagePath);
+                } catch (delError) {
+                    console.warn(`[JSON_DB_API] Failed to delete old image ${existingLocation.imagePath} on removal:`, delError);
+                }
+            }
+            updateData.imagePath = null;
+        } else if (formData.has('imagePath')) {
+            // If imagePath is provided in form (e.g. hidden input with existing path) and not 'null'
+            updateData.imagePath = formData.get('imagePath') as string;
+        } 
+        // If no image changes, updateData.imagePath will remain undefined, and db update logic should not change it.
 
-        if (regionsJson) {
-            try {
-                const parsedRegions = JSON.parse(regionsJson);
-                if (!Array.isArray(parsedRegions)) throw new Error('Regions data must be an array.');
-                updateData.regions = parsedRegions.map((r: any) => ({
-                    id: r.id ? parseInt(r.id) : undefined, // Keep existing ID if provided for update
-                    name: r.name,
-                    x: parseFloat(r.x),
-                    y: parseFloat(r.y),
-                    width: parseFloat(r.width),
-                    height: parseFloat(r.height)
-                }));
-            } catch (e: any) {
-                console.error("[JSON_DB_API] Failed to parse regions JSON for PUT:", e);
-                return NextResponse.json({ error: `Invalid regions data: ${e.message}` }, { status: 400 });
+        // Process regions from FormData
+        const regionEntries: { [key: string]: any } = {};
+        formData.forEach((value, key) => {
+            const regionMatch = key.match(/^regions\[(\d+)\]\.(.+)$/);
+            if (regionMatch) {
+                const index = parseInt(regionMatch[1]);
+                const prop = regionMatch[2];
+                if (!regionEntries[index]) regionEntries[index] = {};
+                if (prop === 'x' || prop === 'y' || prop === 'width' || prop === 'height') {
+                    regionEntries[index][prop] = parseFloat(value as string);
+                } else {
+                    regionEntries[index][prop] = value as string;
+                }
             }
-        }
+        });
+        updateData.regions = Object.values(regionEntries).filter(r => r.name && r.x != null && r.y != null && r.width != null && r.height != null);
 
         const updatedLocation = updateLocationInDb(locationId, updateData);
-
-        if (!updatedLocation) {
+        if (updatedLocation) {
+            return NextResponse.json(formatApiResponseLocation(updatedLocation));
+        } else {
+            // This case should be caught by existingLocation check, but as a fallback:
             return NextResponse.json({ error: 'Location not found or update failed' }, { status: 404 });
         }
-        
-        console.log(`[JSON_DB_API] Successfully updated location ID ${locationId}.`);
-        return NextResponse.json(formatApiResponseLocation(updatedLocation));
-
     } catch (error: any) {
-        console.error(`[JSON_DB_API] Error updating location ${locationId !== undefined ? locationId : context.params.id}:`, error);
+        console.error('[JSON_DB_API] Error updating location:', error);
         return NextResponse.json({ error: `Failed to update location: ${error.message}` }, { status: 500 });
     }
 }
 
 // DELETE /api/locations/:id - Deletes a specific location
-export async function DELETE(request: NextRequest, context: { params: { id: string } }) {
-    let locationId: number | undefined = undefined;
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        locationId = parseInt(context.params.id);
+        const resolvedParams = await params;
+        const locationId = parseInt(resolvedParams.id);
         if (isNaN(locationId)) {
             return NextResponse.json({ error: 'Invalid location ID' }, { status: 400 });
         }
 
-        const locationToDelete = getLocationByIdFromDb(locationId); 
-        if (locationToDelete && locationToDelete.imagePath) {
+        const existingLocation = getLocationByIdFromDb(locationId);
+        if (existingLocation && existingLocation.imagePath) {
             try {
-                await deleteUpload(locationToDelete.imagePath);
-                console.log(`[JSON_DB_API] Deleted image ${locationToDelete.imagePath} for location ${locationId}`);
-            } catch (e: any) {
-                console.warn(`[JSON_DB_API] Failed to delete image ${locationToDelete.imagePath} for location ${locationId}: ${e.message}`);
-                // Decide if this is a critical failure or if location deletion should proceed
+                // Pass the full imagePath (e.g., "locations/image.jpg") to deleteUpload
+                await deleteUpload(existingLocation.imagePath);
+            } catch (delError) {
+                 console.warn(`[JSON_DB_API] Failed to delete image ${existingLocation.imagePath} during location deletion:`, delError);
             }
         }
 
         const success = deleteLocationInDb(locationId);
-
-        if (!success) {
-            return NextResponse.json({ error: 'Location not found or delete failed' }, { status: 404 });
+        if (success) {
+            return NextResponse.json({ message: 'Location deleted successfully' });
+        } else {
+            return NextResponse.json({ error: 'Location not found' }, { status: 404 });
         }
-
-        console.log(`[JSON_DB_API] Successfully deleted location ID ${locationId}.`);
-        return NextResponse.json({ message: 'Location deleted successfully' });
     } catch (error: any) {
-        console.error(`[JSON_DB_API] Error deleting location ${locationId !== undefined ? locationId : context.params.id}:`, error);
+        console.error('[JSON_DB_API] Error deleting location:', error);
         return NextResponse.json({ error: `Failed to delete location: ${error.message}` }, { status: 500 });
     }
 }

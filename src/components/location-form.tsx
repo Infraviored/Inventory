@@ -159,7 +159,17 @@ export function LocationForm({
       setName(initialData.name || '');
       setDescription(initialData.description || '');
       setLocationType(initialData.locationType || '');
-      setImagePreview(initialData.imagePath || null);
+      if (initialData.imagePath) {
+        // Transform to API path if it's in 'category/filename' format
+        const parts = initialData.imagePath.split('/');
+        if (parts.length === 2 && parts[0] && parts[1] && !initialData.imagePath.startsWith('/')) {
+          setImagePreview(`/api/images/${initialData.imagePath}`);
+        } else {
+          setImagePreview(initialData.imagePath); // Assume it's already a full URL or blob
+        }
+      } else {
+        setImagePreview(null);
+      }
       setRegions(Array.isArray(initialData.regions) ? initialData.regions : []);
       
       // Show mapper immediately if editing with an image 
@@ -209,32 +219,36 @@ export function LocationForm({
     }
     setImageFile(file); 
 
-    if (previewUrl) {
-      if (previewUrl.startsWith('blob:')) {
-        try {
-          // Convert blob immediately for stability
-          console.log('Converting blob URL immediately:', previewUrl);
-          const dataUrl = await convertBlobToDataURL(previewUrl);
-          setImagePreview(dataUrl);
-          console.log('Image converted and stored as data URL for preview');
-        } catch (error) {
-          console.error('Failed to convert blob to data URL immediately:', error);
-          setImagePreview(null);
-          setImageFile(null);
-        }
-      } else {
-        // Use provided non-blob URL directly
-        setImagePreview(previewUrl);
-      }
-    } else {
-      // Image cleared via ImageInput component
-      setImagePreview(null);
-      if (isEditing) { 
-        // Only set clear flag if editing and image explicitly cleared
-        console.log("Image cleared during edit, setting clearImage flag.");
-        setClearImage(true);
-      }
-    }
+    // previewUrl from ImageInput will be a blob URL (for new files) 
+    // or the processed API path (for initial images from initialImageUrl).
+    setImagePreview(previewUrl || null); 
+    
+    // No need to convert blob to data URL here anymore if ImageInput provides usable preview URLs
+    // if (previewUrl) {
+    //   if (previewUrl.startsWith('blob:')) {
+    //     try {
+    //       // Convert blob immediately for stability
+    //       console.log('Converting blob URL immediately:', previewUrl);
+    //       const dataUrl = await convertBlobToDataURL(previewUrl);
+    //       setImagePreview(dataUrl);
+    //       console.log('Image converted and stored as data URL for preview');
+    //     } catch (error) {
+    //       console.error('Failed to convert blob to data URL immediately:', error);
+    //       setImagePreview(null);
+    //       setImageFile(null);
+    //     }
+    //   } else {
+    //     // Use provided non-blob URL directly
+    //     setImagePreview(previewUrl);
+    //   }
+    // } else {
+    //   // Image cleared via ImageInput component
+    //   setImagePreview(null);
+    //   if (isEditing) { 
+    //     console.log("Image cleared during edit, setting clearImage flag.");
+    //     setClearImage(true);
+    //   }
+    // }
   };
 
   // handleSubmit remains largely the same, using isEditing flag

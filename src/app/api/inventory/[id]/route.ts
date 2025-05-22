@@ -7,7 +7,7 @@ import {
     Item, // Import type from new db lib
     Location // For location name resolution
 } from '@lib/db';
-// import { saveUpload, deleteUpload } from '@lib/file-handler'; // Temporarily remove for simplification
+import { saveUpload, deleteUpload } from '@/../lib/file-handler'; // Assuming you have a file handler
 
 // Helper to format item data for API response
 function formatApiResponseItem(item: Item, location?: Location): any { 
@@ -28,38 +28,41 @@ function formatApiResponseItem(item: Item, location?: Location): any {
     };
 }
 
-// GET /api/inventory/:id - Fetches a specific item
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export const dynamic = 'force-dynamic';
+
+// GET /api/inventory/:id - Fetches a specific inventory item
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const itemId = parseInt(params.id);
+        const resolvedParams = await params;
+        const itemId = parseInt(resolvedParams.id);
         if (isNaN(itemId)) {
             return NextResponse.json({ error: 'Invalid item ID' }, { status: 400 });
         }
-
-        const item = getItemByIdFromDb(itemId);
-
-        if (!item) {
+        // console.log(`[JSON_DB_API] Attempting to fetch item ${itemId}`);
+        const item = getItemByIdFromDb(itemId); 
+        if (item) {
+            // console.log(`[JSON_DB_API] Fetched item ${itemId}:`, item);
+            // Fetch location to include locationName in the response
+            let itemLocation: Location | undefined;
+            if (item.location_id) {
+                itemLocation = getLocationByIdFromDb(item.location_id);
+            }
+            return NextResponse.json(formatApiResponseItem(item, itemLocation));
+        } else {
+            // console.log(`[JSON_DB_API] Item ${itemId} not found`);
             return NextResponse.json({ error: 'Item not found' }, { status: 404 });
         }
-
-        // Fetch location to include locationName in the response
-        let itemLocation: Location | undefined;
-        if (item.location_id) {
-            itemLocation = getLocationByIdFromDb(item.location_id);
-        }
-        
-        console.log(`[JSON_DB_API] Fetched item ${itemId}`);
-        return NextResponse.json(formatApiResponseItem(item, itemLocation));
     } catch (error: any) {
-        console.error(`[JSON_DB_API] Error fetching item ${params.id}:`, error);
+        console.error('[JSON_DB_API] Error fetching item by ID:', error);
         return NextResponse.json({ error: `Failed to fetch item: ${error.message}` }, { status: 500 });
     }
 }
 
-// PUT /api/inventory/:id - Updates a specific item
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+// PUT /api/inventory/:id - Updates a specific inventory item
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const itemId = parseInt(params.id);
+        const resolvedParams = await params;
+        const itemId = parseInt(resolvedParams.id);
         if (isNaN(itemId)) {
             return NextResponse.json({ error: 'Invalid item ID' }, { status: 400 });
         }
@@ -104,7 +107,22 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         if (clearImage) {
             imagePathToStore = null; 
         } else if (imageFile && imageFile.size > 0) {
-            imagePathToStore = imageFile.name; // Store file name
+            try {
+                const uploadedPath = await saveUpload(imageFile, 'inventory');
+                imagePathToStore = uploadedPath; // Store "inventory/filename.ext"
+            } catch (uploadError: any) {
+                console.error('[JSON_DB_API] Image upload failed:', uploadError);
+                return NextResponse.json({ error: `Image upload failed: ${uploadError.message}` }, { status: 400 });
+            }
+        } else if (formData.has('imagePath') && formData.get('imagePath') === 'null') {
+             // Explicitly set imagePath to null if requested (e.g. image removed)
+             imagePathToStore = null;
+        } else if (formData.has('imagePath')) {
+            // If imagePath is present but not 'null' and not a new file, keep existing or update if string provided
+            const existingPath = formData.get('imagePath') as string;
+            if (typeof existingPath === 'string') {
+                 imagePathToStore = existingPath;
+            }
         }
         if (imagePathToStore !== undefined) {
             updateData.imagePath = imagePathToStore;
@@ -161,22 +179,26 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         return NextResponse.json(formatApiResponseItem(updatedItem, itemLocation));
 
     } catch (error: any) {
-        console.error(`[JSON_DB_API] Error updating item ${params.id}:`, error);
+        console.error('[JSON_DB_API] Error updating item:', error);
         return NextResponse.json({ error: `Failed to update item: ${error.message}` }, { status: 500 });
     }
 }
 
-// DELETE /api/inventory/:id - Deletes a specific item
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+// DELETE /api/inventory/:id - Deletes a specific inventory item
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const itemId = parseInt(params.id);
+        const resolvedParams = await params;
+        const itemId = parseInt(resolvedParams.id);
         if (isNaN(itemId)) {
             return NextResponse.json({ error: 'Invalid item ID' }, { status: 400 });
         }
 
         // TODO: If images were stored, delete associated image file from disk here.
-        // const itemToDelete = getItemByIdFromDb(itemId);
-        // if (itemToDelete && itemToDelete.imagePath) { ... delete file ... }
+        const itemToDelete = getItemByIdFromDb(itemId);
+        if (itemToDelete && itemToDelete.imagePath) {
+            // Assuming imagePath is now "inventory/filename.ext"
+            await deleteUpload(itemToDelete.imagePath);
+        }
 
         const success = deleteItemInDb(itemId);
 
@@ -187,7 +209,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         console.log(`[JSON_DB_API] Successfully deleted item ID ${itemId}.`);
         return NextResponse.json({ message: 'Item deleted successfully' });
     } catch (error: any) {
-        console.error(`[JSON_DB_API] Error deleting item ${params.id}:`, error);
+        console.error('[JSON_DB_API] Error deleting item:', error);
         return NextResponse.json({ error: `Failed to delete item: ${error.message}` }, { status: 500 });
     }
 }

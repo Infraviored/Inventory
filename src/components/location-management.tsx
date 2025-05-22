@@ -210,14 +210,21 @@ export default function LocationManagement({ parentId }: { parentId?: number }) 
               <div className="relative h-48 bg-muted/50 flex items-center justify-center">
                 {location.imagePath ? (
                   <img
-                    src={location.imagePath}
+                    src={`/api/images/${location.imagePath}`}
                     alt={location.name}
                     className="w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    onError={(e) => { 
+                        (e.target as HTMLImageElement).style.display = 'none'; 
+                        const parent = (e.target as HTMLImageElement).parentElement;
+                        if (parent) {
+                            const placeholder = parent.querySelector('.no-image-placeholder');
+                            if (placeholder) (placeholder as HTMLElement).style.display = 'flex';
+                        }
+                    }}
                   />
                 ) : null}
-                <span className="absolute text-muted-foreground text-sm pointer-events-none">
-                     {!location.imagePath ? 'No image' : ''}
+                <span className={`absolute text-muted-foreground text-sm pointer-events-none no-image-placeholder ${location.imagePath ? 'hidden' : 'flex items-center justify-center'}`}>
+                     {!location.imagePath ? 'No image' : 'Image not found'}
                  </span>
               </div>
               <div className="p-4">

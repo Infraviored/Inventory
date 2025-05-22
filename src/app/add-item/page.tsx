@@ -10,8 +10,10 @@ export default function AddItemPage() {
         <h1 className="text-3xl font-bold">Objekt hinzufügen</h1>
       </div>
       
-      <div className="bg-card rounded-lg shadow-sm p-6">
-        <InventoryItemForm />
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-card rounded-lg shadow-sm p-6">
+          <InventoryItemForm />
+        </div>
       </div>
     </div>
   );

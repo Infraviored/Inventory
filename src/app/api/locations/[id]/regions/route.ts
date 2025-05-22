@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
     getLocationById as getLocationByIdFromDb,
     // We might need a specific function to add a region if POST is kept
-    LocationRegion // Import type from new db lib
+    LocationRegion, // Import type from new db lib
+    // getRegionsByLocationId, // Removed as not exported from @lib/db
+    // addRegionToLocation // Removed as not exported from @lib/db
 } from '@lib/db';
 
 // Force dynamic rendering/evaluation for this route
@@ -25,10 +27,17 @@ function formatApiResponseRegion(region: LocationRegion): any {
     };
 }
 
+// Define the expected structure of the context parameters
+interface RouteContext {
+  params: {
+    id: string;
+  };
+}
+
 // GET /api/locations/:id/regions - Fetches regions for a specific location
-export async function GET(request: NextRequest, context: { params: { id: string } }) {
-    // The { params } object is directly available in dynamic routes
-    const locationIdStr = context.params.id;
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const resolvedParams = await params;
+    const locationIdStr = resolvedParams.id;
     console.log(`[JSON_DB_API GET /locations/${locationIdStr}/regions] Received request.`);
 
     const locationId = parseInt(locationIdStr);
@@ -60,9 +69,12 @@ export async function GET(request: NextRequest, context: { params: { id: string 
 // If a separate endpoint to add a region to an EXISTING location is needed, this can be implemented
 // with a new db function like `addRegionToLocation(locationId, regionData)`.
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-    const { id } = params;
-    const locationId = parseInt(id);
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const resolvedParams = await params;
+    const locationIdStr = resolvedParams.id;
+    console.log(`[JSON_DB_API POST /locations/${locationIdStr}/regions] Received request.`);
+
+    const locationId = parseInt(locationIdStr);
     // const db = getDb(); // Old DB call
 
     if (isNaN(locationId)) {

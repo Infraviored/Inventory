@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
@@ -23,17 +23,45 @@ export function ImageInput({ onImageChange, label, initialPreview = null, hideLa
   const [imageError, setImageError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const processedInitialImageUrl = useMemo(() => {
+    if (initialImageUrl) {
+      // If it's an absolute URL (http, https) or a blob URL, use it as is
+      if (initialImageUrl.startsWith('http') || initialImageUrl.startsWith('blob:')) {
+        return initialImageUrl;
+      }
+      // If it looks like a category/filename path (e.g., 'locations/image.jpg')
+      // transform it to the API endpoint path.
+      // It should contain exactly one slash and no leading/trailing slashes for this simple check.
+      const parts = initialImageUrl.split('/');
+      if (parts.length === 2 && parts[0] && parts[1] && !initialImageUrl.startsWith('/') && !initialImageUrl.endsWith('/')) {
+        // parts[0] is category, parts[1] is filename
+        return `/api/images/${parts[0]}/${parts[1]}`;
+      }
+      
+      // Fallback for any other non-absolute, non-blob, non-category/filename paths.
+      // This might indicate an old format or an unexpected path. Log a warning.
+      console.warn(`[ImageInput] Encountered unexpected initialImageUrl format: ${initialImageUrl}. Attempting to treat as direct path, but this may fail.`);
+      // If it starts with a slash, assume it might be an attempt at a public path (though now incorrect)
+      // Otherwise, it's unclear, return as is and let Next/Image try to resolve or error.
+      return initialImageUrl.startsWith('/') ? initialImageUrl : `/${initialImageUrl}`;
+    }
+    return null;
+  }, [initialImageUrl]);
+
   useEffect(() => {
-    if (!preview && initialImageUrl) {
-      setPreview(initialImageUrl);
+    // Use processedInitialImageUrl for setting the preview
+    if (!preview && processedInitialImageUrl) {
+      setPreview(processedInitialImageUrl);
     }
-    if (!image && preview !== initialImageUrl && initialImageUrl) {
-      setPreview(initialImageUrl);
+    // If there's no user-selected image, and the current preview doesn't match the (processed) initial one, reset to initial.
+    if (!image && preview !== processedInitialImageUrl && processedInitialImageUrl) {
+      setPreview(processedInitialImageUrl);
     }
-    if (!image && !initialImageUrl && preview?.startsWith('/')) {
+    // If there's no image, no initial URL, but preview exists (e.g. from a previous invalid initialImageUrl), clear it.
+    if (!image && !processedInitialImageUrl && preview?.startsWith('/')) { // Keep check for / to avoid clearing blob previews too early
       setPreview(null);
     }
-  }, [initialImageUrl, preview, image]);
+  }, [processedInitialImageUrl, preview, image]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -129,7 +157,7 @@ export function ImageInput({ onImageChange, label, initialPreview = null, hideLa
           </div>
         )}
         
-        {preview && (
+        {(preview) && (
           <div className="mt-2 space-y-2">
             <div className="relative aspect-video w-full overflow-hidden rounded-md border">
               <Image
@@ -137,6 +165,13 @@ export function ImageInput({ onImageChange, label, initialPreview = null, hideLa
                 alt={t('images.preview') || "Preview"}
                 fill
                 className="object-contain"
+                onError={() => {
+                  // If even the processed URL or blob fails, show an error or fallback
+                  // This might happen if /uploads/filename.jpg is still not found (old comment)
+                  // Or if /api/images/category/filename fails
+                  setImageError(t('images.loadError') || 'Error loading image preview.');
+                  setPreview(null); // Clear the broken preview
+                }}
               />
             </div>
             
@@ -151,7 +186,7 @@ export function ImageInput({ onImageChange, label, initialPreview = null, hideLa
               </Button>
             </div>
             
-            {showUploadSuccessMessage && (
+            {showUploadSuccessMessage && image && (
             <div className="p-3 border border-blue-200 rounded-md bg-blue-50 text-blue-800 text-sm">
               <p className="font-medium">{t('images.uploadSuccess') || 'Image uploaded successfully!'}</p>
               <p>{t('images.defineRegions') || 'You can now define regions on this image.'}</p>

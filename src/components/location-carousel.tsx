@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Location } from '@/lib/api';
 import Image from 'next/image'; // Using next/image for potential optimization
 import {
@@ -13,12 +13,14 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/lib/language';
+import Autoplay from "embla-carousel-autoplay"; // Import Autoplay
 
 interface LocationCarouselProps {
   locations: Location[];
   onSelectLocation: (locationId: number | null) => void;
   selectedLocationId?: number | null;
   itemsToShow?: number; // How many items to show at once
+  autoplayDelay?: number; // Optional autoplay delay in ms
 }
 
 export default function LocationCarousel({
@@ -26,8 +28,10 @@ export default function LocationCarousel({
   onSelectLocation,
   selectedLocationId,
   itemsToShow = 3, // Default to showing 3 items
+  autoplayDelay = 5000, // Default to 5 seconds
 }: LocationCarouselProps) {
   const { t } = useLanguage();
+  const autoplayPlugin = useRef(Autoplay({ delay: autoplayDelay, stopOnInteraction: true, stopOnMouseEnter: true }));
 
   if (!locations || locations.length === 0) {
     return <div className="p-4 text-center text-muted-foreground">{t('locations.noneFound') || 'No locations found.'}</div>;
@@ -47,6 +51,9 @@ export default function LocationCarousel({
         align: "start",
         loop: locations.length > itemsToShow, // Loop if more items than shown
       }}
+      plugins={[autoplayPlugin.current]} // Add autoplay plugin
+      onMouseEnter={() => autoplayPlugin.current.stop()} // Corrected: Wrap in arrow function
+      onMouseLeave={() => autoplayPlugin.current.play()} // Corrected: Wrap in arrow function
       className="w-full max-w-xs sm:max-w-xl md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto" // Responsive max width
     >
       <CarouselContent className="-ml-1 py-1">
@@ -74,7 +81,7 @@ export default function LocationCarousel({
                 <CardContent className="flex aspect-square items-center justify-center p-0 relative">
                   {location.imagePath ? (
                     <Image
-                      src={location.imagePath}
+                      src={`/api/images/${location.imagePath}`}
                       alt={location.name}
                       width={300} // Provide explicit width
                       height={300} // Provide explicit height

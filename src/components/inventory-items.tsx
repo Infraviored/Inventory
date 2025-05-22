@@ -80,13 +80,30 @@ export default function InventoryItems({ locationId, regionId }: { locationId?: 
               <div className="relative h-48 bg-gray-200">
                 {item.imagePath ? (
                   <img
-                    src={item.imagePath}
+                    src={`/api/images/${item.imagePath}`}
                     alt={item.name}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      console.warn(`Error loading image: /api/images/${item.imagePath}`, e);
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      const parent = (e.target as HTMLImageElement).parentElement;
+                      if (parent) {
+                        const placeholder = parent.querySelector('.image-placeholder-on-error');
+                        if (placeholder) (placeholder as HTMLElement).style.display = 'flex';
+                      }
+                    }}
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full">
+                  <div className="flex items-center justify-center h-full image-placeholder-on-error">
                     <span className="text-gray-400">No image</span>
+                  </div>
+                )}
+                {item.imagePath && (
+                  <div 
+                    className="absolute inset-0 flex items-center justify-center h-full image-placeholder-on-error"
+                    style={{ display: 'none' }}
+                  >
+                    <span className="text-gray-400">Image not found</span>
                   </div>
                 )}
               </div>

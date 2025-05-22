@@ -7,6 +7,7 @@ import {
     Item, // Import type from new db lib
     Location
 } from '@lib/db';
+import { saveUpload } from '@/../lib/file-handler'; // Import saveUpload
 // import { saveUpload, deleteUpload } from '@lib/file-handler'; // Temporarily remove for simplification
 
 // Helper to format item data for API response
@@ -119,8 +120,16 @@ export async function POST(request: NextRequest) {
 
         let imagePathToStore: string | null = null;
         if (imageFile && imageFile.size > 0) {
-            imagePathToStore = imageFile.name; // Simplified: store name
-            console.log(`[JSON_DB_API] Storing item image name: ${imagePathToStore}`);
+            // imagePathToStore = imageFile.name; // Old simplified: store name
+            // console.log(`[JSON_DB_API] Storing item image name: ${imagePathToStore}`); // Old log
+            try {
+                imagePathToStore = await saveUpload(imageFile, 'inventory'); // Use saveUpload with category
+                console.log(`[JSON_DB_API] Item image saved, path to store: ${imagePathToStore}`);
+            } catch (uploadError: any) {
+                console.error("[JSON_DB_API] Error saving item image:", uploadError);
+                // Decide if this is a fatal error for item creation
+                return NextResponse.json({ error: `Failed to save item image: ${uploadError.message}` }, { status: 500 });
+            }
         }
 
         let tagsToStore: string[] = [];
