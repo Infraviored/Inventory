@@ -19,7 +19,7 @@ function formatApiResponseItem(item: Item, location?: Location): any {
         quantity: item.quantity,
         locationId: item.location_id,
         regionId: item.region_id,
-        imagePath: item.imagePath, // JSON DB stores the direct path or name
+        imageFilename: item.imageFilename, // Changed from imagePath
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
         tags: item.tags || [],
@@ -31,10 +31,10 @@ function formatApiResponseItem(item: Item, location?: Location): any {
 export const dynamic = 'force-dynamic';
 
 // GET /api/inventory/:id - Fetches a specific inventory item
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
     try {
-        const resolvedParams = await params;
-        const itemId = parseInt(resolvedParams.id);
+        const { id } = params; // Direct destructure if not a promise
+        const itemId = parseInt(id);
         if (isNaN(itemId)) {
             return NextResponse.json({ error: 'Invalid item ID' }, { status: 400 });
         }
@@ -59,10 +59,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 // PUT /api/inventory/:id - Updates a specific inventory item
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
     try {
-        const resolvedParams = await params;
-        const itemId = parseInt(resolvedParams.id);
+        const { id } = params; // Direct destructure
+        const itemId = parseInt(id);
         if (isNaN(itemId)) {
             return NextResponse.json({ error: 'Invalid item ID' }, { status: 400 });
         }
@@ -103,29 +103,39 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             }
         }
 
-        let imagePathToStore: string | null | undefined = undefined; // undefined means no change
+        let storedFilename: string | null | undefined = undefined; // Renamed, undefined means no change
         if (clearImage) {
-            imagePathToStore = null; 
+            storedFilename = null; 
         } else if (imageFile && imageFile.size > 0) {
+            // If there was an old image, delete it first
+            const existingItemForImage = getItemByIdFromDb(itemId);
+            if (existingItemForImage && existingItemForImage.imageFilename) {
+                try {
+                    await deleteUpload(`inventory/${existingItemForImage.imageFilename}`);
+                } catch (e) {
+                    console.warn(`[JSON_DB_API PUT] Failed to delete old image inventory/${existingItemForImage.imageFilename} during update:`, e);
+                }
+            }
             try {
-                const uploadedPath = await saveUpload(imageFile, 'inventory');
-                imagePathToStore = uploadedPath; // Store "inventory/filename.ext"
+                // saveUpload now returns just the filename
+                const uploadedFilename = await saveUpload(imageFile, 'inventory');
+                storedFilename = uploadedFilename;
             } catch (uploadError: any) {
                 console.error('[JSON_DB_API] Image upload failed:', uploadError);
                 return NextResponse.json({ error: `Image upload failed: ${uploadError.message}` }, { status: 400 });
             }
-        } else if (formData.has('imagePath') && formData.get('imagePath') === 'null') {
-             // Explicitly set imagePath to null if requested (e.g. image removed)
-             imagePathToStore = null;
-        } else if (formData.has('imagePath')) {
-            // If imagePath is present but not 'null' and not a new file, keep existing or update if string provided
-            const existingPath = formData.get('imagePath') as string;
-            if (typeof existingPath === 'string') {
-                 imagePathToStore = existingPath;
+        } else if (formData.has('imageFilename') && formData.get('imageFilename') === 'null') {
+             // Explicitly set imageFilename to null if requested (e.g. image removed)
+             storedFilename = null;
+        } else if (formData.has('imageFilename')) {
+            // If imageFilename is present but not 'null' and not a new file, keep existing or update if string provided
+            const existingFilename = formData.get('imageFilename') as string;
+            if (typeof existingFilename === 'string') {
+                 storedFilename = existingFilename; // This case might be redundant if not sending imageFilename to keep old
             }
         }
-        if (imagePathToStore !== undefined) {
-            updateData.imagePath = imagePathToStore;
+        if (storedFilename !== undefined) { // If storedFilename was explicitly set (new, cleared, or kept via form field)
+            updateData.imageFilename = storedFilename; // Changed from imagePath
         }
         
         if (tagsJson) {
@@ -185,19 +195,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 // DELETE /api/inventory/:id - Deletes a specific inventory item
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
     try {
-        const resolvedParams = await params;
-        const itemId = parseInt(resolvedParams.id);
+        const { id } = params; // Direct destructure
+        const itemId = parseInt(id);
         if (isNaN(itemId)) {
             return NextResponse.json({ error: 'Invalid item ID' }, { status: 400 });
         }
 
         // TODO: If images were stored, delete associated image file from disk here.
         const itemToDelete = getItemByIdFromDb(itemId);
-        if (itemToDelete && itemToDelete.imagePath) {
-            // Assuming imagePath is now "inventory/filename.ext"
-            await deleteUpload(itemToDelete.imagePath);
+        if (itemToDelete && itemToDelete.imageFilename) {
+            // Construct category/filename for deleteUpload
+            await deleteUpload(`inventory/${itemToDelete.imageFilename}`); 
         }
 
         const success = deleteItemInDb(itemId);

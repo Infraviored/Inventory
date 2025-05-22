@@ -5,16 +5,29 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus, ArrowRight } from 'lucide-react';
-import { searchItems } from '@/lib/api';
+import { searchItems, type InventoryItem, deleteInventoryItem } from '@/lib/api';
 import { useLanguage } from '@/lib/language';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function HomePage() {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+  const [searchResults, setSearchResults] = useState<InventoryItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [recentItems, setRecentItems] = useState([]);
+  const [recentItems, setRecentItems] = useState<InventoryItem[]>([]);
+  const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Load recent items from local storage on mount
   useEffect(() => {
@@ -31,8 +44,8 @@ export default function HomePage() {
   }, []);
 
   // Handle search
-  const handleSearch = async (e) => {
-    e.preventDefault();
+  const handleSearch = async (e?: React.FormEvent<HTMLFormElement>) => {
+    if (e) e.preventDefault();
     
     if (!searchQuery.trim()) return;
     
@@ -44,6 +57,21 @@ export default function HomePage() {
       console.error('Error searching items:', error);
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleDeleteItem = async () => {
+    if (!itemToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteInventoryItem(itemToDelete.id);
+      setSearchResults(prevResults => prevResults.filter(item => item.id !== itemToDelete.id));
+      setRecentItems(prevRecent => prevRecent.filter(item => item.id !== itemToDelete.id));
+      setItemToDelete(null);
+    } catch (error) {
+      console.error('Error deleting item:', error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -82,13 +110,13 @@ export default function HomePage() {
         <div className="mt-8 space-y-6">
           <h2 className="text-2xl font-semibold text-center">{t('search.results')} ({searchResults.length})</h2>
           <div className="grid gap-4">
-            {searchResults.map((item) => (
+            {searchResults.map((item: InventoryItem) => (
               <Card key={item.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <div className="flex flex-col sm:flex-row">
-                  {item.imagePath && (
-                    <div className="w-full sm:w-32 h-32 flex-shrink-0">
+                  {item.imageFilename && (
+                    <div className="w-full sm:w-32 h-32 flex-shrink-0 bg-muted">
                       <img 
-                        src={item.imagePath} 
+                        src={`/api/images/inventory/${item.imageFilename}`}
                         alt={item.name} 
                         className="w-full h-full object-cover"
                       />
@@ -136,12 +164,33 @@ export default function HomePage() {
                         {t('items.locate')}
                       </Button>
                     </Link>
-                    <Button variant="outline" size="sm" className="w-full text-red-600 hover:text-red-700 hover:bg-red-50">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                      {t('common.delete')}
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-full text-red-600 hover:text-red-700 hover:bg-red-50">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          {t('common.delete')}
+                        </Button>
+                      </AlertDialogTrigger>
+                      {itemToDelete && itemToDelete.id === item.id && (
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>{t('items.deleteConfirmTitle')}</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {t('items.deleteConfirmDescriptionForItem', { name: itemToDelete.name })}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel onClick={() => setItemToDelete(null)}>{t('common.cancel')}</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDeleteItem} disabled={isDeleting} className="bg-destructive hover:bg-destructive-dark">
+                              {isDeleting && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>} 
+                              {t('common.delete')}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      )}
+                    </AlertDialog>
                   </div>
                 </div>
               </Card>
@@ -250,19 +299,19 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {recentItems.map((item) => (
+            {recentItems.map((item: InventoryItem) => (
               <Link key={item.id} href={`/items/${item.id}`}>
                 <Card className="h-full hover:shadow-md transition-shadow overflow-hidden">
-                  {item.imagePath && (
-                    <div className="w-full h-40 overflow-hidden">
+                  {item.imageFilename && (
+                    <div className="w-full h-40 overflow-hidden bg-muted">
                       <img 
-                        src={item.imagePath} 
+                        src={`/api/images/inventory/${item.imageFilename}`}
                         alt={item.name} 
                         className="w-full h-full object-cover"
                       />
                     </div>
                   )}
-                  <CardHeader className={`pb-2 ${!item.imagePath ? 'pt-6' : ''}`}>
+                  <CardHeader className={`pb-2 ${!item.imageFilename ? 'pt-6' : ''}`}>
                     <CardTitle className="text-lg flex justify-between items-start">
                       <span>{item.name}</span>
                       {item.quantity && (

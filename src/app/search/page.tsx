@@ -8,13 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Plus, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/lib/language';
-import { searchItems } from '@/lib/api';
+import { searchItems, type InventoryItem } from '@/lib/api';
 
 export default function SearchPage() {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [recentSearches, setRecentSearches] = useState([]);
+  const [searchResults, setSearchResults] = useState<InventoryItem[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
 
@@ -33,7 +33,7 @@ export default function SearchPage() {
   }, []);
 
   // Save recent searches to local storage
-  const saveRecentSearch = (query) => {
+  const saveRecentSearch = (query: string) => {
     if (!query.trim()) return;
     
     const updatedSearches = [
@@ -53,8 +53,10 @@ export default function SearchPage() {
   };
 
   // Handle search
-  const handleSearch = async (e) => {
-    e.preventDefault();
+  const handleSearch = async (e?: React.FormEvent<HTMLFormElement> | { preventDefault: () => void }) => {
+    if (e && typeof (e as React.FormEvent<HTMLFormElement>).preventDefault === 'function') {
+      (e as React.FormEvent<HTMLFormElement>).preventDefault();
+    }
     
     if (!searchQuery.trim()) return;
     
@@ -71,7 +73,7 @@ export default function SearchPage() {
   };
 
   // Filter results based on active tab
-  const filteredResults = searchResults.filter(item => {
+  const filteredResults = searchResults.filter((item: InventoryItem) => {
     if (activeTab === 'all') return true;
     if (activeTab === 'withLocation') return item.locationId;
     if (activeTab === 'withoutLocation') return !item.locationId;
@@ -153,13 +155,13 @@ export default function SearchPage() {
           
           <div className="grid gap-4">
             {filteredResults.length > 0 ? (
-              filteredResults.map((item) => (
+              filteredResults.map((item: InventoryItem) => (
                 <Card key={item.id} className="overflow-hidden">
                   <div className="flex">
-                    {item.imagePath && (
-                      <div className="w-24 h-24 flex-shrink-0">
+                    {item.imageFilename && (
+                      <div className="w-24 h-24 flex-shrink-0 bg-muted">
                         <img 
-                          src={item.imagePath} 
+                          src={`/api/images/inventory/${item.imageFilename}`}
                           alt={item.name} 
                           className="w-full h-full object-cover"
                         />

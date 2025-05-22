@@ -27,10 +27,22 @@ import {
   Edit, 
   Trash, 
   MapPin,
-  Filter
+  Filter,
+  Loader2
 } from 'lucide-react';
-import { getInventoryItems, type InventoryItem } from '@/lib/api';
+import { getInventoryItems, type InventoryItem, deleteInventoryItem } from '@/lib/api';
 import { useLanguage } from '@/lib/language';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 // Define interface for location
 interface Location {
@@ -48,6 +60,8 @@ export default function InventoryPage() {
   const [sortDirection, setSortDirection] = useState('asc');
   const [locationFilter, setLocationFilter] = useState('all');
   const [locations, setLocations] = useState<Location[]>([]);
+  const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch inventory items
   useEffect(() => {
@@ -118,6 +132,21 @@ export default function InventoryPage() {
     } else {
       setSortField(field);
       setSortDirection('asc');
+    }
+  };
+
+  const handleDeleteItem = async () => {
+    if (!itemToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteInventoryItem(itemToDelete.id);
+      setItems(prevItems => prevItems.filter(item => item.id !== itemToDelete.id));
+      setItemToDelete(null);
+    } catch (err) {
+      console.error('Error deleting item:', err);
+      setError(t('common.errorDeleting'));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -297,9 +326,42 @@ export default function InventoryPage() {
                             <Edit className="h-4 w-4" />
                           </Button>
                         </Link>
-                        <Button variant="outline" size="icon" title={t('items.deleteAction')} onClick={() => console.log('Delete item:', item.id)} className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90">
-                          <Trash className="h-4 w-4" />
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              title={t('items.deleteAction')} 
+                              onClick={() => setItemToDelete(item)} 
+                              className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          {itemToDelete && (
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>{t('items.deleteConfirmTitle')}</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  {t('items.deleteConfirmDescriptionForItem', { name: itemToDelete.name })}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel onClick={() => setItemToDelete(null)}>{t('common.cancel')}</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={handleDeleteItem}
+                                  disabled={isDeleting}
+                                  className="bg-destructive hover:bg-destructive-dark"
+                                >
+                                  {isDeleting ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : null}
+                                  {t('common.delete')}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          )}
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>

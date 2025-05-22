@@ -12,7 +12,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger as AlertDialogButtonTrigger,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2 } from 'lucide-react';
 
 interface LocationRegion {
     name: string;
@@ -41,6 +53,8 @@ export default function LocationManagement({ parentId }: { parentId?: number }) 
   const [editingLocationDetails, setEditingLocationDetails] = useState<LocationFormInitialData | null>(null);
   const [isEditingLoading, setIsEditingLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [locationToDelete, setLocationToDelete] = useState<Location | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchLocations = useCallback(async () => {
     try {
@@ -60,18 +74,22 @@ export default function LocationManagement({ parentId }: { parentId?: number }) 
     fetchLocations();
   }, [fetchLocations]);
 
-  const handleDelete = async (id: number) => {
-    if (confirm('Are you sure you want to delete this location? This may also affect items stored here.')) {
-      try {
-        await deleteLocation(id);
-        setLocations(prevLocations => prevLocations.filter(loc => loc.id !== id));
-        if (editingLocation?.id === id) {
-           setEditingLocation(null);
-        }
-      } catch (err: any) {
-        console.error('Error deleting location:', err);
-        setError(`Failed to delete location: ${err.message || 'Unknown error'}`);
+  const handleDeleteConfirmation = async () => {
+    if (!locationToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteLocation(locationToDelete.id);
+      setLocations(prevLocations => prevLocations.filter(loc => loc.id !== locationToDelete.id));
+      if (editingLocation?.id === locationToDelete.id) {
+         setEditingLocation(null);
       }
+      setLocationToDelete(null);
+    } catch (err: any) {
+      console.error('Error deleting location:', err);
+      setError(`Failed to delete location: ${err.message || 'Unknown error'}`);
+      setLocationToDelete(null);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -240,13 +258,35 @@ export default function LocationManagement({ parentId }: { parentId?: number }) 
                   >
                     Edit
                   </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleDelete(location.id)}
-                  >
-                    Delete
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogButtonTrigger asChild>
+                      <Button variant="destructive" size="sm" onClick={() => setLocationToDelete(location)}>
+                        Delete
+                      </Button>
+                    </AlertDialogButtonTrigger>
+                    {locationToDelete && (
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete the location "{locationToDelete.name}" 
+                              and might affect items stored within it.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel onClick={() => setLocationToDelete(null)}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={handleDeleteConfirmation} 
+                              disabled={isDeleting}
+                              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                            >
+                              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} 
+                              Delete Location
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                    )}
+                  </AlertDialog>
                 </div>
               </div>
             </div>

@@ -12,8 +12,9 @@ const ALLOWED_CATEGORIES = ['locations', 'inventory', 'items']; // 'items' as an
 
 export async function GET(
   request: NextRequest, 
-  { params }: { params: { category: string; filename: string } }
+  context: { params: { category: string; filename: string } }
 ) {
+  const { params } = context;
   const { category, filename } = params;
 
   // --- Security Validations ---

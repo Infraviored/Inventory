@@ -78,13 +78,13 @@ export default function InventoryItems({ locationId, regionId }: { locationId?: 
               className="border rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow"
             >
               <div className="relative h-48 bg-gray-200">
-                {item.imagePath ? (
+                {item.imageFilename ? (
                   <img
-                    src={`/api/images/${item.imagePath}`}
+                    src={`/api/images/${item.imageFilename}`}
                     alt={item.name}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      console.warn(`Error loading image: /api/images/${item.imagePath}`, e);
+                      console.warn(`Error loading image: /api/images/${item.imageFilename}`, e);
                       (e.target as HTMLImageElement).style.display = 'none';
                       const parent = (e.target as HTMLImageElement).parentElement;
                       if (parent) {
@@ -98,7 +98,7 @@ export default function InventoryItems({ locationId, regionId }: { locationId?: 
                     <span className="text-gray-400">No image</span>
                   </div>
                 )}
-                {item.imagePath && (
+                {item.imageFilename && (
                   <div 
                     className="absolute inset-0 flex items-center justify-center h-full image-placeholder-on-error"
                     style={{ display: 'none' }}

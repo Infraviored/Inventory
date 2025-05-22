@@ -33,7 +33,7 @@ export interface Item {
     name: string;
     description: string | null;
     quantity: number;
-    imagePath: string | null;
+    imageFilename: string | null;
     location_id: number;
     region_id: number | null;
     createdAt?: string;
@@ -257,7 +257,7 @@ export function createItem(data: Omit<Item, 'id' | 'createdAt' | 'updatedAt' | '
         name: data.name,
         description: data.description || null,
         quantity: data.quantity === undefined ? 1 : data.quantity,
-        imagePath: data.imagePath || null,
+        imageFilename: data.imageFilename || null,
         location_id: data.location_id,
         region_id: data.region_id || null,
         id: db.nextItemId++,

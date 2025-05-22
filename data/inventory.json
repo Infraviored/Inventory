@@ -4,78 +4,101 @@
       "name": "test",
       "description": "",
       "parentId": null,
-      "imagePath": "locations/Blank_38ba2196-3a9d-4e3d-badd-ccb46084bc30.jpg",
+      "imagePath": "nobilia-begehbarer-offener-Kleiderschrank-Ankleiderzimmer-240-cm-Touch-341-Steingrau-supermatt-DRSET02_1435aad6-43a3-435d-9274-c2b390543114.webp",
       "locationType": "",
       "createdAt": "2025-05-22T15:38:53.612Z",
-      "updatedAt": "2025-05-22T16:01:02.063Z",
+      "updatedAt": "2025-05-22T19:55:01.295Z",
       "id": 11,
       "regions": [
         {
-          "name": "New",
-          "x": 60.22469065886814,
-          "y": 49.80222566077901,
-          "width": 97.28806873268454,
-          "height": 86.80338964620482,
-          "id": 22,
+          "name": "L",
+          "x": 763.8846172668561,
+          "y": 611.8348387102504,
+          "width": 441.36058587354125,
+          "height": 996.9193652947819,
+          "id": 30,
           "location_id": 11,
-          "createdAt": "2025-05-22T16:01:02.063Z",
-          "updatedAt": "2025-05-22T16:01:02.063Z"
+          "createdAt": "2025-05-22T19:55:01.295Z",
+          "updatedAt": "2025-05-22T19:55:01.295Z"
         },
         {
-          "name": "New_2",
-          "x": 97.1648972077446,
-          "y": 21.761804848100503,
-          "width": 23.407655634931622,
-          "height": 49.49743847803251,
-          "id": 23,
+          "name": "M",
+          "x": 1205.2452031403973,
+          "y": 611.8348387102504,
+          "width": 450.6198988638953,
+          "height": 996.9193652947819,
+          "id": 31,
           "location_id": 11,
-          "createdAt": "2025-05-22T16:01:02.063Z",
-          "updatedAt": "2025-05-22T16:01:02.063Z"
+          "createdAt": "2025-05-22T19:55:01.295Z",
+          "updatedAt": "2025-05-22T19:55:01.295Z"
+        },
+        {
+          "name": "R",
+          "x": 1662.0379773311954,
+          "y": 611.8348387102504,
+          "width": 450.6198988638953,
+          "height": 996.9193652947819,
+          "id": 32,
+          "location_id": 11,
+          "createdAt": "2025-05-22T19:55:01.295Z",
+          "updatedAt": "2025-05-22T19:55:01.295Z"
         }
       ]
     }
   ],
   "location_regions": [
     {
-      "name": "New",
-      "x": 60.22469065886814,
-      "y": 49.80222566077901,
-      "width": 97.28806873268454,
-      "height": 86.80338964620482,
-      "id": 22,
+      "name": "L",
+      "x": 763.8846172668561,
+      "y": 611.8348387102504,
+      "width": 441.36058587354125,
+      "height": 996.9193652947819,
+      "id": 30,
       "location_id": 11,
-      "createdAt": "2025-05-22T16:01:02.063Z",
-      "updatedAt": "2025-05-22T16:01:02.063Z"
+      "createdAt": "2025-05-22T19:55:01.295Z",
+      "updatedAt": "2025-05-22T19:55:01.295Z"
     },
     {
-      "name": "New_2",
-      "x": 97.1648972077446,
-      "y": 21.761804848100503,
-      "width": 23.407655634931622,
-      "height": 49.49743847803251,
-      "id": 23,
+      "name": "M",
+      "x": 1205.2452031403973,
+      "y": 611.8348387102504,
+      "width": 450.6198988638953,
+      "height": 996.9193652947819,
+      "id": 31,
       "location_id": 11,
-      "createdAt": "2025-05-22T16:01:02.063Z",
-      "updatedAt": "2025-05-22T16:01:02.063Z"
+      "createdAt": "2025-05-22T19:55:01.295Z",
+      "updatedAt": "2025-05-22T19:55:01.295Z"
+    },
+    {
+      "name": "R",
+      "x": 1662.0379773311954,
+      "y": 611.8348387102504,
+      "width": 450.6198988638953,
+      "height": 996.9193652947819,
+      "id": 32,
+      "location_id": 11,
+      "createdAt": "2025-05-22T19:55:01.295Z",
+      "updatedAt": "2025-05-22T19:55:01.295Z"
     }
   ],
   "items": [
     {
-      "name": "screw",
-      "description": null,
-      "quantity": 1,
-      "imagePath": "inventory/screw_6f64b28d-7cfe-40a5-a99c-2b8c3e355f93.jpeg",
+      "name": "test",
+      "description": "tes",
+      "quantity": 0,
+      "imageFilename": "screw_f59b7fb0-c5c3-4b49-be5a-04b03a772fad.jpeg",
       "location_id": 11,
       "region_id": 23,
-      "id": 7,
-      "createdAt": "2025-05-22T15:40:06.829Z",
-      "updatedAt": "2025-05-22T16:10:35.947Z",
+      "id": 9,
+      "createdAt": "2025-05-22T19:49:12.775Z",
+      "updatedAt": "2025-05-22T19:49:48.143Z",
       "tags": [
-        "screw"
+        "test",
+        "tes"
       ]
     }
   ],
   "nextLocationId": 12,
-  "nextRegionId": 24,
-  "nextItemId": 8
+  "nextRegionId": 33,
+  "nextItemId": 10
 }

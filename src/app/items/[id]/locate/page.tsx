@@ -124,7 +124,7 @@ export default function LocateItemPage() {
         <div className="mt-6">
           <Link href="/inventory">
             <Button variant="outline">
-              <ArrowLeft className="mr-2 h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" />
               {t('common.backToInventory')}
             </Button>
           </Link>
@@ -140,7 +140,7 @@ export default function LocateItemPage() {
         <div className="mt-6">
           <Link href="/inventory">
             <Button variant="outline">
-              <ArrowLeft className="mr-2 h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" />
               {t('common.backToInventory')}
             </Button>
           </Link>
@@ -154,7 +154,7 @@ export default function LocateItemPage() {
       <div className="flex justify-between items-center">
         <Link href="/inventory">
           <Button variant="outline" size="icon" aria-label={t('common.back')}>
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
         <h1 className="text-4xl font-bold tracking-tight text-center flex-grow">
@@ -211,7 +211,7 @@ export default function LocateItemPage() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>{t('items.consumeConfirmTitle')}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      {t('items.consumeConfirmDescription', { name: item.name, quantity: item.quantity -1 })}
+                      {t('items.consumeConfirmDescription', { name: item.name, quantity: item.quantity -1 } as any)}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -238,7 +238,7 @@ export default function LocateItemPage() {
                 <h3 className="text-xl font-semibold text-center">{location.name}</h3>
                 {location.imagePath ? (
                   <LocationViewer 
-                    imageSrc={location.imagePath ? `locations/${location.imagePath}` : null}
+                    imageSrc={location.imagePath}
                     regions={regions}
                     highlightedRegionId={item.regionId}
                     className="w-full h-auto max-h-[60vh] aspect-[4/3] rounded-md border bg-muted/20"

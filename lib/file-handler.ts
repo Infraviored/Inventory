@@ -39,7 +39,7 @@ function generateUniqueFilename(originalFilename: string): string {
  * Saves an uploaded file to the server under a specific category.
  * @param file The File object to save.
  * @param category The category (subdirectory) to save the file in (e.g., 'locations', 'inventory').
- * @returns The category-relative path to the saved file (e.g., locations/filename.ext).
+ * @returns The filename of the saved file.
  * @throws Will throw an error if saving fails.
  */
 export async function saveUpload(file: File, category: string): Promise<string> {
@@ -61,8 +61,8 @@ export async function saveUpload(file: File, category: string): Promise<string> 
     try {
         await fs.writeFile(filePath, new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.length));
         console.log(`[FileHandler] File saved successfully to: ${filePath}`);
-        // Return the path relative to the category, e.g., "locations/image.jpg"
-        return `${category}/${filename}`;
+        // Return just the filename, the category is known by context where it's saved/retrieved
+        return filename;
     } catch (error)      {
         console.error('[FileHandler] Error saving file:', error);
         throw new Error(`Failed to save file: ${(error as Error).message}`);

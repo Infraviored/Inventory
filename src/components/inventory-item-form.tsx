@@ -21,7 +21,7 @@ interface InventoryItemFormProps {
     quantity: number;
     locationId?: number;
     regionId?: number;
-    imagePath?: string | null;
+    imageFilename?: string | null;
   };
   error?: string | null;
   setError?: (error: string | null) => void;
@@ -220,7 +220,11 @@ export default function InventoryItemForm({ onSubmit, initialData, error, setErr
         <Label className="block text-sm font-medium mb-1">
           {t('common.fields.image')} ({t('common.optional')})
         </Label>
-        <ImageInput onImageChange={(file) => setImage(file)} showUploadSuccessMessage={false} initialImageUrl={initialData?.imagePath} />
+        <ImageInput 
+          onImageChange={(file) => setImage(file)} 
+          showUploadSuccessMessage={false} 
+          initialImageUrl={initialData?.imageFilename ? `inventory/${initialData.imageFilename}` : null}
+        />
       </div>
       
       {/* === Location Selection Section (Conditional) === */}

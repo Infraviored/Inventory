@@ -32,7 +32,7 @@ function formatApiResponseItem(item: Item, allLocations?: Location[]): any {
         quantity: item.quantity,
         locationId: item.location_id,
         regionId: item.region_id,
-        imagePath: item.imagePath, // JSON DB stores the direct path or name
+        imageFilename: item.imageFilename,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
         tags: item.tags || [],
@@ -112,19 +112,17 @@ export async function POST(request: NextRequest) {
         }
         // Validate region exists and belongs to location (if provided)
         if (regionId !== null) {
-            const regionCheck = locationCheck.regions?.find(r => r.id === regionId);
+            const regionCheck = (locationCheck as any).regions?.find((r: any) => r.id === regionId);
             if (!regionCheck) {
                  return NextResponse.json({ error: `Region with ID ${regionId} not found or does not belong to location ${locationId}` }, { status: 404 });
             }
         }
 
-        let imagePathToStore: string | null = null;
+        let storedFilename: string | null = null;
         if (imageFile && imageFile.size > 0) {
-            // imagePathToStore = imageFile.name; // Old simplified: store name
-            // console.log(`[JSON_DB_API] Storing item image name: ${imagePathToStore}`); // Old log
             try {
-                imagePathToStore = await saveUpload(imageFile, 'inventory'); // Use saveUpload with category
-                console.log(`[JSON_DB_API] Item image saved, path to store: ${imagePathToStore}`);
+                storedFilename = await saveUpload(imageFile, 'inventory');
+                console.log(`[JSON_DB_API] Item image saved, filename to store: ${storedFilename}`);
             } catch (uploadError: any) {
                 console.error("[JSON_DB_API] Error saving item image:", uploadError);
                 // Decide if this is a fatal error for item creation
@@ -169,7 +167,7 @@ export async function POST(request: NextRequest) {
             quantity: quantity,
             location_id: locationId,
             region_id: regionId,
-            imagePath: imagePathToStore,
+            imageFilename: storedFilename,
             tags: tagsToStore
         };
 
