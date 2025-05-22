@@ -17,7 +17,9 @@ interface RouteContext {
   };
 }
 
-export async function GET(request: NextRequest, { params }: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext) {
+  // Explicitly access params from the context object, which might satisfy Next.js
+  const params = context.params;
   const { category, filename } = params;
 
   // --- Security Validations ---

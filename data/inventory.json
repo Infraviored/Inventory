@@ -7,7 +7,7 @@
       "imagePath": "locations/Blank_38ba2196-3a9d-4e3d-badd-ccb46084bc30.jpg",
       "locationType": "",
       "createdAt": "2025-05-22T15:38:53.612Z",
-      "updatedAt": "2025-05-22T15:39:36.692Z",
+      "updatedAt": "2025-05-22T16:01:02.063Z",
       "id": 11,
       "regions": [
         {
@@ -16,10 +16,10 @@
           "y": 49.80222566077901,
           "width": 97.28806873268454,
           "height": 86.80338964620482,
-          "id": 20,
+          "id": 22,
           "location_id": 11,
-          "createdAt": "2025-05-22T15:39:36.692Z",
-          "updatedAt": "2025-05-22T15:39:36.692Z"
+          "createdAt": "2025-05-22T16:01:02.063Z",
+          "updatedAt": "2025-05-22T16:01:02.063Z"
         },
         {
           "name": "New_2",
@@ -27,10 +27,10 @@
           "y": 21.761804848100503,
           "width": 23.407655634931622,
           "height": 49.49743847803251,
-          "id": 21,
+          "id": 23,
           "location_id": 11,
-          "createdAt": "2025-05-22T15:39:36.692Z",
-          "updatedAt": "2025-05-22T15:39:36.692Z"
+          "createdAt": "2025-05-22T16:01:02.063Z",
+          "updatedAt": "2025-05-22T16:01:02.063Z"
         }
       ]
     }
@@ -42,10 +42,10 @@
       "y": 49.80222566077901,
       "width": 97.28806873268454,
       "height": 86.80338964620482,
-      "id": 20,
+      "id": 22,
       "location_id": 11,
-      "createdAt": "2025-05-22T15:39:36.692Z",
-      "updatedAt": "2025-05-22T15:39:36.692Z"
+      "createdAt": "2025-05-22T16:01:02.063Z",
+      "updatedAt": "2025-05-22T16:01:02.063Z"
     },
     {
       "name": "New_2",
@@ -53,10 +53,10 @@
       "y": 21.761804848100503,
       "width": 23.407655634931622,
       "height": 49.49743847803251,
-      "id": 21,
+      "id": 23,
       "location_id": 11,
-      "createdAt": "2025-05-22T15:39:36.692Z",
-      "updatedAt": "2025-05-22T15:39:36.692Z"
+      "createdAt": "2025-05-22T16:01:02.063Z",
+      "updatedAt": "2025-05-22T16:01:02.063Z"
     }
   ],
   "items": [
@@ -66,16 +66,16 @@
       "quantity": 1,
       "imagePath": "inventory/screw_6f64b28d-7cfe-40a5-a99c-2b8c3e355f93.jpeg",
       "location_id": 11,
-      "region_id": 21,
+      "region_id": 23,
       "id": 7,
       "createdAt": "2025-05-22T15:40:06.829Z",
-      "updatedAt": "2025-05-22T15:40:06.829Z",
+      "updatedAt": "2025-05-22T16:10:35.947Z",
       "tags": [
         "screw"
       ]
     }
   ],
   "nextLocationId": 12,
-  "nextRegionId": 22,
+  "nextRegionId": 24,
   "nextItemId": 8
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -55,16 +55,11 @@ import Link from 'next/link';
 import InventoryItemForm from '@/components/inventory-item-form';
 import { LocationViewer } from '@/components/location-viewer';
 
-interface ItemParams {
-  params: {
-    id: string;
-  };
-}
-
-export default function ItemPage({ params }: ItemParams) {
+export default function ItemPage() {
   const { t } = useLanguage();
   const router = useRouter();
-  const { id } = params;
+  const params = useParams();
+  const id = params.id as string;
   
   const [item, setItem] = useState<any>(null);
   const [loading, setLoading] = useState(true);
